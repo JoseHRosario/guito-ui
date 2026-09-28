@@ -1,5 +1,11 @@
 // Pulls design tokens from Figma Variables (REST API) and writes design/tokens.json.
 //
+// DEAD ON THIS PLAN (2026-09-28): the REST Variables API requires the
+// `file_variables:read` scope, which is ENTERPRISE-ONLY. On José's Professional
+// plan the PAT gets a 403 naming that scope; no scope selection fixes it.
+// Token sync now goes through the Figma remote MCP (see guito-api ADR-0010);
+// this script is kept only as documentation of the intended shape.
+//
 // Requires: FIGMA_TOKEN (personal access token with the file_variables:read scope)
 // in the environment or in a gitignored .env at the repo root.
 // Config: tools/tokens/figma.json (file key, collection, mode, name mapping).
