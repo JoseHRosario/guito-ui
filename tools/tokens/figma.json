@@ -1,0 +1,29 @@
+{
+  "fileKey": "1Rdnge5x2ixnJZLEidZnNe",
+  "collection": "Design Tokens",
+  "mode": "Mode 1",
+  "mapping": {
+    "primary": "color/primary",
+    "on-primary": "color/primary-content",
+    "secondary": "color/secondary",
+    "on-secondary": "color/secondary-content",
+    "tertiary": "color/accent",
+    "on-tertiary": "color/accent-content",
+    "surface": "color/base-100",
+    "surface-dim": "color/base-200",
+    "surface-bright": "color/base-300",
+    "on-surface": "color/base-content",
+    "outline": "color/neutral",
+    "success": "color/success",
+    "on-success": "color/success-content",
+    "warning": "color/warning",
+    "on-warning": "color/warning-content",
+    "error": "color/error",
+    "on-error": "color/error-content",
+    "info": "color/info",
+    "on-info": "color/info-content",
+    "radius-sm": "radius/field",
+    "radius-md": "radius/selector",
+    "radius-lg": "radius/box"
+  }
+}

@@ -1,0 +1,7 @@
+/* Global styles: Tailwind + daisyUI, themed entirely by design tokens.
+   tokens.css is generated (npm run tokens) from design/tokens.json — never edit by hand. */
+@import 'tailwindcss';
+@plugin 'daisyui' {
+  themes: light --default;
+}
+@import './theme/tokens.css';

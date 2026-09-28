@@ -1,0 +1,66 @@
+/**
+ * Do not edit directly, this file was auto-generated.
+ */
+
+:root {
+  --guito-color-primary: #570df8;
+  --guito-color-primary-content: #ffffff;
+  --guito-color-secondary: #bb6bf9;
+  --guito-color-secondary-content: #ffffff;
+  --guito-color-accent: #1dc8cc;
+  --guito-color-accent-content: #ffffff;
+  --guito-color-neutral: #2a323c;
+  --guito-color-neutral-content: #ffffff;
+  --guito-color-base-100: #ffffff;
+  --guito-color-base-200: #f2f2f2;
+  --guito-color-base-300: #e5e6e6;
+  --guito-color-base-content: #1f2933;
+  --guito-color-info: #0ca5e9;
+  --guito-color-info-content: #ffffff;
+  --guito-color-success: #00a96e;
+  --guito-color-success-content: #ffffff;
+  --guito-color-warning: #ffbe00;
+  --guito-color-warning-content: #ffffff;
+  --guito-color-error: #ff5861;
+  --guito-color-error-content: #ffffff;
+  --guito-radius-field: 0.25rem;
+  --guito-radius-selector: 0.5rem;
+  --guito-radius-box: 1rem;
+  --guito-size-field: 0.25rem;
+  --guito-size-selector: 0.25rem;
+  --guito-border: 1px;
+  --guito-font-sans: ui-sans-serif, system-ui, sans-serif;
+  --guito-font-mono: ui-monospace, monospace;
+}
+
+/* daisyUI theme aliases — daisyUI components consume these; keep in sync with design/tokens.json */
+:root {
+  --color-primary: var(--guito-color-primary);
+  --color-primary-content: var(--guito-color-primary-content);
+  --color-secondary: var(--guito-color-secondary);
+  --color-secondary-content: var(--guito-color-secondary-content);
+  --color-accent: var(--guito-color-accent);
+  --color-accent-content: var(--guito-color-accent-content);
+  --color-neutral: var(--guito-color-neutral);
+  --color-neutral-content: var(--guito-color-neutral-content);
+  --color-base-100: var(--guito-color-base-100);
+  --color-base-200: var(--guito-color-base-200);
+  --color-base-300: var(--guito-color-base-300);
+  --color-base-content: var(--guito-color-base-content);
+  --color-info: var(--guito-color-info);
+  --color-info-content: var(--guito-color-info-content);
+  --color-success: var(--guito-color-success);
+  --color-success-content: var(--guito-color-success-content);
+  --color-warning: var(--guito-color-warning);
+  --color-warning-content: var(--guito-color-warning-content);
+  --color-error: var(--guito-color-error);
+  --color-error-content: var(--guito-color-error-content);
+  --radius-field: var(--guito-radius-field);
+  --radius-selector: var(--guito-radius-selector);
+  --radius-box: var(--guito-radius-box);
+  --size-field: var(--guito-size-field);
+  --size-selector: var(--guito-size-selector);
+  --border: var(--guito-border);
+  --font-sans: var(--guito-font-sans);
+  --font-mono: var(--guito-font-mono);
+}

@@ -1,0 +1,45 @@
+name: ci
+
+# Required PR check gating deploy: builds, unit tests, and the Playwright
+# smoke e2e must all pass before a PR can merge into master.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Compile design tokens
+        run: npm run tokens
+
+      - name: Build
+        run: npx ng build
+
+      - name: Unit tests (Vitest)
+        run: npm test
+
+      - name: E2E smoke
+        run: npx playwright test

@@ -1,0 +1,15 @@
+<main class="min-h-dvh bg-base-200 flex items-center justify-center p-6">
+  <div class="card bg-base-100 shadow-xl w-full max-w-md">
+    <div class="card-body items-center text-center gap-4">
+      <h1 class="card-title text-3xl font-bold text-base-content">Guito</h1>
+      <p class="text-base-content/70">Expense tracking, revived.</p>
+      @if (!started()) {
+        <button class="btn btn-primary" (click)="start()">Get started</button>
+      } @else {
+        <div class="alert alert-success">
+          <span>Signals and tokens are working.</span>
+        </div>
+      }
+    </div>
+  </div>
+</main>
