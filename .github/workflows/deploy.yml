@@ -24,27 +24,6 @@ env:
   CF_DISTRIBUTION_ID: E1165HQRHT670N
 
 jobs:
-  oidc-debug:
-    name: oidc-debug (temporary)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Dump OIDC claims
-        run: |
-          TOKEN=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')
-          python3 - "$TOKEN" <<'PY'
-          import base64, json, sys
-          payload = sys.argv[1].split(".")[1]
-          payload += "=" * (-len(payload) % 4)
-          claims = json.loads(base64.urlsafe_b64decode(payload))
-          keep = {k: claims[k] for k in ("iss", "sub", "aud", "ref", "sha", "repository", "repository_owner", "workflow", "event_name", "actor", "job_workflow_ref") if k in claims}
-          print(json.dumps(keep, indent=2))
-          PY
-
   e2e:
     name: e2e (deploy gate)
     runs-on: ubuntu-latest
@@ -90,19 +69,6 @@ jobs:
 
       - name: Build (tokens + Angular production build)
         run: npm run build
-
-      - name: RAW STS cross-test (temporary)
-        run: |
-          TOKEN=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c 'import json,sys;print(json.load(sys.stdin)["value"])')
-          for ROLE in guito-api-deploy guito-ui-deploy; do
-            echo "== assuming $ROLE =="
-            aws sts assume-role-with-web-identity \
-              --role-arn "arn:aws:iam::497087877832:role/$ROLE" \
-              --role-session-name GitHubActions \
-              --web-identity-token "$TOKEN" \
-              --query 'Credentials.AccessKeyId' --output text 2>&1 | sed -E 's/(ASIA)[A-Z0-9]+/\1<redacted>/'
-          done
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
