@@ -1,0 +1,86 @@
+<div class="relative flex w-full flex-col lg:flex-row lg:items-start lg:gap-8 lg:px-12 lg:pt-10 lg:pb-16">
+  <!-- Mobile body -->
+  <div class="flex flex-1 flex-col items-start gap-4 p-4 lg:hidden">
+    <g-month-nav [month]="month()" />
+    <g-summary-bar class="w-full" [summary]="summary()" />
+    <ng-container *ngTemplateOutlet="expenseList" />
+  </div>
+
+  <!-- Desktop: sidebar -->
+  <aside class="hidden w-80 shrink-0 flex-col gap-6 lg:flex">
+    <div class="flex w-full flex-col items-start gap-4 rounded-2xl border border-base-content/10 bg-base-100 p-6">
+      <div class="flex items-center gap-3">
+        <span class="flex size-12 items-center justify-center rounded-full bg-neutral text-neutral-content">
+          <span class="text-lg leading-none">JD</span>
+        </span>
+        <div class="flex flex-col items-start gap-1">
+          <p class="text-base font-semibold leading-snug text-base-content">John Doe</p>
+          <p class="text-xs leading-normal text-base-content/50">Premium Tier Member</p>
+        </div>
+      </div>
+      <hr class="w-full border-base-content/10" />
+      <div class="flex w-full items-start justify-between text-sm">
+        <p class="text-base-content/50">Main Wallet</p>
+        <p class="font-bold text-success" data-testid="sidebar-wallet">{{ sidebarWallet() }}</p>
+      </div>
+    </div>
+
+    <div class="flex w-full flex-col items-start gap-4 rounded-2xl bg-primary p-6">
+      <p class="min-w-full max-w-fit text-2xl leading-tight font-semibold tracking-tight text-primary-content">
+        Get complete clarity on your spendings
+      </p>
+      <p class="min-w-full max-w-fit text-[13px] leading-normal text-primary-content/80">
+        Create smart budget targets to save up to 25% more every month.
+      </p>
+      <button type="button" class="btn btn-neutral btn-sm">Setup Budget</button>
+    </div>
+  </aside>
+
+  <!-- Desktop: main panel -->
+  <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
+    <div class="flex w-full items-center justify-between">
+      <div class="w-[370px]"><g-month-nav [month]="month()" /></div>
+      <button type="button" class="btn btn-primary" aria-label="Add expense">
+        <g-icon name="plus" class="size-5" />
+        Add Expense
+      </button>
+    </div>
+    <g-summary-bar class="w-full" [summary]="summary()" />
+    <ng-container *ngTemplateOutlet="expenseList" />
+  </div>
+
+  <!-- Mobile floating action button -->
+  <button
+    type="button"
+    class="fixed right-3 bottom-24 z-10 flex size-14 items-center justify-center rounded-full bg-primary text-primary-content shadow-lg lg:hidden"
+    aria-label="Add expense"
+  >
+    <g-icon name="plus" class="size-7" />
+  </button>
+
+  <!-- Shared expense list card -->
+  <ng-template #expenseList>
+    <div class="flex w-full flex-col items-start rounded-2xl border border-base-content/10 bg-base-100 pb-4 lg:pb-6">
+      @for (group of groups(); track group.key) {
+        <div class="flex w-full flex-col items-start gap-1 px-4 pt-4 pb-2">
+          <p class="w-full text-base font-semibold leading-snug text-base-content" data-testid="group-header">{{ group.label }}</p>
+          <hr class="w-full border-base-content/10" />
+        </div>
+        @for (expense of group.expenses; track expense.id) {
+          <div class="flex w-full items-center gap-3 border-b border-base-content/10 px-4 py-3" data-testid="expense-row">
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-success-content text-success">
+              <g-icon [name]="expense.icon" class="size-5" />
+            </span>
+            <div class="flex min-w-0 flex-1 flex-col items-start gap-1">
+              <p class="max-w-full truncate text-base font-semibold leading-snug text-base-content">{{ expense.description }}</p>
+              <p class="text-xs font-semibold leading-normal text-base-content/50">{{ expense.category }}</p>
+            </div>
+            <div class="flex flex-col items-end">
+              <p class="text-base font-semibold leading-tight tracking-tight text-error text-right">{{ amount(expense.amount) }}</p>
+            </div>
+          </div>
+        }
+      }
+    </div>
+  </ng-template>
+</div>

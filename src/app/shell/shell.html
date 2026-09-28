@@ -1,0 +1,58 @@
+<div class="flex min-h-dvh flex-col bg-base-200">
+  <!-- Header -->
+  <header class="flex shrink-0 items-center justify-between border-b border-base-content/10 bg-base-100 px-4 py-4 lg:px-12 lg:py-4">
+    <div class="flex items-center gap-3">
+      <!-- Mobile: hamburger + wordmark -->
+      <button type="button" class="flex items-center gap-3 lg:hidden" aria-label="Open menu">
+        <g-icon name="menu" class="size-6" />
+        <span class="text-2xl font-semibold tracking-tight text-base-content">Guito</span>
+      </button>
+      <!-- Desktop: logo tile + wordmark -->
+      <a routerLink="/" class="hidden items-center gap-3 lg:flex" aria-label="Guito home">
+        <span class="flex size-8 items-center justify-center rounded-lg bg-primary text-base-100">
+          <span class="text-base font-normal leading-none">G</span>
+        </span>
+        <span class="text-4xl font-bold tracking-tight text-base-content">Guito</span>
+      </a>
+    </div>
+
+    <!-- Desktop pill nav -->
+    <nav class="hidden items-center gap-6 lg:flex" aria-label="Main navigation">
+      @for (item of nav; track item.label) {
+        @if (item.enabled) {
+          <a
+            routerLink="/"
+            routerLinkActive="bg-base-200 text-base-content font-semibold"
+            class="rounded-full px-4 py-2 font-normal text-base-content/50 hover:text-base-content"
+            [attr.aria-current]="item.label === 'Dashboard' ? 'page' : null"
+            >{{ item.label }}</a
+          >
+        } @else {
+          <a href="#" aria-disabled="true" class="rounded-full px-4 py-2 font-normal text-base-content/50" (click)="$event.preventDefault()">{{ item.label }}</a>
+        }
+      }
+    </nav>
+
+    <div class="flex items-center">
+      <button type="button" class="btn btn-primary" aria-label="Sign in">Sign In</button>
+    </div>
+  </header>
+
+  <main class="flex-1"><router-outlet /></main>
+
+  <!-- Mobile bottom navigation -->
+  <nav class="flex shrink-0 items-center justify-between border-t border-base-content/10 bg-base-100 pt-3 pb-6 lg:hidden" aria-label="Bottom navigation">
+    @for (item of nav; track item.label; let i = $index) {
+      <div class="flex min-w-0 flex-1 flex-col items-center gap-1 p-1">
+        <g-icon [name]="tabIcons[i]" class="size-6" [class]="tabClass(item.label)" />
+        <p class="text-sm leading-none font-semibold" [class]="tabClass(item.label)">{{ item.label }}</p>
+      </div>
+    }
+  </nav>
+
+  <!-- Desktop footer -->
+  <footer class="hidden shrink-0 items-center justify-between border-t border-base-content/10 bg-base-100 px-12 py-6 text-sm lg:flex">
+    <p class="text-base-content/50">Guito · Personal Expense Tracker</p>
+    <p class="text-base-content/50">Stubbed data · No Live API Connection</p>
+  </footer>
+</div>
