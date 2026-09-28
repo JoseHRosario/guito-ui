@@ -28,6 +28,4 @@ export function groupExpensesByDay(expenses: readonly Expense[]): ExpenseDayGrou
 }
 
 /** Formats an expense amount for a list row. */
-export function expenseAmount(value: number): string {
-  return formatEur(value);
-}
+export const expenseAmount = formatEur;

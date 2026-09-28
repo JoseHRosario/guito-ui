@@ -1,20 +1,21 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-import { GIcon } from '../shared/gicon';
+import { GIcon, type IconName } from '../shared/gicon';
 
 export interface NavItem {
   label: string;
   path: string;
+  icon: IconName;
   /** Placeholder sections render inert (no route yet in this stub). */
   enabled: boolean;
 }
 
 /** Unified nav labels (José's settled design): Dashboard/Expenses/Budgets/Settings. */
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', path: '/', enabled: true },
-  { label: 'Expenses', path: '/', enabled: false },
-  { label: 'Budgets', path: '/', enabled: false },
-  { label: 'Settings', path: '/', enabled: false },
+  { label: 'Dashboard', path: '/', icon: 'credit-card', enabled: true },
+  { label: 'Expenses', path: '/', icon: 'dollar-sign', enabled: false },
+  { label: 'Budgets', path: '/', icon: 'shopping-bag', enabled: false },
+  { label: 'Settings', path: '/', icon: 'menu', enabled: false },
 ];
 
 @Component({
@@ -26,12 +27,9 @@ export const NAV_ITEMS: NavItem[] = [
 })
 export class Shell {
   protected readonly nav = NAV_ITEMS;
-  /** lucide glyph per bottom-nav tab, index-aligned with NAV_ITEMS. */
-  protected readonly tabIcons = ['credit-card', 'dollar-sign', 'shopping-bag', 'menu'] as const;
 
   /** Active tab paints with the primary token; the rest stay muted. */
   protected tabClass(label: string): string {
-    const active = label === 'Dashboard';
-    return (active ? 'text-primary' : 'text-base-content/60') + (active ? ' text-primary' : '');
+    return label === 'Dashboard' ? 'text-primary' : 'text-base-content/60';
   }
 }
