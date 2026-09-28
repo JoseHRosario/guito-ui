@@ -70,3 +70,14 @@ You are an expert AI developer specialized in TypeScript, modern Angular, and sc
 *   **Security:** Avoid raw DOM manipulation via `ElementRef.nativeElement`. Never bypass built-in sanitization unless absolutely required via `DomSanitizer`.
 *   **Semantic HTML:** Use native semantic HTML elements (`<button>`, `<main>`, `<nav>`) to ensure accessibility.
 *   **ARIA Attributes:** Ensure appropriate `aria-*` tags and keyboard navigation patterns are supported in custom interactive components.
+
+---
+
+## 6. Figma Design Loop
+
+The UI is defined in Figma and implemented through the design loop. File: **Guito design file**, key `UoIK5MnIqDrgfHqMmBZoYk` (José's duplicate of "Simple Design System (Community)"; the Community original is read-only and never edited). All app designs live on the dedicated **Guito App** page.
+
+*   **Design loop:** Hermes drafts the screen on the Guito App page via the Figma MCP → José validates/edits in Figma → approval = the implement source. Design changes happen in Figma, never as code-side drift.
+*   **Token sync:** at implement time the agent reads the file's 'Design Tokens' variables via the Figma MCP and regenerates `design/tokens.json` (style-dictionary shape; mapping in `tools/tokens/figma.json`, fileKey = the duplicate). The REST pull (`tools/tokens/pull-figma.mjs`) is dead on this plan — `file_variables:read` is Enterprise-only. Token-source decision: guito-api ADR-0010.
+*   **Styling convention:** all styling derives from the token-generated theme (`npm run tokens` → `src/theme/tokens.css`); no ad-hoc hex/px values. Light mode only.
+*   **Git workflow:** always pull from master, then create a feature branch per issue. Never push to master — PRs only (CI gates: tokens + build + Vitest + Playwright).
