@@ -3,26 +3,26 @@
  */
 
 :root {
-  --guito-color-primary: #570df8;
-  --guito-color-primary-content: #ffffff;
-  --guito-color-secondary: #bb6bf9;
-  --guito-color-secondary-content: #ffffff;
-  --guito-color-accent: #1dc8cc;
-  --guito-color-accent-content: #ffffff;
-  --guito-color-neutral: #2a323c;
-  --guito-color-neutral-content: #ffffff;
+  --guito-color-primary: #2c2c2c;
+  --guito-color-primary-content: #f5f5f5;
+  --guito-color-secondary: #e6e6e6;
+  --guito-color-secondary-content: #1e1e1e;
+  --guito-color-accent: #f5f5f5;
+  --guito-color-accent-content: #2c2c2c;
+  --guito-color-neutral: #303030;
+  --guito-color-neutral-content: #f3f3f3;
   --guito-color-base-100: #ffffff;
-  --guito-color-base-200: #f2f2f2;
-  --guito-color-base-300: #e5e6e6;
-  --guito-color-base-content: #1f2933;
+  --guito-color-base-200: #f5f5f5;
+  --guito-color-base-300: #d9d9d9;
+  --guito-color-base-content: #1e1e1e;
   --guito-color-info: #0ca5e9;
   --guito-color-info-content: #ffffff;
-  --guito-color-success: #00a96e;
-  --guito-color-success-content: #ffffff;
-  --guito-color-warning: #ffbe00;
-  --guito-color-warning-content: #ffffff;
-  --guito-color-error: #ff5861;
-  --guito-color-error-content: #ffffff;
+  --guito-color-success: #14ae5c;
+  --guito-color-success-content: #ebffee;
+  --guito-color-warning: #e8b931;
+  --guito-color-warning-content: #401b01;
+  --guito-color-error: #ec221f;
+  --guito-color-error-content: #fee9e7;
   --guito-radius-field: 0.25rem;
   --guito-radius-selector: 0.5rem;
   --guito-radius-box: 1rem;
