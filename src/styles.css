@@ -5,3 +5,7 @@
   themes: light --default;
 }
 @import './theme/tokens.css';
+
+/* The e2e specs quote selectors like [data-testid="x"]:visible; Tailwind's source
+   scanner would mistake them for variants and emit invalid CSS (build warnings). */
+@source not '../e2e';
