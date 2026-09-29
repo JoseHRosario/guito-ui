@@ -4,21 +4,32 @@ import { provideRouter, Router } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 import { routes } from './app.routes';
+import { serializeSession, SESSION_STORAGE_KEY } from './core/auth/auth-session';
 
-describe('App shell + expenses list (stubbed)', () => {
+function seedSession(): void {
+  localStorage.setItem(
+    SESSION_STORAGE_KEY,
+    serializeSession({ idToken: 'id', accessToken: 'access', expiresAt: Date.now() + 3_600_000 }),
+  );
+}
+
+describe('App shell + expenses list (stubbed, authed session)', () => {
   beforeEach(async () => {
+    localStorage.clear();
+    seedSession();
     await TestBed.configureTestingModule({ imports: [App], providers: [provideRouter(routes)] }).compileComponents();
     const router = TestBed.inject(Router);
     await TestBed.inject(NgZone).run(() => router.navigateByUrl('/'));
   });
 
-  it('renders the shell header with the Guito wordmark', async () => {
+  it('renders the shell header with the Guito wordmark and the signed-in avatar', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Guito');
     expect(el.querySelector('nav[aria-label="Bottom navigation"]')).not.toBeNull();
     expect(el.querySelector('footer')).not.toBeNull();
+    expect(el.querySelector('[data-testid="header-avatar"]')).not.toBeNull();
   });
 
   it('renders the stubbed expense list grouped by day with formatted amounts', async () => {
@@ -34,5 +45,26 @@ describe('App shell + expenses list (stubbed)', () => {
     expect(el.textContent).toContain('65,55');
     // pt-PT has minimumGroupingDigits=2, so Intl does not group 4853.72 (frame shows hand-typed "4.853,72").
     expect(el.textContent).toContain('4853,72');
+  });
+});
+
+describe('App behind the auth gate (ADR-0011, unauthenticated)', () => {
+  beforeEach(async () => {
+    localStorage.clear();
+    await TestBed.configureTestingModule({ imports: [App], providers: [provideRouter(routes)] }).compileComponents();
+    const router = TestBed.inject(Router);
+    await TestBed.inject(NgZone).run(() => router.navigateByUrl('/'));
+  });
+
+  it('redirects / to /signin: bare sign-in screen, no shell chrome, no list', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(TestBed.inject(Router).url).toContain('/signin');
+    expect(el.querySelector('[data-testid="signin-button"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="expense-row"]')).toBeNull();
+    // Auth screens render outside the shell chrome (header/nav/footer), per the Figma frames.
+    expect(el.querySelector('footer')).toBeNull();
+    expect(el.querySelector('nav[aria-label="Bottom navigation"]')).toBeNull();
   });
 });
