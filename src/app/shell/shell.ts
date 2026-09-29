@@ -1,5 +1,5 @@
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-import { computed, ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { computed, ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { AuthService } from '../core/auth/auth-service';
 import { GIcon, type IconName } from '../shared/gicon';
 
@@ -36,8 +36,44 @@ export class Shell {
   /** Header Sign-In link preserves the current URL through the sign-in flow. */
   protected readonly signInQuery = computed(() => ({ returnUrl: this.router.url }));
 
+  /** Avatar dropdown (placeholder menu design — sign-out is the only item). */
+  protected readonly menuOpen = signal(false);
+
+  /** Initials from the ID token's name/email claims (JWT payload is plain base64url). */
+  protected readonly avatarInitials = computed(() => {
+    const s = this.auth.session();
+    return s === null ? 'G' : initialsFromIdToken(s.idToken);
+  });
+
   /** Active tab paints with the primary token; the rest stay muted. */
   protected tabClass(label: string): string {
     return label === 'Dashboard' ? 'text-primary' : 'text-base-content/60';
+  }
+
+  protected toggleMenu(): void {
+    this.menuOpen.update((open) => !open);
+  }
+
+  protected signOut(): void {
+    this.menuOpen.set(false);
+    this.router.navigateByUrl(this.auth.signOut());
+  }
+}
+
+/** First letters of the ID-token name (fallback: email, then 'G'). */
+function initialsFromIdToken(idToken: string): string {
+  const payload = idToken.split('.')[1];
+  if (!payload) return 'G';
+  try {
+    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as {
+      name?: string;
+      email?: string;
+    };
+    const source = claims.name ?? claims.email;
+    if (!source) return 'G';
+    const words = source.split(/[\s.]+/).filter(Boolean);
+    return words.slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
+  } catch {
+    return 'G';
   }
 }

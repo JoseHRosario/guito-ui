@@ -16,7 +16,7 @@ const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const PKCE_STORAGE_KEY = 'guito.auth.pkce';
 const AUTH_CALLBACK_PATH = '/auth/callback';
-const SIGN_OUT_REDIRECT = '/auth/signed-out';
+const SIGN_OUT_REDIRECT = '/signin';
 
 interface PendingSignIn {
   verifier: string;

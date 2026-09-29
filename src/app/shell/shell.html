@@ -35,13 +35,28 @@
 
     <div class="flex items-center">
       @if (isAuthenticated()) {
-        <!-- Avatar placeholder — sign-out menu TBD (future header iteration). -->
-        <span
-          class="flex size-10 items-center justify-center rounded-full bg-primary text-base-100 text-sm font-semibold"
-          data-testid="header-avatar"
-          aria-label="Signed in"
-          >JD</span
-        >
+        <!-- Avatar dropdown — placeholder menu (design TBD per guito-api#50). -->
+        <div class="relative" data-testid="avatar-menu">
+          <button
+            type="button"
+            class="flex size-10 items-center justify-center rounded-full bg-primary text-base-100 text-sm font-semibold"
+            data-testid="header-avatar"
+            aria-label="Account menu"
+            (click)="toggleMenu()"
+            >{{ avatarInitials() }}</button
+          >
+          @if (menuOpen()) {
+            <div class="absolute right-0 z-30 mt-2 rounded-box border border-base-content/10 bg-base-100 shadow-md">
+              <button
+                type="button"
+                class="block w-full rounded-box px-4 py-2 text-left font-normal text-base-content hover:bg-base-200"
+                data-testid="sign-out"
+                (click)="signOut()"
+                >Sign out</button
+              >
+            </div>
+          }
+        </div>
       } @else {
         <a routerLink="/signin" [queryParams]="signInQuery()" class="btn btn-primary" aria-label="Sign in">Sign In</a>
       }

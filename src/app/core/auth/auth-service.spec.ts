@@ -199,4 +199,9 @@ describe('AuthService.signOut', () => {
     expect(auth.session()).toBeNull();
     expect(storage['guito.auth.session']).toBeUndefined();
   });
+
+  it('returns the /signin redirect target', () => {
+    const auth = serviceWithStorage({});
+    expect(auth.signOut()).toBe('/signin');
+  });
 });
