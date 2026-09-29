@@ -38,10 +38,10 @@
     </div>
   </header>
 
-  <main class="flex-1"><router-outlet /></main>
+  <main class="flex-1 pb-[86px] lg:pb-0"><router-outlet /></main>
 
-  <!-- Mobile bottom navigation -->
-  <nav class="flex shrink-0 items-center justify-between border-t border-base-content/10 bg-base-100 pt-3 pb-6 lg:hidden" aria-label="Bottom navigation">
+  <!-- Mobile bottom navigation (fixed — always visible, content scrolls beneath) -->
+  <nav class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between border-t border-base-content/10 bg-base-100 pt-3 pb-6 lg:hidden" aria-label="Bottom navigation">
     @for (item of nav; track item.label) {
       <div class="flex min-w-0 flex-1 flex-col items-center gap-1 p-1">
         <g-icon [name]="item.icon" class="size-6" [class]="tabClass(item.label)" />
