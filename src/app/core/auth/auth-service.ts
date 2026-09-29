@@ -13,7 +13,6 @@ import { codeChallenge, createCodeVerifier, generateState } from './pkce';
 export class AuthError extends Error {}
 
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const PKCE_STORAGE_KEY = 'guito.auth.pkce';
 const AUTH_CALLBACK_PATH = '/auth/callback';
 const SIGN_OUT_REDIRECT = '/signin';
@@ -22,6 +21,29 @@ interface PendingSignIn {
   verifier: string;
   state: string;
   returnUrl: string;
+}
+
+/**
+ * Surface the API's RFC 6749 `error`/`error_description` body (the exchange
+ * endpoint returns Google's verbatim error) so a rejected sign-in is
+ * diagnosable from the UI; falls back to the status-only message when the
+ * body isn't that JSON. Contains no credentials — safe to display.
+ */
+async function exchangeFailureMessage(response: Response): Promise<string> {
+  const base = `Sign-in token exchange failed (HTTP ${response.status})`;
+  try {
+    const body = (await response.json()) as {
+      error?: unknown;
+      error_description?: unknown;
+    };
+    const error = typeof body.error === 'string' ? body.error : '';
+    const description =
+      typeof body.error_description === 'string' ? body.error_description : '';
+    if (!error && !description) return base;
+    return [error, description].filter(Boolean).join(' — ');
+  } catch {
+    return base;
+  }
 }
 
 /**
@@ -86,36 +108,39 @@ export class AuthService {
       throw new AuthError('Sign-in state mismatch — possible CSRF, restarting sign-in');
     }
 
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code: params['code'] ?? '',
-      code_verifier: pending.verifier,
-      client_id: this.env.googleClientId,
-      redirect_uri: this.redirectUri(),
-    });
-
+    // The exchange runs SERVER-SIDE (guito-api issue #52): Google's token
+    // endpoint requires a client_secret for Web-app clients, which must never
+    // ship in the browser bundle — the API adds client_id + client_secret.
     let tokenResponse: Response;
     try {
-      tokenResponse = await fetch(TOKEN_URL, { method: 'POST', body });
+      tokenResponse = await fetch(`${this.env.apiBaseUrl}/Auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: params['code'] ?? '',
+          codeVerifier: pending.verifier,
+          redirectUri: this.redirectUri(),
+        }),
+      });
     } catch (cause) {
-      throw new AuthError('Could not reach the Google token endpoint', { cause });
+      throw new AuthError('Could not reach the token exchange endpoint', { cause });
     }
     if (!tokenResponse.ok) {
-      throw new AuthError(`Google token endpoint rejected the exchange (HTTP ${tokenResponse.status})`);
+      throw new AuthError(await exchangeFailureMessage(tokenResponse));
     }
 
     const tokens: unknown = await tokenResponse.json();
-    const { id_token, access_token, expires_in } = tokens as Record<string, unknown>;
-    if (typeof id_token !== 'string' || typeof access_token !== 'string' || typeof expires_in !== 'number') {
+    const { idToken, accessToken, expiresIn } = tokens as Record<string, unknown>;
+    if (typeof idToken !== 'string' || typeof accessToken !== 'string' || typeof expiresIn !== 'number') {
       this.clearPending();
-      throw new AuthError('Google token response was malformed');
+      throw new AuthError('Token exchange response was malformed');
     }
 
     this.clearPending();
     this.setSession({
-      idToken: id_token,
-      accessToken: access_token,
-      expiresAt: Date.now() + expires_in * 1000,
+      idToken: idToken,
+      accessToken: accessToken,
+      expiresAt: Date.now() + expiresIn * 1000,
     });
     return pending.returnUrl;
   }

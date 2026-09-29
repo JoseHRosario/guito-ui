@@ -10,7 +10,7 @@ const TEST_ENV = {
 };
 
 const AUTHORIZE_HOST = 'https://accounts.google.com/o/oauth2/v2/auth';
-const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const EXCHANGE_URL = 'https://api.example.com/Auth/token';
 
 function serviceWithStorage(storage: Record<string, string>) {
   vi.stubGlobal(
@@ -37,9 +37,9 @@ function serviceWithStorage(storage: Record<string, string>) {
 function okTokenResponse() {
   return new Response(
     JSON.stringify({
-      id_token: 'new.id.token',
-      access_token: 'new.at',
-      expires_in: 3600,
+      idToken: 'new.id.token',
+      accessToken: 'new.at',
+      expiresIn: 3600,
     }),
     { status: 200 },
   );
@@ -135,13 +135,15 @@ describe('AuthService.completeSignIn', () => {
     expect(storage['session:guito.auth.pkce']).toBeUndefined();
 
     const fetchMock = vi.mocked(fetch);
-    expect(fetchMock).toHaveBeenCalledWith(TOKEN_URL, expect.objectContaining({ method: 'POST' }));
-    const body = new URLSearchParams(fetchMock.mock.calls[0][1]!.body as string);
-    expect(body.get('grant_type')).toBe('authorization_code');
-    expect(body.get('code')).toBe('abc');
-    expect(body.get('code_verifier')).toBe(pkce.verifier);
-    expect(body.get('client_id')).toBe(TEST_ENV.googleClientId);
-    expect(body.get('redirect_uri')).toBe('https://app.example.com/auth/callback');
+    expect(fetchMock).toHaveBeenCalledWith(EXCHANGE_URL, expect.objectContaining({ method: 'POST' }));
+    const body = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
+    expect(body).toEqual({
+      code: 'abc',
+      codeVerifier: pkce.verifier,
+      redirectUri: 'https://app.example.com/auth/callback',
+    });
+    // No client_secret and no client_id — the API adds both server-side.
+    expect(Object.keys(body).sort()).toEqual(['code', 'codeVerifier', 'redirectUri']);
   });
 
   it('rejects a state mismatch without exchanging the code', async () => {
@@ -167,20 +169,38 @@ describe('AuthService.completeSignIn', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('rejects when the token endpoint fails', async () => {
+  it('rejects with the RFC 6749 error when the exchange endpoint rejects the code', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
     await auth.signIn();
     const pkce = JSON.parse(storage['session:guito.auth.pkce']);
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('{"error":"invalid_grant"}', { status: 400 })),
+      vi.fn(async () => new Response(
+        JSON.stringify({ error: 'invalid_grant', error_description: 'code was already redeemed' }),
+        { status: 400 },
+      )),
     );
 
     await expect(
       auth.completeSignIn({ code: 'abc', state: pkce.state }),
-    ).rejects.toThrowError(/token/i);
+    ).rejects.toThrowError(/invalid_grant/);
     expect(storage['guito.auth.session']).toBeUndefined();
+  });
+
+  it('rejects with a status-only message when the exchange failure body is not RFC 6749 JSON', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    await auth.signIn();
+    const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('Internal Server Error', { status: 502 })),
+    );
+
+    await expect(
+      auth.completeSignIn({ code: 'abc', state: pkce.state }),
+    ).rejects.toThrowError(/502/);
   });
 });
 
