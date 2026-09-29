@@ -1,59 +1,66 @@
-# GuitoUi
+# Guito UI
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.0.
+The web frontend of **Guito**, a personal expense tracker: control expenses and maximize savings. This SPA consumes the [guito-api](https://github.com/JoseHRosario/guito-api) HTTP API and is designed screen-by-screen in Figma before any code is written.
 
-## Development server
+> Live demo: https://dna69cy69n7jb.cloudfront.net/ (deployed from `master`; data is currently stubbed in-app)
 
-To start a local development server, run:
+> Status (2026): MVP under revival. The app shell and the latest-expenses screen are implemented against approved Figma frames; live API wiring comes next (guito-api#9).
 
-```bash
-ng serve
-```
+## Tech stack
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+| Layer     | Choice                                                        |
+| --------- | ------------------------------------------------------------- |
+| Framework | Angular 22 (standalone components, signals, zoneless-friendly) |
+| Styling   | Tailwind CSS 4 + daisyUI 5, themed entirely by design tokens   |
+| Tests     | Vitest (unit, jsdom) + Playwright (e2e, both breakpoints)      |
+| Hosting   | S3 + CloudFront (eu-west-1), deployed by GitHub Actions (OIDC)  |
 
-## Code scaffolding
+## Design loop (how UI work happens)
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+1. **Draft**: Hermes (the AI agent) composes the screen on the **Guito App** page of the Guito design file — José's duplicate of the *Simple Design System (Community)* Figma file — using the design system's components, icons, and variables.
+2. **Validate**: José reviews/edits the frame in Figma. Approval = the implement source; designs change in Figma, never as code-side drift.
+3. **Implement**: the agent reads the approved frame, converts it to Angular components, and styles everything from the token-generated theme.
 
-```bash
-ng generate component component-name
-```
+**Tokens pipeline**: the design file's 'Color' variables (SDS Light mode) are synced via the Figma MCP into `design/tokens.json` (style-dictionary shape; mapping in `tools/tokens/figma.json`) → `npm run tokens` → `src/theme/tokens.css` (`--guito-*` custom properties + daisyUI semantic aliases). Light mode only. No ad-hoc hex values in components — see [AGENTS.md](AGENTS.md) for the hard rules.
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+## Getting started
 
 ```bash
-ng build
+npm ci
+npm run tokens   # regenerate the theme from design/tokens.json
+npm start        # ng serve → http://localhost:4200/
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## Testing
 
 ```bash
-ng test
+npm test                 # Vitest unit tests (specs live next to the code)
+npx playwright test      # e2e against the built app (serves dist on :8081)
+npm run build            # production build (runs the token pipeline first)
 ```
 
-## Running end-to-end tests
+## Project structure
 
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
+```
+src/app/
+  core/       models + pure functions (money formatting, day grouping), stub data
+  shell/      header, nav, bottom navigation, footer
+  features/   one folder per screen (expenses/ today)
+  shared/     cross-feature components (inline SVG icon set)
+  theme/      tokens.css — GENERATED, never hand-edited
+design/       tokens.json — style-dictionary source of the theme
+tools/tokens/ token pipeline: build-tokens.mjs, figma.json (role→variable map)
+e2e/          Playwright specs
+docs/adr/     UI decision records (0001–0010+)
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Deployment
 
-## Additional Resources
+`.github/workflows/`: `ci.yml` runs the full gate (tokens → build → Vitest → Playwright) on every PR; `deploy.yml` on push to `master` syncs `dist/` to S3 and invalidates CloudFront — AWS authentication is OIDC-only (role `guito-ui-deploy`, no long-lived keys). Any branch can be deployed on demand via `workflow_dispatch` for review-before-merge.
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Docs
+
+- [CONTEXT.md](CONTEXT.md) — glossary (design file, design loop, token sync)
+- [docs/adr/](docs/adr/) — decisions (token source = Figma MCP sync, …)
+- [AGENTS.md](AGENTS.md) — rules for AI coding agents
+- [guito-api](https://github.com/JoseHRosario/guito-api) — the backend (issues for both repos live there)

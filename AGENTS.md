@@ -1,83 +1,62 @@
-# Project Context & Coding Standards for AI Agents
+# AGENTS.md
 
-You are an expert AI developer specialized in TypeScript, modern Angular, and scalable web architecture. You write clean, maintainable, performant, and type-safe code. Follow these project instructions implicitly.
+Rules for AI coding agents working in guito-ui. Overview and architecture story live in [README.md](README.md); domain glossary in [CONTEXT.md](CONTEXT.md); UI decision records in [docs/adr/](docs/adr/).
 
----
+## Commands
 
-## 1. Project Overview & Commands
-*   **Framework:** Angular (v18+) using Standalone Components and Signals.
-*   **Build Command:** `npm run build` or `ng build`
-*   **Test Command:** `npm run test` or `ng test`
-*   **Lint Command:** `npm run lint` or `ng lint`
+```bash
+npm run tokens          # regenerate src/theme/tokens.css from design/tokens.json (run after any token change, BEFORE build)
+npm run build           # tokens + Angular production build → dist/guito-ui/browser
+npm test                # Vitest unit tests (ng test). Do NOT use bare `npx vitest run` — it also picks up e2e/*.spec.ts and fails
+npx playwright test     # e2e: Playwright serves dist/guito-ui/browser on :8081 itself
+npm start               # ng serve (dev server, :4200)
+```
 
----
+Deploy gate on every PR (CI): tokens → build → Vitest → Playwright. Run all four locally before pushing.
 
-## 2. Core Angular Architecture Standards
+## Git workflow
 
-### 2.1 Standalone Components & Architecture
-*   **No NgModules:** Always create Standalone Components, Directives, and Pipes.
-*   **File Structure:** Group by feature modules using a clean architecture (e.g., `features/`, `shared/`, `core/`).
-*   **Control Flow:** Always use the modern `@if`, `@for`, `@switch` template syntax. Never use `*ngIf` or `*ngFor`.
-*   **Deferrable Views:** Utilize `@defer` blocks for heavy or non-critical components to optimize initial bundle sizes.
+- `git pull` from `master` first; **one feature branch per issue** (`feature/<slug>`), work lands via PR. **Never push to `master`.**
+- Agent commits/PRs are authored as the bot: `Meireles (Hermes Agent) <332697001+xungameireles@users.noreply.github.com>`; José's commits stay under his name.
+- PRs carry the issue reference; José reviews and merges.
 
-### 2.2 Modern Dependency Injection (DI)
-*   **`inject()` Function:** Use the `inject()` function for dependency injection instead of traditional constructor injection.
-    ```typescript
-    // Correct
-    export class MyComponent {
-      private myService = inject(MyService);
-    }
-    ```
-*   **Singleton Services:** Use `@Injectable({ providedIn: 'root' })` for global services. 
+## Stack (verified — do not suggest older patterns)
 
-### 2.3 Reactivity & State Management (Signals)
-*   **Signals First:** Prefer Angular Signals (`signal`, `computed`, `effect`) over RxJS for synchronous state management and UI state.
-*   **Component Inputs/Outputs:** Use the new Signal-based inputs and outputs APIs:
-    ```typescript
-    // Correct
-    export class UserComponent {
-      userId = input.required<string>(); // Signal-based input
-      userUpdated = output<User>();       // Modern output API
-    }
-    ```
-*   **RxJS Interoperability:** Use `rxjs-interop` (`toSignal`, `toObservable`) when integrating with asynchronous data streams (e.g., HttpClient). Always provide an `DestroyRef` or `allowSignalWrites` inside effects where necessary.
+- Angular **22.2**: standalone components, signals (`signal`/`computed`/`input.required`), `@if`/`@for` with `track`, `inject()`, `ChangeDetectionStrategy.OnPush` everywhere, no `any`.
+- Tailwind **4.3** + daisyUI **5** (user-settled choice — do not re-litigate). TypeScript ~6.0.2, Vitest 5, Playwright 1.63.
+- Routing uses `withComponentInputBinding`; route `data` binds to component `input()` by name.
 
-### 2.4 Performance & Change Detection
-*   **Zoneless/OnPush:** Ensure components default to `changeDetection: ChangeDetectionStrategy.OnPush`. If the project configuration allows, optimize for Zoneless Angular applications.
-*   **Track By Equivalents:** Always use the `track` expression inside `@for` blocks to prevent unnecessary DOM re-renders.
+## Styling rules (hard)
 
----
+- **All styling derives from the token-generated theme.** No ad-hoc hex values, ever. Tailwind arbitrary px (`text-[11px]`, `w-[370px]`) is allowed ONLY when the value comes from an approved Figma frame and the token pipeline has no equivalent — cite the frame in the PR.
+- Light mode only (`src/theme/tokens.css` emits `:root` only; extend `tools/tokens/build-tokens.mjs` if dark mode is ever wanted). Never edit `tokens.css` by hand.
+- Colors go through daisyUI semantic roles (`bg-base-100`, `text-error`, `bg-primary`, …) or the `--guito-*` custom properties. `src/styles.css` must keep `@source not '../e2e'` (Tailwind's scanner mistakes Playwright selectors for variants otherwise).
 
-## 3. TypeScript & Code Style Guidelines
+## Code structure
 
-*   **Strict Typing:** Never use `any`. Always define explicit interfaces or types for API contracts and component states.
-*   **Immutability:** Treat state as immutable. Use spread operators or pure functions instead of mutating objects directly.
-*   **CamelCase Functions:** Always use `camelCase` for function and variable names, and `PascalCase` for classes, interfaces, and enums.
-*   **Imports:** Clean up unused imports automatically and prioritize path aliases (e.g., `@core/*`, `@shared/*`) defined in `tsconfig.json`.
+- `src/app/core/` — models, pure functions (money formatting via `Intl.NumberFormat('pt-PT')` in `money.ts`), stub data. Collocated `*.spec.ts`.
+- `src/app/shell/` — header, nav, bottom nav, footer.
+- `src/app/features/<feature>/` — one folder per screen (`expenses/` today), split components per region.
+- `src/app/shared/` — cross-feature pieces (`gicon.ts` inline SVG icons).
+- Semantic HTML with `aria-label` on navs; no `*ngIf`/`*ngFor`; no raw `ElementRef` DOM manipulation.
 
----
+## Testing rules
 
-## 4. Testing & Quality Assurance
+- Unit specs live next to the code (Vitest, jsdom). jsdom applies no CSS: both responsive branches render in tests — use `:visible` scoping in e2e and duplicate-tolerant counts in unit tests.
+- e2e specs in `e2e/` against the built app; every `data-testid` must have an assertion using it.
+- Route-data-bound inputs must have defaults (required inputs throw NG0950 before the router binding lands in tests).
 
-*   **Component Testing:** Prefer using `ComponentHarness` for interacting with UI components in tests to keep them resilient to DOM changes.
-*   **Isolated Service Tests:** Test services in isolation by mocking dependencies using basic spies or testing utility libraries.
-*   **Mocking HTTP:** Utilize `HttpTestingController` for robust backend integration testing.
+## Figma design loop
 
----
+Designs live on the **Guito App** page of the Guito design file (duplicate of Simple Design System, key `UoIK5MnIqDrgfHqMmBZoYk`); the Community original is never edited. Flow: Hermes drafts in Figma (MCP) → José validates → the approved frame is the implement source; design changes happen in Figma, never as code-side drift. Token source is the MCP sync (ADR 0010) — `tools/tokens/pull-figma.mjs` is dead on this plan (`file_variables:read` is Enterprise-only). Token sync regenerates `design/tokens.json` (mapping in `tools/tokens/figma.json`, fileKey = the duplicate).
 
-## 5. Security & Accessibility (a11y)
+## Deployment
 
-*   **Security:** Avoid raw DOM manipulation via `ElementRef.nativeElement`. Never bypass built-in sanitization unless absolutely required via `DomSanitizer`.
-*   **Semantic HTML:** Use native semantic HTML elements (`<button>`, `<main>`, `<nav>`) to ensure accessibility.
-*   **ARIA Attributes:** Ensure appropriate `aria-*` tags and keyboard navigation patterns are supported in custom interactive components.
+- `deploy.yml` on push to `master` (e2e-gated) → OIDC-assumes `arn:aws:iam::497087877832:role/guito-ui-deploy` → S3 sync + CloudFront invalidation. `workflow_dispatch` can deploy any branch for review-before-merge.
+- Live demo: https://dna69cy69n7jb.cloudfront.net/
 
----
+## Boundaries
 
-## 6. Figma Design Loop
-
-The UI is defined in Figma and implemented through the design loop. File: **Guito design file**, key `UoIK5MnIqDrgfHqMmBZoYk` (José's duplicate of "Simple Design System (Community)"; the Community original is read-only and never edited). All app designs live on the dedicated **Guito App** page.
-
-*   **Design loop:** Hermes drafts the screen on the Guito App page via the Figma MCP → José validates/edits in Figma → approval = the implement source. Design changes happen in Figma, never as code-side drift.
-*   **Token sync:** at implement time the agent reads the file's 'Design Tokens' variables via the Figma MCP and regenerates `design/tokens.json` (style-dictionary shape; mapping in `tools/tokens/figma.json`, fileKey = the duplicate). The REST pull (`tools/tokens/pull-figma.mjs`) is dead on this plan — `file_variables:read` is Enterprise-only. Token-source decision: guito-api ADR-0010.
-*   **Styling convention:** all styling derives from the token-generated theme (`npm run tokens` → `src/theme/tokens.css`); no ad-hoc hex/px values. Light mode only.
-*   **Git workflow:** always pull from master, then create a feature branch per issue. Never push to master — PRs only (CI gates: tokens + build + Vitest + Playwright).
+- **Never** commit secrets (`.env` holds the Figma PAT and is gitignored); never edit the Community Figma file; never push to `master`.
+- **Ask first** before: adding a dependency, deviating from a token color (document each deviation in the PR body), changing the deploy pipeline, or touching the token mapping (`tools/tokens/figma.json`).
+- **Always** run the full local suite before pushing; keep this file current — add a rule whenever an agent correction recurs, prune stale ones in the same commit.
