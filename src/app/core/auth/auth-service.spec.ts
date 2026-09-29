@@ -188,19 +188,43 @@ describe('AuthService.completeSignIn', () => {
     expect(storage['guito.auth.session']).toBeUndefined();
   });
 
-  it('rejects with a status-only message when the exchange failure body is not RFC 6749 JSON', async () => {
+  it('includes the Google error and description when the exchange is rejected', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
     await auth.signIn();
     const pkce = JSON.parse(storage['session:guito.auth.pkce']);
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('Internal Server Error', { status: 502 })),
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: 'invalid_grant',
+              error_description: 'Code was already redeemed.',
+            }),
+            { status: 400 },
+          ),
+      ),
     );
 
     await expect(
       auth.completeSignIn({ code: 'abc', state: pkce.state }),
-    ).rejects.toThrowError(/502/);
+    ).rejects.toThrowError(/invalid_grant.*already redeemed/s);
+  });
+
+  it('keeps the generic message when the error body is not JSON', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    await auth.signIn();
+    const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>oops</html>', { status: 502 })),
+    );
+
+    await expect(
+      auth.completeSignIn({ code: 'abc', state: pkce.state }),
+    ).rejects.toThrowError(/HTTP 502/);
   });
 });
 
