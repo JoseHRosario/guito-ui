@@ -1,6 +1,6 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { inject, Injectable, InjectionToken } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ENVIRONMENT } from '../app-environment';
@@ -29,8 +29,6 @@ class TestClient {
   }
 }
 
-const WITH_ENV = new InjectionToken<void>('WITH_ENV');
-
 function setup(session: object | null) {
   const storage: Record<string, string> = {};
   if (session) storage[SESSION_STORAGE_KEY] = JSON.stringify(session);
@@ -42,7 +40,6 @@ function setup(session: object | null) {
   TestBed.configureTestingModule({
     providers: [
       { provide: APP_ENVIRONMENT, useValue: TEST_ENV },
-      { provide: WITH_ENV, useValue: undefined },
       provideHttpClient(withInterceptors([authInterceptor])),
       provideHttpClientTesting(),
     ],

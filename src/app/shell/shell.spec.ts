@@ -44,6 +44,7 @@ describe('Shell header auth state', () => {
 
     const avatar = fixture.debugElement.query(By.css('[data-testid="header-avatar"]'));
     expect(avatar).not.toBeNull();
+    expect(fixture.debugElement.query(By.css('[data-testid="avatar-menu"]'))).not.toBeNull();
     expect(avatar.nativeElement.textContent).toContain('JD');
     expect(fixture.debugElement.queryAll(By.css('a[aria-label="Sign in"]'))).toEqual([]);
   });

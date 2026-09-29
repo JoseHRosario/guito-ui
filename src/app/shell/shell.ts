@@ -1,6 +1,7 @@
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { computed, ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { AuthService } from '../core/auth/auth-service';
+import { avatarInitials } from '../core/auth/avatar-initials';
 import { GIcon, type IconName } from '../shared/gicon';
 
 export interface NavItem {
@@ -42,7 +43,7 @@ export class Shell {
   /** Initials from the ID token's name/email claims (JWT payload is plain base64url). */
   protected readonly avatarInitials = computed(() => {
     const s = this.auth.session();
-    return s === null ? 'G' : initialsFromIdToken(s.idToken);
+    return s === null ? 'G' : avatarInitials(s.idToken);
   });
 
   /** Active tab paints with the primary token; the rest stay muted. */
@@ -57,23 +58,5 @@ export class Shell {
   protected signOut(): void {
     this.menuOpen.set(false);
     this.router.navigateByUrl(this.auth.signOut());
-  }
-}
-
-/** First letters of the ID-token name (fallback: email, then 'G'). */
-function initialsFromIdToken(idToken: string): string {
-  const payload = idToken.split('.')[1];
-  if (!payload) return 'G';
-  try {
-    const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as {
-      name?: string;
-      email?: string;
-    };
-    const source = claims.name ?? claims.email;
-    if (!source) return 'G';
-    const words = source.split(/[\s.]+/).filter(Boolean);
-    return words.slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
-  } catch {
-    return 'G';
   }
 }
