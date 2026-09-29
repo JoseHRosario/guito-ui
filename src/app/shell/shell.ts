@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { computed, ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AuthService } from '../core/auth/auth-service';
 import { GIcon, type IconName } from '../shared/gicon';
 
@@ -28,9 +28,13 @@ export const NAV_ITEMS: NavItem[] = [
 })
 export class Shell {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
   protected readonly nav = NAV_ITEMS;
   protected readonly isAuthenticated = this.auth.isAuthenticated;
+
+  /** Header Sign-In link preserves the current URL through the sign-in flow. */
+  protected readonly signInQuery = computed(() => ({ returnUrl: this.router.url }));
 
   /** Active tab paints with the primary token; the rest stay muted. */
   protected tabClass(label: string): string {

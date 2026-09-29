@@ -43,7 +43,7 @@
           >JD</span
         >
       } @else {
-        <a routerLink="/signin" class="btn btn-primary" aria-label="Sign in">Sign In</a>
+        <a routerLink="/signin" [queryParams]="signInQuery()" class="btn btn-primary" aria-label="Sign in">Sign In</a>
       }
     </div>
   </header>

@@ -3,9 +3,10 @@ import { AuthService } from '../../core/auth/auth-service';
 import { GIcon } from '../../shared/gicon';
 
 /**
- * `/signin` screen per the approved Figma frames (mobile 3071:35, desktop
- * 3080:53): centered logo + tagline + Google button, trust line pinned to the
- * bottom. Google-only auth (ADR-0011); visual restyle tracked in #41.
+ * `/signin` screen per the drafted Figma frames (mobile 3071:35, desktop
+ * 3080:53) — pending José's Figma approval (the design-loop implement source);
+ * the visual restyle pass is tracked separately (#41). Google-only auth
+ * (ADR-0011).
  */
 @Component({
   selector: 'g-signin',

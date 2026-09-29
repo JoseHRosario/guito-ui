@@ -9,14 +9,14 @@ import { serializeSession, SESSION_STORAGE_KEY, type AuthSession } from './auth-
 
 import { Component } from '@angular/core';
 
+function validSession(): AuthSession {
+  return { idToken: 'id', accessToken: 'access', expiresAt: Date.now() + 3_600_000 };
+}
+
 const auth = { isAuthenticated: vi.fn(() => false) };
 
 @Component({ template: '', standalone: true })
 class DummyRoute {}
-
-function validSession(): AuthSession {
-  return { idToken: 'id', accessToken: 'access', expiresAt: Date.now() + 3_600_000 };
-}
 
 beforeEach(() => {
   auth.isAuthenticated.mockReturnValue(false);
@@ -50,7 +50,7 @@ describe('authGuard', () => {
   it('treats an expired persisted session as unauthenticated', async () => {
     localStorage.setItem(
       SESSION_STORAGE_KEY,
-      serializeSession({ idToken: 'id', accessToken: 'access', expiresAt: Date.now() - 1_000 }),
+      serializeSession({ ...validSession(), expiresAt: Date.now() - 1_000 }),
     );
     // Real AuthService: session signal reads localStorage; isExpired forces re-auth.
     const { AuthService: RealAuthService } = await import('./auth-service');
