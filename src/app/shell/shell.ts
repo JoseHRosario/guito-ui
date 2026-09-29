@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { AuthService } from '../core/auth/auth-service';
 import { GIcon, type IconName } from '../shared/gicon';
 
 export interface NavItem {
@@ -26,7 +27,10 @@ export const NAV_ITEMS: NavItem[] = [
   imports: [RouterOutlet, RouterLink, RouterLinkActive, GIcon],
 })
 export class Shell {
+  private readonly auth = inject(AuthService);
+
   protected readonly nav = NAV_ITEMS;
+  protected readonly isAuthenticated = this.auth.isAuthenticated;
 
   /** Active tab paints with the primary token; the rest stay muted. */
   protected tabClass(label: string): string {

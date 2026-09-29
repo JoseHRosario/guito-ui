@@ -10,7 +10,9 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npx http-server dist/guito-ui/browser -p 8081 -c-1 --silent',
+    // http-server has no SPA fallback; tools/dev/spa-server.mjs serves index.html
+    // for unknown paths so deep links (/signin, /auth/callback) resolve.
+    command: 'node tools/dev/spa-server.mjs dist/guito-ui/browser 8081',
     url: 'http://localhost:8081',
     reuseExistingServer: false,
     timeout: 60_000,

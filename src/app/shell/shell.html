@@ -34,7 +34,17 @@
     </nav>
 
     <div class="flex items-center">
-      <button type="button" class="btn btn-primary" aria-label="Sign in">Sign In</button>
+      @if (isAuthenticated()) {
+        <!-- Avatar placeholder — sign-out menu TBD (future header iteration). -->
+        <span
+          class="flex size-10 items-center justify-center rounded-full bg-primary text-base-100 text-sm font-semibold"
+          data-testid="header-avatar"
+          aria-label="Signed in"
+          >JD</span
+        >
+      } @else {
+        <a routerLink="/signin" class="btn btn-primary" aria-label="Sign in">Sign In</a>
+      }
     </div>
   </header>
 
