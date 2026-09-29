@@ -16,7 +16,7 @@ Deploy gate on every PR (CI): tokens → build → Vitest → Playwright. Run al
 
 ## Git workflow
 
-- `git pull` from `master` first; **one feature branch per issue** (`feature/<slug>`), work lands via PR. **Never push to `master`.**
+- `git pull` from `master` first; **one feature branch per issue**, named `feature/<issue#>-<slug>` (issue number first — e.g. `feature/9-user-flow`; no `t6a2`-style prefixes on new work). Work lands via PR, and the PR body **must end with `Closes #N`** so GitHub closes the issue on merge into `master` (staging merges don't close — that's deliberate). **Never push to `master`.**
 - Agent commits/PRs are authored as the bot: `Meireles (Hermes Agent) <332697001+xungameireles@users.noreply.github.com>`; José's commits stay under his name.
 - PRs carry the issue reference; José reviews and merges.
 
