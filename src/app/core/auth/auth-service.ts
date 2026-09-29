@@ -107,6 +107,7 @@ export class AuthService {
     const tokens: unknown = await tokenResponse.json();
     const { id_token, access_token, expires_in } = tokens as Record<string, unknown>;
     if (typeof id_token !== 'string' || typeof access_token !== 'string' || typeof expires_in !== 'number') {
+      this.clearPending();
       throw new AuthError('Google token response was malformed');
     }
 

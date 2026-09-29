@@ -53,4 +53,22 @@ describe('AuthCallback', () => {
     fixture.componentInstance.retry();
     expect(auth.signIn).toHaveBeenCalledWith('/');
   });
+
+  it('renders the error card with retry on exchange failure (template-level)', async () => {
+    auth.completeSignIn.mockRejectedValue(new AuthError('Sign-in state mismatch — possible CSRF, restarting sign-in'));
+    const fixture = await create({ code: 'abc', state: 'st' });
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('[data-testid="auth-error"]')).toBeTruthy();
+    expect(el.querySelector('button')?.textContent).toMatch(/try again/i);
+    expect(el.querySelector('.loading')).toBeNull();
+  });
+
+  it('navigates to / when the returnUrl is not a relative path', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    auth.completeSignIn.mockResolvedValue('https://evil.example.com/steal');
+    await create({ code: 'abc', state: 'st' });
+    expect(navigate).toHaveBeenCalledWith('/');
+  });
 });

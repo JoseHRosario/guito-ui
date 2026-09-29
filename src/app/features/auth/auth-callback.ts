@@ -11,8 +11,8 @@ import { AuthError, AuthService } from '../../core/auth/auth-service';
   selector: 'guito-auth-callback',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (error(); as err) {
-      <div class="flex min-h-dvh items-center justify-center p-6">
+    @if (message(); as err) {
+      <div class="flex min-h-dvh items-center justify-center p-6" data-testid="auth-error">
         <div class="card w-full max-w-sm bg-base-100 shadow">
           <div class="card-body">
             <h2 class="card-title text-error">Sign-in failed</h2>
@@ -30,6 +30,7 @@ import { AuthError, AuthService } from '../../core/auth/auth-service';
     }
   `,
 })
+
 export class AuthCallback {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -59,10 +60,10 @@ export class AuthCallback {
       return;
     }
     try {
-      const returnUrl = await this.auth.completeSignIn({
+      const returnUrl = this.safeReturnUrl(await this.auth.completeSignIn({
         code: this.code(),
         state: this.state(),
-      });
+      }));
       await this.router.navigateByUrl(returnUrl);
     } catch (cause) {
       this.message.set(
@@ -74,7 +75,10 @@ export class AuthCallback {
   retry(): void {
     void this.auth.signIn('/');
   }
+
+  /** Only navigate to relative paths — an absolute/foreign returnUrl is an open-redirect vector. */
+  private safeReturnUrl(url: string): string {
+    return url.startsWith('/') && !url.startsWith('//') ? url : '/';
+  }
 }
 
-// Tiny local signal to avoid importing `signal` twice in template bindings.
-import { signal as signal_like } from '@angular/core';
