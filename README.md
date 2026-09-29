@@ -4,7 +4,7 @@ The web frontend of **Guito**, a personal expense tracker: control expenses and 
 
 > Live demo: https://dna69cy69n7jb.cloudfront.net/ (deployed from `master`; data is currently stubbed in-app)
 
-> Status (2026): MVP under revival. The app shell and the latest-expenses screen are implemented against approved Figma frames; live API wiring comes next (guito-api#9).
+> Status (2026): MVP under revival. The app shell, the latest-expenses screen, and the Google auth layer (env config, PKCE `AuthService`, `/auth/callback`) are implemented against approved Figma frames / settled decisions; next up: the Sign In screen (drafted in Figma, pending approval) and the route guard. Live API wiring follows (guito-api#9).
 
 ## Tech stack
 
@@ -44,8 +44,9 @@ npm run build            # production build (runs the token pipeline first)
 ```
 src/app/
   core/       models + pure functions (money formatting, day grouping), stub data
+  core/auth/  Google PKCE session: AuthService (signals), session storage, pkce
   shell/      header, nav, bottom navigation, footer
-  features/   one folder per screen (expenses/ today)
+  features/   one folder per screen (expenses/, auth/ — callback screen today)
   shared/     cross-feature components (inline SVG icon set)
   theme/      tokens.css — GENERATED, never hand-edited
 design/       tokens.json — style-dictionary source of the theme

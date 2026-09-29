@@ -50,6 +50,11 @@ Deploy gate on every PR (CI): tokens → build → Vitest → Playwright. Run al
 
 Designs live on the **Guito App** page of the Guito design file (duplicate of Simple Design System, key `UoIK5MnIqDrgfHqMmBZoYk`); the Community original is never edited. Flow: Hermes drafts in Figma (MCP) → José validates → the approved frame is the implement source; design changes happen in Figma, never as code-side drift. Token source is the MCP sync (ADR 0010) — `tools/tokens/pull-figma.mjs` is dead on this plan (`file_variables:read` is Enterprise-only). Token sync regenerates `design/tokens.json` (mapping in `tools/tokens/figma.json`, fileKey = the duplicate).
 
+Current design state on the Guito App page:
+- **Workspace** frame (expenses list, mobile + desktop) — José's design, approved and implemented.
+- **SignIn** (mobile `node-id=3071-35`) and **SignIn Desktop** (`node-id=3080-53`) — minimalist, Google-only direction; centered logo/tagline/button with the official Google G mark and a bottom trust line. **Pending José's Figma approval** — approval is the implement source for the Sign In screen and the auth route guard. Button is a token-faithful copy of the DS Primary Button (DS instances cannot take an icon child).
+- Pinning convention for fixed elements: bottom nav / FAB are direct children rendered last, scrolling content lives in a clipped sub-frame — see the annotated Workspace frame.
+
 ## User flow
 
 The **interaction contract** (auth gate → Sign In → Expenses List → Create Expense, sign-out via header avatar) is the FigJam board "Guito User Flow": https://www.figma.com/board/TulG8ptcGlLxQI78GciXr3 — also linked from the Guito App page. Decisions behind it (all routes gated, Google-only, returnUrl) are in **ADR 0011**. Read both before implementing any screen or route; the board is the live artifact — don't copy it into the repo.
