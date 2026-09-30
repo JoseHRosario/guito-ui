@@ -91,3 +91,29 @@ jobs:
         run: >
           aws cloudfront create-invalidation
           --distribution-id "${{ env.CF_DISTRIBUTION_ID }}" --paths "/*"
+
+  smoke:
+    name: smoke (deployed URL)
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Deployed smoke (stubbed sign-in flow against the live site)
+        env:
+          # What's real: the prod build, S3 assets and the CloudFront SPA
+          # fallback for deep links. Google + token exchange stay stubbed.
+          SMOKE_URL: https://dna69cy69n7jb.cloudfront.net/
+        run: npx playwright test e2e/deployed-smoke.spec.ts
