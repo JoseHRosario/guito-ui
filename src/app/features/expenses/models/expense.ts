@@ -1,4 +1,4 @@
-import type { IconName } from '../shared/gicon';
+import type { IconName } from '../../../shared/gicon';
 
 /** Mirrors the API Expense contract (description, amount, date); extra fields are UI stubs. */
 export interface Expense {

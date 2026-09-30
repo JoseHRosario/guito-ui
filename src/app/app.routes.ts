@@ -1,8 +1,8 @@
 import { Routes } from '@angular/router';
-import { ExpensesPage } from './features/expenses/expenses-page';
-import { SignIn } from './features/signin/signin';
-import { AuthCallback } from './features/auth/auth-callback';
-import { Shell } from './shell/shell';
+import { ExpensesPage } from './features/expenses/components/expenses-page';
+import { SignIn } from './features/signin/components/signin';
+import { AuthCallback } from './features/auth/components/auth-callback';
+import { Shell } from './features/shell/components/shell';
 import { authGuard } from './core/auth/auth-guard';
 
 export const routes: Routes = [

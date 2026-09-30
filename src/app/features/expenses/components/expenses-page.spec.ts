@@ -1,8 +1,8 @@
 import '@angular/compiler';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { APP_ENVIRONMENT } from '../../core/app-environment';
-import { serializeSession, SESSION_STORAGE_KEY } from '../../core/auth/auth-session';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
 import { ExpensesPage } from './expenses-page';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

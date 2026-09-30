@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { AuthError, AuthService } from '../../core/auth/auth-service';
+import { AuthError, AuthService } from '../../../core/auth/auth-service';
 
 /**
  * Landing for the Google OAuth redirect (`/auth/callback`). Exchanges the

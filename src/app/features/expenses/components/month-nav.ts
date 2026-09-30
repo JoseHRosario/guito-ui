@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { GIcon } from '../../shared/gicon';
+import { GIcon } from '../../../shared/gicon';
 
 /** ‹month› + filter control bar shared by mobile and desktop frames. */
 @Component({

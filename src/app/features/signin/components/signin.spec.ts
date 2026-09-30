@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@angular/compiler';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { AuthService } from '../../core/auth/auth-service';
+import { AuthService } from '../../../core/auth/auth-service';
 import { SignIn } from './signin';
 
 const auth = { signIn: vi.fn(async () => {}), isAuthenticated: vi.fn(() => false) };

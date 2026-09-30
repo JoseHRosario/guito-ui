@@ -1,13 +1,14 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
-import { formatEur } from '../../core/money';
-import { groupExpensesByDay } from '../../core/group-by-day';
-import type { Expense } from '../../core/expense';
-import { ExpenseApi } from '../../core/expense-api';
-import { expenseSummary, monthLabelOf } from '../../core/expense-summary';
-import { GIcon } from '../../shared/gicon';
+import { formatEur } from '../../../core/money';
+import { groupExpensesByDay } from '../../../core/group-by-day';
+import type { Expense } from '../models/expense';
+import { ExpenseApi } from '../services/expense-api';
+import { expenseSummary, monthLabelOf } from '../../../core/expense-summary';
+import { GIcon } from '../../../shared/gicon';
 import { MonthNav } from './month-nav';
-import { SummaryBar, type MonthSummary } from './summary-bar';
+import { SummaryBar } from './summary-bar';
+import type { MonthSummary } from '../models/month-summary';
 
 /**
  * Latest-expenses screen, LIVE from the deployed API (guito-api#9): loads

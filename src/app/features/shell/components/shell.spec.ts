@@ -4,8 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Shell } from './shell';
-import { routes } from '../app.routes';
-import { SESSION_STORAGE_KEY } from '../core/auth/auth-session';
+import { routes } from '../../../app.routes';
+import { SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
 
 const LIVE_SESSION = {
   idToken: `${btoa(JSON.stringify({ alg: 'none' }))}.${btoa(

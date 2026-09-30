@@ -1,5 +1,5 @@
 import { formatEur } from './money';
-import type { Expense } from './expense';
+import type { Expense } from '../features/expenses/models/expense';
 
 export interface ExpenseDayGroup {
   /** ISO date key (yyyy-MM-dd) of the group. */
