@@ -1,7 +1,7 @@
 /**
- * Production environment (CloudFront demo domain + the fixed prod API domain).
+ * Production environment (fixed web + API domains).
  * googleClientId must match GOOGLE_CLIENT_ID / OAuthAudience on the deployed authorizer
- * and the OAuth client's authorized redirect URIs (…/auth/callback on the CloudFront domain).
+ * and the OAuth client's authorized origins/redirect URIs (…/auth/callback on the web domain).
  */
 export const environment = {
   production: true,
