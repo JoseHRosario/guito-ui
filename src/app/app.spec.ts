@@ -5,8 +5,8 @@ import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 import { routes } from './app.routes';
 import { serializeSession, SESSION_STORAGE_KEY } from './core/auth/auth-session';
-import { ExpenseApi } from './core/expense-api';
-import { STUB_EXPENSES } from './core/stub-expenses';
+import { ExpenseApi } from './features/expenses/services/expense-api';
+import { STUB_EXPENSES } from './features/expenses/services/stub-expenses';
 
 function seedSession(): void {
   localStorage.setItem(

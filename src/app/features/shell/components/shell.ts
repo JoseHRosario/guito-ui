@@ -1,8 +1,8 @@
 import { Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { computed, ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { AuthService } from '../core/auth/auth-service';
-import { avatarInitials } from '../core/auth/avatar-initials';
-import { GIcon, type IconName } from '../shared/gicon';
+import { AuthService } from '../../../core/auth/auth-service';
+import { avatarInitials } from '../../../core/auth/avatar-initials';
+import { GIcon, type IconName } from '../../../shared/gicon';
 
 export interface NavItem {
   label: string;

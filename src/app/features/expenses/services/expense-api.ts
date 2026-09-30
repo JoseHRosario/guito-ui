@@ -1,9 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { APP_ENVIRONMENT } from './app-environment';
-import type { Expense } from './expense';
-import { categoryIcon } from './category-icon';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import type { Expense } from '../models/expense';
+import { categoryIcon } from '../../../core/category-icon';
 
 /**
  * The Expense wire contract of `GET /Expense/latest/{count}` (ADR-0003 human

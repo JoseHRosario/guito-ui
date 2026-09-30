@@ -1,10 +1,5 @@
-import type { Expense } from './expense';
-
-export interface MonthSummary {
-  expense: number;
-  income: number;
-  total: number;
-}
+import type { Expense } from '../features/expenses/models/expense';
+import type { MonthSummary } from '../features/expenses/models/month-summary';
 
 /**
  * Month summary derived from the loaded expenses (EXPENSE = outflows, INCOME =

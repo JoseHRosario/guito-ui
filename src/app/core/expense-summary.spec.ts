@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { expenseSummary, monthLabelOf } from './expense-summary';
-import type { Expense } from './expense';
+import type { Expense } from '../features/expenses/models/expense';
 
 function expense(amount: number, date: string): Expense {
   return { id: 'x', description: 'X', amount, date, category: '', icon: 'tag' };

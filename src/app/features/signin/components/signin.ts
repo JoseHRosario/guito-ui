@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { AuthService } from '../../core/auth/auth-service';
-import { GIcon } from '../../shared/gicon';
+import { AuthService } from '../../../core/auth/auth-service';
+import { GIcon } from '../../../shared/gicon';
 
 /**
  * `/signin` screen per the drafted Figma frames (mobile 3071:35, desktop

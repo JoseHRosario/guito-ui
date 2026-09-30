@@ -1,4 +1,4 @@
-import { Expense } from './expense';
+import { Expense } from '../models/expense';
 
 /** Stubbed expense data mirroring the approved Figma frames — test fixture only since the live API wiring (guito-api#9); unit specs inject it via a fake ExpenseApi. */
 export const STUB_EXPENSES: Expense[] = [

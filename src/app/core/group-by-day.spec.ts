@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { groupExpensesByDay } from './group-by-day';
-import type { Expense } from './expense';
+import type { Expense } from '../features/expenses/models/expense';
 
 function expense(id: string, date: string, description = 'X'): Expense {
   return { id, description, amount: -10, date, category: 'Bills', icon: 'zap' };
