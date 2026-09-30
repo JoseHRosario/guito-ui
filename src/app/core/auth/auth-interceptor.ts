@@ -4,11 +4,13 @@ import { APP_ENVIRONMENT } from '../app-environment';
 import { AuthService } from './auth-service';
 
 /**
- * Attaches `Authorization: Bearer <Google ID token>` to requests aimed at the
- * guito API (ADR-0003 human-auth contract). External URLs (Google endpoints)
- * and unauthenticated state get no header — never leak the token off-target.
- * Matching is by URL origin, not string prefix, so a lookalike host
- * (`https://<api-host>.evil.com`) can never receive the token.
+ * Attaches the human-auth dual-header contract (ADR-0003) to requests aimed at
+ * the guito API: `Authorization: Bearer <ID token>` (the gateway identity
+ * source, validated by the edge authorizer) AND `x-google-idtoken` (validated
+ * by the app's GoogleIdTokenMiddleware as defense-in-depth). External URLs
+ * (Google endpoints) and unauthenticated state get no header — never leak the
+ * token off-target. Matching is by URL origin, not string prefix, so a
+ * lookalike host (`https://<api-host>.evil.com`) can never receive the token.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const apiOrigin = new URL(inject(APP_ENVIRONMENT).apiBaseUrl).origin;
@@ -23,6 +25,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   return next(
-    req.clone({ setHeaders: { Authorization: `Bearer ${session.idToken}` } }),
+    req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${session.idToken}`,
+        'x-google-idtoken': session.idToken,
+      },
+    }),
   );
 };

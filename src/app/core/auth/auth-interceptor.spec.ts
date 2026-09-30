@@ -52,13 +52,16 @@ describe('authInterceptor', () => {
     vi.unstubAllGlobals();
   });
 
-  it('ShouldAttachBearerIdToken_WhenRequestTargetsTheApi', () => {
+  it('ShouldAttachBearerIdTokenAndXGoogleIdtoken_WhenRequestTargetsTheApi', () => {
     const { client, http } = setup(LIVE_SESSION);
 
     client.get(`${TEST_ENV.apiBaseUrl}/Expense/latest/5`).subscribe();
 
     const req = http.expectOne(`${TEST_ENV.apiBaseUrl}/Expense/latest/5`);
+    // Dual-header human-auth contract (ADR-0003): gateway identity source AND
+    // the in-app defense middleware both validate the ID token.
     expect(req.request.headers.get('Authorization')).toBe(`Bearer ${LIVE_SESSION.idToken}`);
+    expect(req.request.headers.get('x-google-idtoken')).toBe(LIVE_SESSION.idToken);
     http.verify();
   });
 
