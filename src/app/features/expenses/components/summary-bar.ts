@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { formatEur } from '../../../core/money';
+import { formatEur } from '../services/money';
 import { MonthSummary } from '../models/month-summary';
 
 /** EXPENSE / INCOME / TOTAL summary bar, mirroring the approved frames. */
