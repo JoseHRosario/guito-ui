@@ -37,7 +37,7 @@ Deploy gate on every PR (CI): tokens → build → Vitest → Playwright. Run al
 
 ## Code structure
 
-- **Feature-nested (settled 2026-09-30): `src/app/features/<feature>/{components,models,services}/`** — one folder per feature (`auth/`, `expenses/`, `shell/`, `signin/`); components per region in `components/`, feature models in `models/` (one type per file), HTTP services + their specs + feature test fixtures in `services/`.
+- **Feature-nested (settled 2026-09-30): `src/app/features/<feature>/{pages,components,models,services}/`** — one folder per feature (`auth/`, `expenses/`, `shell/`, `signin/`); `pages/` holds the feature's top-level screens (html/css/ts/spec — e.g. expenses-page, signin, auth-callback); `components/` holds reusable regions (month-nav, summary-bar; `shell` is the layout chrome, not a screen, so it lives in `features/shell/components/`); models in `models/` (one type per file); HTTP services + specs + feature test fixtures in `services/`.
 - `src/app/core/` — cross-feature pure helpers and plumbing that no single feature owns: `money.ts` (formatting via `Intl.NumberFormat('pt-PT')`), `group-by-day.ts`, `expense-summary.ts`, `category-icon.ts`, `app-environment.ts`, and `core/auth/` (auth plumbing; will move under `features/auth/` when it gains components). Core helpers may import feature models (`Expense`, `MonthSummary`) — the inverted edge is deliberate.
 - `src/app/shared/` — cross-feature presentational pieces (`gicon.ts` inline SVG icons).
 - Semantic HTML with `aria-label` on navs; no `*ngIf`/`*ngFor`; no raw `ElementRef` DOM manipulation.

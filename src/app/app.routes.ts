@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
-import { ExpensesPage } from './features/expenses/components/expenses-page';
-import { SignIn } from './features/signin/components/signin';
-import { AuthCallback } from './features/auth/components/auth-callback';
+import { ExpensesPage } from './features/expenses/pages/expenses-page';
+import { SignIn } from './features/signin/pages/signin';
+import { AuthCallback } from './features/auth/pages/auth-callback';
 import { Shell } from './features/shell/components/shell';
 import { authGuard } from './core/auth/auth-guard';
 

@@ -6,8 +6,8 @@ import type { Expense } from '../models/expense';
 import { ExpenseApi } from '../services/expense-api';
 import { expenseSummary, monthLabelOf } from '../../../core/expense-summary';
 import { GIcon } from '../../../shared/gicon';
-import { MonthNav } from './month-nav';
-import { SummaryBar } from './summary-bar';
+import { MonthNav } from '../components/month-nav';
+import { SummaryBar } from '../components/summary-bar';
 import type { MonthSummary } from '../models/month-summary';
 
 /**
