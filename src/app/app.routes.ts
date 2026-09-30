@@ -4,7 +4,6 @@ import { SignIn } from './features/signin/signin';
 import { AuthCallback } from './features/auth/auth-callback';
 import { Shell } from './shell/shell';
 import { authGuard } from './core/auth/auth-guard';
-import { STUB_EXPENSES, STUB_MONTH_LABEL, STUB_SUMMARY } from './core/stub-expenses';
 
 export const routes: Routes = [
   {
@@ -17,7 +16,6 @@ export const routes: Routes = [
         path: '',
         component: ExpensesPage,
         title: 'Guito · Dashboard',
-        data: { expenses: STUB_EXPENSES, summary: STUB_SUMMARY, month: STUB_MONTH_LABEL },
       },
     ],
   },

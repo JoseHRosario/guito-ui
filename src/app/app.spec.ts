@@ -5,6 +5,8 @@ import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 import { routes } from './app.routes';
 import { serializeSession, SESSION_STORAGE_KEY } from './core/auth/auth-session';
+import { ExpenseApi } from './core/expense-api';
+import { STUB_EXPENSES } from './core/stub-expenses';
 
 function seedSession(): void {
   localStorage.setItem(
@@ -13,11 +15,17 @@ function seedSession(): void {
   );
 }
 
+/** Fake of the live API: the shell specs test rendering, not the HTTP layer. */
+const FAKE_EXPENSE_API = { provide: ExpenseApi, useValue: { latest: async () => STUB_EXPENSES } };
+
 describe('App shell + expenses list (stubbed, authed session)', () => {
   beforeEach(async () => {
     localStorage.clear();
     seedSession();
-    await TestBed.configureTestingModule({ imports: [App], providers: [provideRouter(routes)] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [provideRouter(routes), FAKE_EXPENSE_API],
+    }).compileComponents();
     const router = TestBed.inject(Router);
     await TestBed.inject(NgZone).run(() => router.navigateByUrl('/'));
   });
@@ -43,8 +51,8 @@ describe('App shell + expenses list (stubbed, authed session)', () => {
     const rows = el.querySelectorAll('[data-testid="expense-row"]');
     expect(rows.length).toBe(14);
     expect(el.textContent).toContain('65,55');
-    // pt-PT has minimumGroupingDigits=2, so Intl does not group 4853.72 (frame shows hand-typed "4.853,72").
-    expect(el.textContent).toContain('4853,72');
+    // Summary derives from the loaded data: 5 outflows sum to 579.70 (pt-PT, ungrouped under 1000).
+    expect(el.textContent).toContain('579,70');
   });
 });
 

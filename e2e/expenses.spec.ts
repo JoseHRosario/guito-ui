@@ -1,8 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// e2e for the app shell + latest-expenses list (issue guito-api#40).
-// Data is stubbed in-app; no live API wiring yet, so no network stubbing is needed.
-// All routes sit behind the auth gate (ADR-0011): specs seed a valid session first.
+import { stubExpensesApi } from './helpers/stub-auth';
+
+// e2e for the app shell + latest-expenses list (guito-api#40, now LIVE per
+// guito-api#9): the expense data comes from `GET /Expense/latest/20`, stubbed
+// at the HTTP transport level. All routes sit behind the auth gate (ADR-0011):
+// specs seed a valid session first.
 
 const SESSION_KEY = 'guito.auth.session';
 
@@ -17,6 +20,7 @@ async function seedSession(page: Page): Promise<void> {
 
 test.describe('app shell + expense list (stubbed data, signed in)', () => {
   test('desktop: header nav, avatar, sidebar, summary bar and grouped list render', async ({ page }) => {
+    await stubExpensesApi(page);
     await seedSession(page);
     await page.setViewportSize({ width: 1440, height: 1033 });
     await page.goto('/');
@@ -31,10 +35,10 @@ test.describe('app shell + expense list (stubbed data, signed in)', () => {
     }
     await expect(page.getByTestId('header-avatar')).toBeVisible();
 
-    // Summary bar (token-formatted stub values)
-    await expect(page.getByTestId('summary-expense').first()).toHaveText(/4853,72\s+€/);
-    await expect(page.getByTestId('summary-income').first()).toHaveText(/8\.?700,00\s+€/);
-    await expect(page.getByTestId('summary-total').first()).toHaveText(/3\.?846,28\s+€/);
+    // Summary derives from the loaded data: 7 outflows → 579.70 €, no income, net -579.70 €
+    await expect(page.getByTestId('summary-expense').first()).toHaveText(/579,70\s+€/);
+    await expect(page.getByTestId('summary-income').first()).toHaveText(/0,00\s+€/);
+    await expect(page.getByTestId('summary-total').first()).toHaveText(/-579,70\s+€/);
 
     // Grouped list mirrors the approved frames
     const headers = page.locator('[data-testid="group-header"]:visible');
@@ -50,6 +54,7 @@ test.describe('app shell + expense list (stubbed data, signed in)', () => {
   });
 
   test('mobile: hamburger header, bottom nav, FAB and list render', async ({ page }) => {
+    await stubExpensesApi(page);
     await seedSession(page);
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto('/');
