@@ -1,14 +1,64 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
-import { formatEur } from '../../../core/money';
-import { groupExpensesByDay } from '../../../core/group-by-day';
+import { formatEur } from '../services/money';
+import type { MonthSummary } from '../models/month-summary';
+
+// --- list-model helpers (folded single-consumer helpers, guito-api#40/#9) ---
+
+export interface ExpenseDayGroup {
+  /** ISO date key (yyyy-MM-dd) of the group. */
+  key: string;
+  /** Human label matching the approved frames, e.g. "Jan 03, Sunday". */
+  label: string;
+  expenses: readonly Expense[];
+}
+
+const dayLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit' });
+const weekdayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+
+/** Groups expenses onto calendar days (newest first). */
+function groupExpensesByDay(expenses: readonly Expense[]): ExpenseDayGroup[] {
+  const byDay = new Map<string, Expense[]>();
+  for (const expense of expenses) {
+    const day = expense.date.slice(0, 10);
+    byDay.set(day, [...(byDay.get(day) ?? []), expense]);
+  }
+  return [...byDay.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, group]) => {
+      const date = new Date(key + 'T12:00:00');
+      return { key, label: `${dayLabel.format(date)}, ${weekdayLabel.format(date)}`, expenses: group };
+    });
+}
+
+/** EXPENSE = outflows, INCOME = inflows, TOTAL = net; the API has no summary endpoint. */
+function expenseSummary(expenses: readonly Expense[]): MonthSummary {
+  let outflow = 0;
+  let inflow = 0;
+  for (const expense of expenses) {
+    if (expense.amount < 0) outflow += -expense.amount;
+    else inflow += expense.amount;
+  }
+  return { expense: outflow, income: inflow, total: inflow - outflow };
+}
+
+const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long' });
+
+/** The list's month label (e.g. "January, 2021"), from the newest expense; '' when empty. */
+function monthLabelOf(expenses: readonly Expense[]): string {
+  const newest = expenses.reduce<string | null>(
+    (latest, expense) => (latest === null || expense.date > latest ? expense.date : latest),
+    null,
+  );
+  if (newest === null) return '';
+  const date = new Date(newest);
+  return `${longMonth.format(date)}, ${date.getFullYear()}`;
+}
 import type { Expense } from '../models/expense';
 import { ExpenseApi } from '../services/expense-api';
-import { expenseSummary, monthLabelOf } from '../../../core/expense-summary';
 import { GIcon } from '../../../shared/gicon';
 import { MonthNav } from '../components/month-nav';
 import { SummaryBar } from '../components/summary-bar';
-import type { MonthSummary } from '../models/month-summary';
 
 /**
  * Latest-expenses screen, LIVE from the deployed API (guito-api#9): loads

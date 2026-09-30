@@ -2,8 +2,8 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import type { IconName } from '../../../shared/gicon';
 import type { Expense } from '../models/expense';
-import { categoryIcon } from '../../../core/category-icon';
 
 /**
  * The Expense wire contract of `GET /Expense/latest/{count}` (ADR-0003 human
@@ -17,6 +17,20 @@ interface ExpenseDto {
   description?: string | null;
   category?: string | null;
   creatorEmail?: string | null;
+}
+
+/** Maps the API's category to its list-row lucide glyph; 'tag' fallback for unknown categories. */
+function categoryIcon(category: string): IconName {
+  const ICONS: Readonly<Record<string, IconName>> = {
+    clothing: 'tag',
+    broadband: 'wifi',
+    shopping: 'shopping-bag',
+    bills: 'zap',
+    entertainment: 'film',
+    snacks: 'utensils',
+    health: 'heart',
+  };
+  return ICONS[category.toLowerCase()] ?? 'tag';
 }
 
 /** The deployed API's latest-expenses list (guito-api#9). */
