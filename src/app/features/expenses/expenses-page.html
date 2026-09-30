@@ -60,6 +60,23 @@
 
   <!-- Shared expense list card -->
   <ng-template #expenseList>
+    @if (loadError(); as error) {
+      <div class="flex w-full flex-col items-start gap-3 rounded-2xl border border-base-content/10 bg-base-100 p-6" data-testid="expenses-error">
+        <p class="text-base font-semibold text-error">Something went wrong</p>
+        <p class="text-sm leading-normal text-base-content/60">{{ error }}</p>
+        <button type="button" class="btn btn-primary btn-sm" (click)="load()" data-testid="expenses-retry">Try again</button>
+      </div>
+    } @else if (expenses() === null) {
+      <div class="flex w-full flex-col items-center gap-3 rounded-2xl border border-base-content/10 bg-base-100 p-10" data-testid="expenses-loading">
+        <span class="loading loading-spinner loading-lg text-primary" aria-label="Loading expenses"></span>
+        <p class="text-sm text-base-content/50">Loading your expenses…</p>
+      </div>
+    } @else if (groups().length === 0) {
+      <div class="flex w-full flex-col items-start gap-2 rounded-2xl border border-base-content/10 bg-base-100 p-10" data-testid="expenses-empty">
+        <p class="text-base font-semibold leading-snug text-base-content">No expenses yet</p>
+        <p class="text-sm leading-normal text-base-content/50">Your latest expenses will appear here once you add one.</p>
+      </div>
+    } @else {
     <div class="flex w-full flex-col items-start rounded-2xl border border-base-content/10 bg-base-100 pb-4 lg:pb-6">
       @for (group of groups(); track group.key) {
         <div class="flex w-full flex-col items-start gap-1 px-4 pt-4 pb-2">
@@ -82,5 +99,6 @@
         }
       }
     </div>
+    }
   </ng-template>
 </div>

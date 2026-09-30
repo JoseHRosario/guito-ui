@@ -1,6 +1,6 @@
 import { Expense } from './expense';
 
-/** Stubbed expense data mirroring the approved Figma frames (guito-api#40). No live API wiring yet. */
+/** Stubbed expense data mirroring the approved Figma frames — test fixture only since the live API wiring (guito-api#9); unit specs inject it via a fake ExpenseApi. */
 export const STUB_EXPENSES: Expense[] = [
   { id: '1', description: 'H&M', amount: -65.55, date: '2021-01-03T10:12:00', category: 'Clothing', icon: 'tag' },
   { id: '2', description: 'T-Mobile', amount: -80.0, date: '2021-01-03T11:30:00', category: 'Broadband', icon: 'wifi' },

@@ -11,6 +11,25 @@ export const E2E_AUTH_CODE = 'e2e-auth-code';
 
 export const SESSION_KEY = 'guito.auth.session';
 
+/** The latest-expenses list is LIVE (guito-api#9) — stub it at the transport. */
+const STUB_API_EXPENSES = {
+  expenses: [
+    { storedOrder: 1, date: '2021-01-03T10:12:00', amount: -65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
+    { storedOrder: 2, date: '2021-01-03T11:30:00', amount: -80.0, description: 'T-Mobile', category: 'Broadband', creatorEmail: 'e2e@guito.app' },
+    { storedOrder: 3, date: '2021-01-03T14:45:00', amount: -120.0, description: 'Walmart', category: 'Shopping', creatorEmail: 'e2e@guito.app' },
+    { storedOrder: 4, date: '2021-01-03T18:20:00', amount: -150.6, description: 'Con Edison', category: 'Bills', creatorEmail: 'e2e@guito.app' },
+    { storedOrder: 5, date: '2021-01-02T08:00:00', amount: -30.15, description: 'Netflix', category: 'Entertainment', creatorEmail: 'e2e@guito.app' },
+    { storedOrder: 6, date: '2021-01-02T09:15:00', amount: -55.0, description: 'Starbucks', category: 'Snacks', creatorEmail: 'e2e@guito.app' },
+    { storedOrder: 7, date: '2021-01-02T17:40:00', amount: -78.4, description: 'CVS Pharmacy', category: 'Health', creatorEmail: 'e2e@guito.app' },
+  ],
+};
+
+export async function stubExpensesApi(page: Page): Promise<void> {
+  await page.route('**/Expense/latest/**', (route: Route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(STUB_API_EXPENSES) }),
+  );
+}
+
 export async function stubGoogleAuthorize(page: Page, appOrigin: string): Promise<void> {
   await page.route('**/accounts.google.com/**', (route: Route) => {
     // Echo the state the app generated so the CSRF check passes end-to-end.
@@ -75,6 +94,7 @@ export async function stubbedSignInFlow(page: Page): Promise<void> {
   const appOrigin = new URL(page.url()).origin;
   await stubGoogleAuthorize(page, appOrigin);
   await stubTokenExchange(page);
+  await stubExpensesApi(page); // the Expenses list is live (guito-api#9) — stub the transport
   await page.getByTestId('signin-button').click();
 
   // Callback exchange lands the session and routes to the original target.
