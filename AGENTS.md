@@ -9,6 +9,8 @@ npm run tokens          # regenerate src/theme/tokens.css from design/tokens.jso
 npm run build           # tokens + Angular production build → dist/guito-ui/browser
 npm test                # Vitest unit tests (ng test). Do NOT use bare `npx vitest run` — it also picks up e2e/*.spec.ts and fails
 npx playwright test     # e2e: Playwright serves dist/guito-ui/browser on :8081 itself
+SMOKE_URL=https://dna69cy69n7jb.cloudfront.net/ npx playwright test e2e/deployed-smoke.spec.ts
+                        # deployed smoke: same stubbed sign-in flow against the live site (CI-only by default)
 npm start               # ng serve (dev server, :4200)
 ```
 
@@ -62,7 +64,7 @@ The **interaction contract** (auth gate → Sign In → Expenses List → Create
 
 ## Deployment
 
-- `deploy.yml` on push to `master` (e2e-gated) → OIDC-assumes `arn:aws:iam::497087877832:role/guito-ui-deploy` → S3 sync + CloudFront invalidation. `workflow_dispatch` can deploy any branch for review-before-merge.
+- `deploy.yml` on push to `master` (e2e-gated) → OIDC-assumes `arn:aws:iam::497087877832:role/guito-ui-deploy` → S3 sync + CloudFront invalidation → **deployed smoke** (`smoke` job): runs `e2e/deployed-smoke.spec.ts` with `SMOKE_URL` = the live URL — same stubbed sign-in flow, real prod build + CloudFront SPA fallback for deep links (Google/token exchange stay stubbed). `workflow_dispatch` can deploy any branch for review-before-merge.
 - Live demo: https://dna69cy69n7jb.cloudfront.net/
 
 ## Boundaries
