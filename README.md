@@ -2,7 +2,7 @@
 
 The web frontend of **Guito**, a personal expense tracker: control expenses and maximize savings. This SPA consumes the [guito-api](https://github.com/JoseHRosario/guito-api) HTTP API and is designed screen-by-screen in Figma before any code is written.
 
-> Live demo: https://dna69cy69n7jb.cloudfront.net/ (deployed from `master`; data is currently stubbed in-app)
+> Live demo: https://guito.web.kerumirembora.com/ (deployed from `master`; data is currently stubbed in-app)
 
 > Status (2026): MVP under revival. The app shell, the latest-expenses screen, and the Google auth layer (env config, PKCE `AuthService`, `/auth/callback`) are implemented against approved Figma frames / settled decisions; next up: the Sign In screen (drafted in Figma, pending approval) and the route guard. Live API wiring follows (guito-api#9).
 

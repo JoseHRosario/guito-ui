@@ -115,5 +115,5 @@ jobs:
         env:
           # What's real: the prod build, S3 assets and the CloudFront SPA
           # fallback for deep links. Google + token exchange stay stubbed.
-          SMOKE_URL: https://dna69cy69n7jb.cloudfront.net/
+          SMOKE_URL: https://guito.web.kerumirembora.com/
         run: npx playwright test e2e/deployed-smoke.spec.ts
