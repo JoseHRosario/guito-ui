@@ -5,12 +5,14 @@ import { routes } from './app.routes';
 import { environment } from '../environments/environment';
 import { APP_ENVIRONMENT } from './core/app-environment';
 import { authInterceptor } from './core/auth/auth-interceptor';
+import { provideWarmUp } from './core/warm-up/warm-up-initializer';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor])),
+    provideWarmUp(),
     { provide: APP_ENVIRONMENT, useValue: environment },
   ],
 };
