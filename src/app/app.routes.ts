@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { ExpensesPage } from './features/expenses/pages/expenses-page';
+import { CreateExpensePage } from './features/expenses/pages/create-expense-page';
 import { SignIn } from './features/signin/pages/signin';
 import { AuthCallback } from './features/auth/pages/auth-callback';
 import { Shell } from './features/shell/components/shell';
@@ -16,6 +17,11 @@ export const routes: Routes = [
         path: '',
         component: ExpensesPage,
         title: 'Guito · Dashboard',
+      },
+      {
+        path: 'expenses/create',
+        component: CreateExpensePage,
+        title: 'Guito · Create Expense',
       },
     ],
   },

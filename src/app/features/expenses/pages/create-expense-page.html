@@ -1,0 +1,160 @@
+<div class="flex w-full flex-col items-start gap-4 p-4 lg:flex-row lg:items-start lg:gap-8 lg:px-12 lg:pt-10 lg:pb-16">
+  <!-- Mobile body -->
+  <div class="flex w-full flex-col items-start gap-4 lg:hidden">
+    <p class="text-2xl leading-normal font-semibold text-base-content" data-testid="create-title">Create Expense</p>
+    <ng-container *ngTemplateOutlet="createForm" />
+  </div>
+
+  <!-- Desktop: sidebar (matches the approved Workspace desktop chrome) -->
+  <aside class="hidden w-80 shrink-0 flex-col gap-6 lg:flex">
+    <div class="flex w-full flex-col items-start gap-4 rounded-2xl border border-base-content/10 bg-base-100 p-6">
+      <div class="flex items-center gap-3">
+        <span class="flex size-12 items-center justify-center rounded-full bg-neutral text-neutral-content">
+          <span class="text-lg leading-none">JD</span>
+        </span>
+        <div class="flex flex-col items-start gap-1">
+          <p class="text-base font-semibold leading-snug text-base-content">John Doe</p>
+          <p class="text-xs leading-normal text-base-content/50">Premium Tier Member</p>
+        </div>
+      </div>
+      <hr class="w-full border-base-content/10" />
+      <div class="flex w-full items-start justify-between text-sm">
+        <p class="text-base-content/50">Main Wallet</p>
+        <p class="font-bold text-success">+12.450,00 €</p>
+      </div>
+    </div>
+
+    <div class="flex w-full flex-col items-start gap-4 rounded-2xl bg-primary p-6">
+      <p class="min-w-full max-w-fit text-2xl leading-tight font-semibold tracking-tight text-primary-content">
+        Get complete clarity on your spendings
+      </p>
+      <p class="min-w-full max-w-fit text-[13px] leading-normal text-primary-content/80">
+        Create smart budget targets to save up to 25% more every month.
+      </p>
+      <button type="button" class="btn btn-neutral btn-sm">Setup Budget</button>
+    </div>
+  </aside>
+
+  <!-- Desktop: main panel — full-width form card (frame 3094:9704) -->
+  <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
+    <p class="text-2xl leading-normal font-semibold text-base-content" data-testid="create-title">Create Expense</p>
+    <ng-container *ngTemplateOutlet="createForm" />
+  </div>
+
+  <!-- Shared form card -->
+  <ng-template #createForm>
+    <form class="flex w-full flex-col items-start gap-4 rounded-2xl border border-base-content/10 bg-base-100 p-4 lg:p-6" (submit)="$event.preventDefault(); save()" novalidate>
+      <!-- Save-failure card (frame 3094:10011): above Save, red-bordered, values kept -->
+      @if (saveError(); as error) {
+        <div class="flex w-full flex-col items-start gap-1 rounded-xl border border-error bg-error/10 p-3" data-testid="save-error">
+          <p class="text-sm font-semibold text-error">{{ error }}</p>
+          <p class="text-xs leading-normal text-base-content/60">Your values are kept — try again.</p>
+        </div>
+      }
+
+      <div class="grid w-full grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        <div class="flex flex-col items-start gap-2">
+          <label class="text-base leading-snug text-base-content" for="amount">Amount</label>
+          <input
+            id="amount"
+            [class.input-error]="errors().amount !== ''"
+            class="input h-10 w-full rounded-lg border-base-content/20 bg-base-100 px-4"
+            type="text"
+            inputmode="decimal"
+            placeholder="65,55"
+            [value]="amount()"
+            (input)="amount.set($any($event.target).value)"
+            data-testid="amount-input"
+          />
+          @if (errors().amount; as message) {
+            <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
+          }
+        </div>
+
+        <div class="flex flex-col items-start gap-2">
+          <label class="text-base leading-snug text-base-content" for="date-day">Date</label>
+          <div class="flex w-full items-start gap-2">
+            <input
+              id="date-day"
+              [class.input-error]="errors().date !== ''"
+              class="input h-10 min-w-0 flex-1 rounded-lg border-base-content/20 bg-base-100 px-4"
+              type="text"
+              inputmode="numeric"
+              placeholder="dd"
+              [value]="day()"
+              (input)="onDateSegment('day', $event)"
+              data-testid="date-day"
+            />
+            <input
+              aria-label="Month"
+              [class.input-error]="errors().date !== ''"
+              class="input h-10 min-w-0 flex-1 rounded-lg border-base-content/20 bg-base-100 px-4"
+              type="text"
+              inputmode="numeric"
+              placeholder="mm"
+              [value]="month()"
+              (input)="onDateSegment('month', $event)"
+              data-testid="date-month"
+            />
+            <input
+              aria-label="Year"
+              [class.input-error]="errors().date !== ''"
+              class="input h-10 min-w-0 flex-1 rounded-lg border-base-content/20 bg-base-100 px-4"
+              type="text"
+              inputmode="numeric"
+              placeholder="yyyy"
+              [value]="year()"
+              (input)="onDateSegment('year', $event)"
+              data-testid="date-year"
+            />
+          </div>
+          @if (errors().date; as message) {
+            <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
+          }
+        </div>
+
+        <div class="flex flex-col items-start gap-2 lg:col-span-2">
+          <label class="text-base leading-snug text-base-content" for="description">Description</label>
+          <input
+            id="description"
+            [class.input-error]="errors().description !== ''"
+            class="input h-10 w-full rounded-lg border-base-content/20 bg-base-100 px-4"
+            type="text"
+            placeholder="Veggies and fruit"
+            [value]="description()"
+            (input)="description.set($any($event.target).value)"
+            data-testid="description-input"
+          />
+          @if (errors().description; as message) {
+            <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
+          }
+        </div>
+
+        <div class="flex flex-col items-start gap-2">
+          <label class="text-base leading-snug text-base-content" for="category">Category</label>
+          <select
+            id="category"
+            [class.select-error]="errors().category !== ''"
+            class="select h-10 w-full rounded-lg border-base-content/20 bg-base-100 pl-4"
+            (change)="category.set($any($event.target).value)"
+            data-testid="category-select"
+          >
+            @for (name of categories(); track name) {
+              <option [value]="name" [selected]="name === category()">{{ name }}</option>
+            }
+          </select>
+          @if (errors().category; as message) {
+            <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
+          }
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" [disabled]="saving()" data-testid="save-expense">
+        @if (saving()) {
+          <span class="loading loading-spinner loading-sm"></span>
+        }
+        Save Expense
+      </button>
+    </form>
+  </ng-template>
+</div>

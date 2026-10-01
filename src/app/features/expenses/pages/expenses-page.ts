@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { NavigationEnd, Router } from '@angular/router';
 import { formatEur } from '../services/money';
 import type { MonthSummary } from '../models/month-summary';
 
@@ -76,6 +77,7 @@ import { SummaryBar } from '../components/summary-bar';
 export class ExpensesPage {
   private readonly expenseApi = inject(ExpenseApi);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
   private destroyed = false;
   /** Guards against a stale response (e.g. a retry racing a slow first load). */
   private loadSequence = 0;
@@ -89,11 +91,31 @@ export class ExpensesPage {
   protected readonly groups = computed(() => groupExpensesByDay(this.expenses() ?? []));
   protected readonly sidebarWallet = computed(() => formatEur(12450, { signed: true }));
 
+  /** "Expense saved" toast (frame 3094:10243): bottom-center above nav, auto-dismiss ~3s. */
+  protected readonly savedToast = signal(false);
+
   protected readonly amount = formatEur;
 
   constructor() {
     this.destroyRef.onDestroy(() => (this.destroyed = true));
     this.load();
+    // The create page lands back here with saved=1 → show the toast once, then clear the param.
+    this.router.events.subscribe((event) => {
+      if (this.destroyed || !(event instanceof NavigationEnd)) return;
+      if (this.router.parseUrl(event.urlAfterRedirects).queryParams['saved'] === '1') {
+        this.savedToast.set(true);
+        setTimeout(() => {
+          if (!this.destroyed) {
+            this.savedToast.set(false);
+            void this.router.navigate([], { queryParams: { saved: null }, queryParamsHandling: 'merge' });
+          }
+        }, 3000);
+      }
+    });
+  }
+
+  protected createExpense(): void {
+    void this.router.navigate(['/expenses/create']);
   }
 
   protected load(): void {
