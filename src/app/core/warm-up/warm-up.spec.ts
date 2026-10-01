@@ -1,5 +1,5 @@
 import { warmUpApi } from './warm-up';
-import { stubFetch } from './testing/fetch-stub';
+import { stubFetch } from './fetch-stub';
 
 describe('warmUpApi', () => {
   it('issues exactly one GET to {apiBaseUrl}/healthz', async () => {

@@ -5,7 +5,7 @@ import { routes } from './app.routes';
 import { environment } from '../environments/environment';
 import { APP_ENVIRONMENT } from './core/app-environment';
 import { authInterceptor } from './core/auth/auth-interceptor';
-import { provideWarmUp } from './core/warm-up-initializer';
+import { provideWarmUp } from './core/warm-up/warm-up-initializer';
 
 export const appConfig: ApplicationConfig = {
   providers: [

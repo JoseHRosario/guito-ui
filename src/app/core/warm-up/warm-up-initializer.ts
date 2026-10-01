@@ -1,5 +1,5 @@
 import { EnvironmentProviders, inject, provideAppInitializer } from '@angular/core';
-import { APP_ENVIRONMENT } from './app-environment';
+import { APP_ENVIRONMENT } from '../app-environment';
 import { warmUpApi } from './warm-up';
 
 /**

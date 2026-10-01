@@ -1,8 +1,8 @@
 import { ApplicationInitStatus } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { APP_ENVIRONMENT } from './app-environment';
+import { APP_ENVIRONMENT } from '../app-environment';
 import { provideWarmUp } from './warm-up-initializer';
-import { stubFetch } from './testing/fetch-stub';
+import { stubFetch } from './fetch-stub';
 
 const TEST_ENV = { production: false, googleClientId: 'cid', apiBaseUrl: 'https://api.test' };
 
