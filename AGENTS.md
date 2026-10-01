@@ -21,6 +21,10 @@ Deploy gate on every PR (CI): tokens → build → Vitest → Playwright. Run al
 - `git pull` from `master` first; **one feature branch per issue**, named `feature/<issue#>-<slug>` (issue number first — e.g. `feature/9-user-flow`; no `t6a2`-style prefixes on new work). Work lands via PR, and the PR body **must end with `Closes #N`** so GitHub closes the issue on merge into `master` (staging merges don't close — that's deliberate). **Never push to `master`.**
 - Agent commits/PRs are authored as the bot: `Meireles (Hermes Agent) <332697001+xungameireles@users.noreply.github.com>`; José's commits stay under his name.
 - PRs carry the issue reference; José reviews and merges.
+- **Parallel sessions use git worktrees.** The main tree (`/d/srv/projects/guito-ui`) stays on `master` and is shared (José's Windows sync + any agent session) — never check a feature branch out there. For work on a separate issue while another session works, create a worktree **inside the repo** under the gitignored `.worktrees/` dir: `git worktree add .worktrees/<issue#>-<slug> feature/<issue#>-<slug>`. Branches are exclusive per worktree, so sessions cannot collide.
+- **Before any blanket `git add -A`, verify `.worktrees/` is ignored on the current branch** (`git check-ignore .worktrees/` — branch history may predate the ignore entry); otherwise prefer adding explicit paths. A branch without the ignore entry would stage an entire nested repo copy.
+- **Always run `git branch --show-current` before starting work** — the shared tree may have been switched by another session since you last looked.
+- Remove the worktree when its PR merges: `git worktree remove .worktrees/<name> && git worktree prune`.
 
 ## Stack (verified — do not suggest older patterns)
 
