@@ -9,6 +9,13 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy target (push-to-master deploys production regardless)'
+        type: choice
+        required: true
+        default: production
+        options: [production, staging]
 
 permissions:
   contents: read
@@ -20,8 +27,6 @@ concurrency:
 
 env:
   AWS_REGION: eu-west-1
-  S3_BUCKET: guito-ui-site-497087877832
-  CF_DISTRIBUTION_ID: E1165HQRHT670N
 
 jobs:
   e2e:
@@ -54,6 +59,8 @@ jobs:
   deploy:
     name: deploy (S3 + CloudFront)
     needs: e2e
+    outputs:
+      smoke_url: ${{ steps.resolve-target.outputs.smoke_url }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -67,8 +74,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (tokens + Angular production build)
-        run: npm run build
+      - name: Resolve deploy target
+        id: resolve-target
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TARGET=production
+          else
+            TARGET="${{ inputs.environment }}"
+          fi
+          echo "Deploy target: $TARGET"
+          if [ "$TARGET" = "staging" ]; then
+            echo "S3_BUCKET=guito-ui-staging-site-497087877832" >> "$GITHUB_ENV"
+            echo "CF_DISTRIBUTION_ID=E3REPLACE_STAGING_DIST_ID" >> "$GITHUB_ENV"
+            echo "BUILD_CONFIGURATION=staging" >> "$GITHUB_ENV"
+            echo "SMOKE_URL=https://guito-staging.web.kerumirembora.com/" >> "$GITHUB_ENV"
+          else
+            echo "S3_BUCKET=guito-ui-site-497087877832" >> "$GITHUB_ENV"
+            echo "CF_DISTRIBUTION_ID=E1165HQRHT670N" >> "$GITHUB_ENV"
+            echo "BUILD_CONFIGURATION=production" >> "$GITHUB_ENV"
+            echo "SMOKE_URL=https://guito.web.kerumirembora.com/" >> "$GITHUB_ENV"
+          fi
+          echo "smoke_url=$SMOKE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Build (tokens + Angular build, ${{ env.BUILD_CONFIGURATION }})
+        run: npm run build -- --configuration "${{ env.BUILD_CONFIGURATION }}"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -113,7 +142,8 @@ jobs:
 
       - name: Deployed smoke (stubbed sign-in flow against the live site)
         env:
-          # What's real: the prod build, S3 assets and the CloudFront SPA
+          # What's real: the target build, S3 assets and the CloudFront SPA
           # fallback for deep links. Google + token exchange stay stubbed.
-          SMOKE_URL: https://guito.web.kerumirembora.com/
+          # SMOKE_URL is resolved per target in the deploy job.
+          SMOKE_URL: ${{ needs.deploy.outputs.smoke_url }}
         run: npx playwright test e2e/deployed-smoke.spec.ts
