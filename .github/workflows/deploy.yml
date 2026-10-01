@@ -87,13 +87,17 @@ jobs:
             echo "S3_BUCKET=guito-ui-staging-site-497087877832" >> "$GITHUB_ENV"
             echo "CF_DISTRIBUTION_ID=E215NA8R2JDTMB" >> "$GITHUB_ENV"
             echo "BUILD_CONFIGURATION=staging" >> "$GITHUB_ENV"
-            echo "SMOKE_URL=https://guito-staging.web.kerumirembora.com/" >> "$GITHUB_ENV"
+            SMOKE_URL='https://guito-staging.web.kerumirembora.com/'
           else
             echo "S3_BUCKET=guito-ui-site-497087877832" >> "$GITHUB_ENV"
             echo "CF_DISTRIBUTION_ID=E1165HQRHT670N" >> "$GITHUB_ENV"
             echo "BUILD_CONFIGURATION=production" >> "$GITHUB_ENV"
-            echo "SMOKE_URL=https://guito.web.kerumirembora.com/" >> "$GITHUB_ENV"
+            SMOKE_URL='https://guito.web.kerumirembora.com/'
           fi
+          # Export for downstream steps AND emit the job output in the same
+          # step: $GITHUB_ENV writes only apply to SUBSEQUENT steps, so the
+          # smoke_url output must be echoed from the local variable here.
+          echo "SMOKE_URL=$SMOKE_URL" >> "$GITHUB_ENV"
           echo "smoke_url=$SMOKE_URL" >> "$GITHUB_OUTPUT"
 
       - name: Build (tokens + Angular build, ${{ env.BUILD_CONFIGURATION }})
