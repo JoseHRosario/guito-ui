@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { APP_ENVIRONMENT } from '../app-environment';
 import { AuthService } from './auth-service';
@@ -33,6 +33,15 @@ function serviceWithStorage(storage: Record<string, string>) {
     providers: [{ provide: APP_ENVIRONMENT, useValue: TEST_ENV }],
   }).inject(AuthService);
 }
+
+// The Angular unit-test builder runs vitest with `isolate: false`: spec files
+// in the same worker share one environment, so global stubs created here
+// (storage, location, fetch) leak into the next file the worker runs. Tear
+// them down after each test — otherwise a later spec's `localStorage.clear()`
+// hits our clear-less storage stub (CI failure, PR #33).
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function okTokenResponse() {
   return new Response(
