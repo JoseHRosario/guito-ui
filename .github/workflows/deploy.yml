@@ -85,7 +85,7 @@ jobs:
           echo "Deploy target: $TARGET"
           if [ "$TARGET" = "staging" ]; then
             echo "S3_BUCKET=guito-ui-staging-site-497087877832" >> "$GITHUB_ENV"
-            echo "CF_DISTRIBUTION_ID=E3REPLACE_STAGING_DIST_ID" >> "$GITHUB_ENV"
+            echo "CF_DISTRIBUTION_ID=E215NA8R2JDTMB" >> "$GITHUB_ENV"
             echo "BUILD_CONFIGURATION=staging" >> "$GITHUB_ENV"
             echo "SMOKE_URL=https://guito-staging.web.kerumirembora.com/" >> "$GITHUB_ENV"
           else
