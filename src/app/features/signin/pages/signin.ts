@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth-service';
 import { GIcon } from '../../../shared/gicon';
 
@@ -17,18 +18,35 @@ import { GIcon } from '../../../shared/gicon';
 })
 export class SignIn {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
   /** Query param bound via withComponentInputBinding (defaults per AGENTS rule). */
   readonly returnUrl = input<string>('/');
 
   protected readonly safeReturnUrl = computed(() => sanitize(this.returnUrl()));
 
-  protected signIn(): void {
-    void this.auth.signIn(this.safeReturnUrl());
+  /**
+   * Popup flow: resolves with the returnUrl → swap this screen for it in place.
+   * Full-page fallback: signIn resolves `undefined` after leaving for Google.
+   * Popup closed by the user: signIn rejects → stay put.
+   */
+  protected async signIn(): Promise<void> {
+    let url: string | undefined;
+    try {
+      url = await this.auth.signIn(this.safeReturnUrl());
+    } catch {
+      return;
+    }
+    if (url === undefined) return;
+    await this.router.navigateByUrl(sanitize(url), { replaceUrl: true });
   }
 }
 
-/** Only relative paths — an absolute/foreign returnUrl is an open-redirect vector. */
-function sanitize(url: string): string {
-  return url.startsWith('/') && !url.startsWith('//') ? url : '/';
+/**
+ * Only relative paths — an absolute/foreign returnUrl is an open-redirect
+ * vector. `withComponentInputBinding` sets the bound input to undefined when
+ * the query param is absent (direct /signin visits), so undefined maps to '/'.
+ */
+function sanitize(url: string | undefined): string {
+  return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') ? url : '/';
 }

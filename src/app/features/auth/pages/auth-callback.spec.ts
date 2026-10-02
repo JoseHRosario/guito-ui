@@ -32,7 +32,7 @@ describe('AuthCallback', () => {
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     await create({ code: 'abc', state: 'st' });
     expect(auth.completeSignIn).toHaveBeenCalledWith({ code: 'abc', state: 'st' });
-    expect(navigate).toHaveBeenCalledWith('/expenses');
+    expect(navigate).toHaveBeenCalledWith('/expenses', { replaceUrl: true });
   });
 
   it('shows the Google error and does not exchange the code', async () => {
@@ -69,6 +69,24 @@ describe('AuthCallback', () => {
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     auth.completeSignIn.mockResolvedValue('https://evil.example.com/steal');
     await create({ code: 'abc', state: 'st' });
-    expect(navigate).toHaveBeenCalledWith('/');
+    expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+  });
+
+  it('hands the code to the opener window and closes itself when running inside the popup', async () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', { configurable: true, value: opener });
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {});
+    try {
+      await create({ code: 'abc', state: 'st' });
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        { source: 'guito-auth-popup-handoff', code: 'abc', state: 'st', error: '' },
+        location.origin,
+      );
+      expect(auth.completeSignIn).not.toHaveBeenCalled();
+      expect(closeSpy).toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'opener', { configurable: true, value: null });
+      closeSpy.mockRestore();
+    }
   });
 });

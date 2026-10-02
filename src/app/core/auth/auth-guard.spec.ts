@@ -4,7 +4,7 @@ import { NgZone } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, type UrlTree } from '@angular/router';
 import { AuthService } from './auth-service';
-import { authGuard } from './auth-guard';
+import { authGuard, signedInGuard } from './auth-guard';
 import { serializeSession, SESSION_STORAGE_KEY, type AuthSession } from './auth-session';
 
 import { Component } from '@angular/core';
@@ -60,6 +60,24 @@ describe('authGuard', () => {
   });
 });
 
+describe('signedInGuard (issue #36)', () => {
+  it('redirects an already-authenticated user to the app root', () => {
+    auth.isAuthenticated.mockReturnValue(true);
+    const guard = TestBed.runInInjectionContext(() =>
+      signedInGuard({} as never, { url: '/signin' } as never),
+    ) as UrlTree;
+    expect(guard.toString()).toBe('/');
+  });
+
+  it('lets unauthenticated visitors through', () => {
+    auth.isAuthenticated.mockReturnValue(false);
+    const guard = TestBed.runInInjectionContext(() =>
+      signedInGuard({} as never, { url: '/signin' } as never),
+    );
+    expect(guard).toBe(true);
+  });
+});
+
 describe('app routing behind the guard (ADR-0011)', () => {
   it('unauthenticated visits to / land on /signin?returnUrl=/', async () => {
     TestBed.resetTestingModule();
@@ -69,6 +87,24 @@ describe('app routing behind the guard (ADR-0011)', () => {
     await TestBed.inject(NgZone).run(() => router.navigateByUrl('/'));
     expect(router.url).toContain('/signin');
     expect(router.url).toContain('returnUrl=%2F');
+  });
+
+  it('an authenticated user re-entering /auth/callback lands on the app root (cold-start stale entry)', async () => {
+    localStorage.setItem(SESSION_STORAGE_KEY, serializeSession(validSession()));
+    TestBed.resetTestingModule();
+    const { routes } = await import('../../app.routes');
+    TestBed.configureTestingModule({ providers: [provideRouter(routes)] });
+    const router = TestBed.inject(Router);
+    await TestBed.inject(NgZone).run(() =>
+      router.navigateByUrl('/auth/callback?code=spent&state=st'),
+    );
+    expect(router.url).toBe('/');
+  });
+
+  afterEach(() => {
+    // CONVENTIONS: cleanup must not depend on the preceding assertions —
+    // isolate:false means a leaked session can bleed into the next spec.
+    localStorage.removeItem(SESSION_STORAGE_KEY);
   });
 
   it('unauthenticated deep links keep the full URL as returnUrl', async () => {

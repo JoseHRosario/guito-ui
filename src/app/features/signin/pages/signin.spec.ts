@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@angular/compiler';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth-service';
 import { SignIn } from './signin';
 
-const auth = { signIn: vi.fn(async () => {}), isAuthenticated: vi.fn(() => false) };
+const auth = { signIn: vi.fn(async (): Promise<string | undefined> => undefined), isAuthenticated: vi.fn(() => false) };
 
 beforeEach(() => {
-  auth.signIn.mockClear();
+  auth.signIn.mockClear().mockResolvedValue(undefined);
   TestBed.configureTestingModule({
     providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
   });
@@ -65,5 +65,49 @@ describe('SignIn', () => {
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('[data-testid="signin-legal"]')?.textContent).toMatch(/terms of service/i);
+  });
+
+  it('swaps the sign-in screen for the returnUrl after a popup sign-in succeeds (replaceUrl)', async () => {
+    auth.signIn.mockResolvedValue('/');
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    const fixture = await create();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[data-testid="signin-button"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+  });
+
+  it('does not navigate when the full-page redirect fallback took over (undefined)', async () => {
+    auth.signIn.mockResolvedValue(undefined);
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl');
+    const fixture = await create();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[data-testid="signin-button"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('stays on the sign-in screen when the user closes the popup (signIn rejects)', async () => {
+    auth.signIn.mockRejectedValue(new Error('Sign-in window was closed before completing.'));
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl');
+    const fixture = await create();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[data-testid="signin-button"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('treats an absent returnUrl binding (direct /signin, input set to undefined) as /', async () => {
+    // Regression: withComponentInputBinding sets the bound input to undefined
+    // when the query param is absent — the click must still start sign-in.
+    const fixture = await create();
+    fixture.componentRef.setInput('returnUrl', undefined);
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[data-testid="signin-button"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(auth.signIn).toHaveBeenCalledWith('/');
   });
 });
