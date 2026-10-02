@@ -42,7 +42,11 @@ export class SignIn {
   }
 }
 
-/** Only relative paths — an absolute/foreign returnUrl is an open-redirect vector. */
-function sanitize(url: string): string {
-  return url.startsWith('/') && !url.startsWith('//') ? url : '/';
+/**
+ * Only relative paths — an absolute/foreign returnUrl is an open-redirect
+ * vector. `withComponentInputBinding` sets the bound input to undefined when
+ * the query param is absent (direct /signin visits), so undefined maps to '/'.
+ */
+function sanitize(url: string | undefined): string {
+  return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') ? url : '/';
 }

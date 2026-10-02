@@ -99,4 +99,15 @@ describe('SignIn', () => {
     await fixture.whenStable();
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it('treats an absent returnUrl binding (direct /signin, input set to undefined) as /', async () => {
+    // Regression: withComponentInputBinding sets the bound input to undefined
+    // when the query param is absent — the click must still start sign-in.
+    const fixture = await create();
+    fixture.componentRef.setInput('returnUrl', undefined);
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('[data-testid="signin-button"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(auth.signIn).toHaveBeenCalledWith('/');
+  });
 });

@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page, type Route } from '@playwright/test';
 
 /**
  * Shared stubs for the sign-in flow e2e (guito-api#51 + deployed smoke):
@@ -24,13 +24,13 @@ const STUB_API_EXPENSES = {
   ],
 };
 
-export async function stubExpensesApi(page: Page): Promise<void> {
+export async function stubExpensesApi(page: Page | BrowserContext): Promise<void> {
   await page.route('**/Expense/latest/**', (route: Route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(STUB_API_EXPENSES) }),
   );
 }
 
-export async function stubGoogleAuthorize(page: Page, appOrigin: string): Promise<void> {
+export async function stubGoogleAuthorize(page: Page | BrowserContext, appOrigin: string): Promise<void> {
   await page.route('**/accounts.google.com/**', (route: Route) => {
     // Echo the state the app generated so the CSRF check passes end-to-end.
     const state = new URL(route.request().url()).searchParams.get('state') ?? '';
@@ -50,7 +50,7 @@ interface TokenRequestBody {
   redirectUri: string;
 }
 
-export async function stubTokenExchange(page: Page): Promise<void> {
+export async function stubTokenExchange(page: Page | BrowserContext): Promise<void> {
   await page.route('**/Auth/token', async (route: Route) => {
     const request = route.request();
     if (request.method() !== 'POST') {
