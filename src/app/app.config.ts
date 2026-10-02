@@ -6,6 +6,7 @@ import { environment } from '../environments/environment';
 import { APP_ENVIRONMENT } from './core/app-environment';
 import { authInterceptor } from './core/auth/auth-interceptor';
 import { provideWarmUp } from './core/warm-up/warm-up-initializer';
+import { provideBfcacheGuard } from './core/auth/bfcache-guard-initializer';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -13,6 +14,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideWarmUp(),
+    provideBfcacheGuard(),
     { provide: APP_ENVIRONMENT, useValue: environment },
   ],
 };
