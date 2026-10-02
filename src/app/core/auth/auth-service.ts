@@ -24,8 +24,8 @@ const SIGN_OUT_REDIRECT = '/signin';
 // Back-safe.
 const POPUP_WIDTH = 480;
 const POPUP_HEIGHT = 720;
-const POPUP_TIMEOUT_MS = 120_000;
-const POPUP_POLL_INTERVAL_MS = 500;
+/** Mutable so tests can shorten the waits — real code never touches it. */
+export const popupTiming = { timeoutMs: 120_000, pollIntervalMs: 500 };
 /** data.source marker on the postMessage the popup's callback page sends back. */
 export const AUTH_POPUP_HANDOFF = 'guito-auth-popup-handoff';
 
@@ -190,7 +190,7 @@ export class AuthService {
           clearTimeout(timeout);
           reject(new PopupAbandoned('popup window was closed'));
         }
-      }, POPUP_POLL_INTERVAL_MS);
+      }, popupTiming.pollIntervalMs);
       const timeout = setTimeout(() => {
         if (settled) return;
         settled = true;
@@ -198,7 +198,7 @@ export class AuthService {
         clearInterval(poll);
         clearTimeout(timeout);
         reject(new Error('Popup sign-in handoff timed out.'));
-      }, POPUP_TIMEOUT_MS);
+      }, popupTiming.timeoutMs);
       window.addEventListener('message', onMessage);
     });
   }

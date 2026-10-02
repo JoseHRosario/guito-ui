@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { APP_ENVIRONMENT } from '../app-environment';
-import { AuthService } from './auth-service';
+import { AuthService, popupTiming } from './auth-service';
 
 const TEST_ENV = {
   production: false,
@@ -207,17 +207,17 @@ describe('AuthService.signIn — popup flow (issue #36 desktop Back)', () => {
     const auth = serviceWithStorage(storage);
     const popup = fakePopup();
     openFn.mockReturnValue(popup);
-    vi.useFakeTimers();
+    // Real timers with a shortened window — deterministic under CI load,
+    // unlike fake-timer advances racing the native crypto setup (PR #37).
+    popupTiming.timeoutMs = 40;
+    popupTiming.pollIntervalMs = 10;
     try {
-      const startPromise = auth.signIn();
-      await vi.advanceTimersByTimeAsync(0);
-
-      await vi.advanceTimersByTimeAsync(121_000);
-      await startPromise;
+      await auth.signIn();
       expect(assign).toHaveBeenCalledTimes(1);
       expect(new URL(assign.mock.calls[0][0] as string).host).toBe('accounts.google.com');
     } finally {
-      vi.useRealTimers();
+      popupTiming.timeoutMs = 120_000;
+      popupTiming.pollIntervalMs = 500;
     }
   });
 
