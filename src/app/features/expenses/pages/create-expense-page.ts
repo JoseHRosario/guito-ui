@@ -17,6 +17,9 @@ function amountText(amount: number): string {
   return amount.toFixed(2).replace('.', ',');
 }
 
+/** Fields the voice path may mark as AI suggested; keeps template lookups type-checked. */
+export type VoiceField = 'amount' | 'date' | 'description' | 'category';
+
 /** history.state payload left by the voice capture path (issue #44). */
 export interface VoicePrefillState {
   voicePrefill: ExtractedExpense;
@@ -49,7 +52,7 @@ export class CreateExpensePage {
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
   /** AI proposal fields carry "AI suggested" markers until the user edits them (frame 3134:10053). */
-  protected readonly voiceSuggested = signal<ReadonlySet<string>>(new Set());
+  protected readonly voiceSuggested = signal<ReadonlySet<VoiceField>>(new Set());
 
   constructor() {
     // Voice capture (issue #44) lands here with history.state.voicePrefill.
@@ -61,7 +64,7 @@ export class CreateExpensePage {
           // The AI-proposed category only preselects when the API offers it.
           const match = names.find((name) => name.toLowerCase() === prefill.category.toLowerCase());
           this.category.set(match ?? (names.length > 0 ? names[0] : ''));
-          if (match) this.voiceSuggested.update((set) => new Set([...set, 'category']));
+          if (match) this.voiceSuggested.update((set) => new Set([...set, 'category' as VoiceField]));
         } else if (names.length > 0) {
           this.category.set(names[0]);
         }
@@ -74,7 +77,10 @@ export class CreateExpensePage {
       this.amount.set(amountText(prefill.amount));
       this.description.set(prefill.description);
       if (prefill.date) this.isoDate.set(prefill.date);
-      this.voiceSuggested.set(new Set(['amount', 'date', 'description']));
+      // 'date' only when the proposal actually carried one (marker/value drift guard).
+      const fields: VoiceField[] = ['amount', 'description'];
+      if (prefill.date) fields.push('date');
+      this.voiceSuggested.set(new Set(fields));
     }
   }
 
@@ -99,7 +105,7 @@ export class CreateExpensePage {
     this.clearSuggested('category');
   }
 
-  private clearSuggested(field: string): void {
+  private clearSuggested(field: VoiceField): void {
     this.voiceSuggested.update((set) => {
       const next = new Set(set);
       next.delete(field);

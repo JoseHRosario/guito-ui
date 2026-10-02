@@ -45,8 +45,9 @@ export function speechSupported(): boolean {
 export class SpeechCapture {
   private readonly createRecognition: SpeechRecognitionFactory;
   private active: SpeechRecognitionLike | null = null;
-  /** '' = keep listening; a transcript finalizes as it arrives. */
+  /** '' = keep listening; final results accumulate with exact-text dedupe. */
   private transcript = '';
+  private readonly seen = new Set<string>();
   private cancelled = false;
 
   constructor(createRecognition: SpeechRecognitionFactory = defaultFactory) {
@@ -63,6 +64,7 @@ export class SpeechCapture {
     if (!recognition) return Promise.reject(new Error('speech-unsupported'));
     this.active = recognition;
     this.transcript = '';
+    this.seen.clear();
     this.cancelled = false;
     return new Promise<string>((resolve, reject) => {
       recognition.lang = lang;
@@ -70,10 +72,14 @@ export class SpeechCapture {
       recognition.interimResults = false;
       recognition.onresult = (event) => {
         for (let i = 0; i < event.results.length; i++) {
-          const result = event.results[i];
-          const alternative = result[0];
-          if (alternative && alternative.transcript && !this.transcript.includes(alternative.transcript)) {
-            this.transcript += (this.transcript ? ' ' : '') + alternative.transcript.trim();
+          const alternative = event.results[i][0];
+          const text = alternative?.transcript?.trim();
+          // Dedupe by exact text: the engine re-delivers every final result on
+          // each event, but a NEW utterance repeating a word ("café" again)
+          // must not be dropped — only exact re-delivery is.
+          if (text && !this.seen.has(text)) {
+            this.seen.add(text);
+            this.transcript += (this.transcript ? ' ' : '') + text;
           }
         }
       };
