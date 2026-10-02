@@ -95,6 +95,12 @@ export async function stubbedSignInFlow(page: Page): Promise<void> {
   await stubGoogleAuthorize(page, appOrigin);
   await stubTokenExchange(page);
   await stubExpensesApi(page); // the Expenses list is live (guito-api#9) — stub the transport
+  // The app prefers a POPUP sign-in (issue #36) and Playwright page routes do
+  // not cover popup windows — block the popup so the flow exercises the
+  // full-page redirect fallback, which IS routed by stubGoogleAuthorize.
+  await page.evaluate(() => {
+    (window as unknown as { open: unknown }).open = () => null;
+  });
   await page.getByTestId('signin-button').click();
 
   // Callback exchange lands the session and routes to the original target.

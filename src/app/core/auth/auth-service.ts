@@ -17,11 +17,26 @@ const PKCE_STORAGE_KEY = 'guito.auth.pkce';
 const AUTH_CALLBACK_PATH = '/auth/callback';
 const SIGN_OUT_REDIRECT = '/signin';
 
+// Popup sign-in (issue #36): desktop browsers open Google in a popup so the
+// main window's history never gains a Google entry and Back after sign-in
+// stays in the app. Standalone PWAs (Android) can't host popups reliably and
+// keep the full-page redirect, which replaceUrl + signedInGuard already make
+// Back-safe.
+const POPUP_WIDTH = 480;
+const POPUP_HEIGHT = 720;
+const POPUP_TIMEOUT_MS = 120_000;
+const POPUP_POLL_INTERVAL_MS = 500;
+/** data.source marker on the postMessage the popup's callback page sends back. */
+export const AUTH_POPUP_HANDOFF = 'guito-auth-popup-handoff';
+
 interface PendingSignIn {
   verifier: string;
   state: string;
   returnUrl: string;
 }
+
+/** The popup went away without completing (user closed it) — abort, no fallback. */
+class PopupAbandoned extends Error {}
 
 /**
  * Surface the API's RFC 6749 `error`/`error_description` body (the exchange
@@ -65,25 +80,140 @@ export class AuthService {
   });
 
   /**
-   * Start the PKCE flow: persist the verifier/state pair, then leave for the
-   * Google consent screen. `returnUrl` is restored after the callback lands.
+   * Start the PKCE flow and persist the verifier/state pair.
+   *
+   * Desktop (popup-capable): Google opens in a popup; the popup's callback
+   * page posts the authorization code back (AUTH_POPUP_HANDOFF) and the main
+   * window completes the exchange. Resolves with the returnUrl — no Google
+   * entry ever enters the main window's history, so Back after sign-in does
+   * nothing (issue #36).
+   *
+   * Standalone PWA / blocked popup / handoff failure: falls back to the
+   * full-page redirect. Resolves `undefined` once the redirect has been
+   * initiated (the caller must not navigate); the pending PKCE pair is kept
+   * so the /auth/callback redirect can complete the flow.
+   *
+   * Rejects only when the user abandons the popup (closed without completing).
    */
-  async signIn(returnUrl: string = '/'): Promise<void> {
-    const verifier = createCodeVerifier();
-    const pending: PendingSignIn = { verifier, state: generateState(), returnUrl };
+  async signIn(returnUrl: string = '/'): Promise<string | undefined> {
+    const pending: PendingSignIn = {
+      verifier: createCodeVerifier(),
+      state: generateState(),
+      returnUrl,
+    };
     sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(pending));
     this.pending.set(pending);
 
+    const authorizeUrl = await this.buildAuthorizeUrl(pending);
+    const popup = this.canUsePopup() ? this.openSignInPopup(authorizeUrl) : null;
+    if (popup === null) {
+      location.assign(authorizeUrl);
+      return undefined;
+    }
+
+    try {
+      const handoff = await this.waitForPopupHandoff(popup);
+      try {
+        return await this.completeSignIn(handoff);
+      } finally {
+        this.closeSignInPopup(popup);
+      }
+    } catch (cause) {
+      if (cause instanceof PopupAbandoned) {
+        this.clearPending();
+        throw new AuthError('Sign-in window was closed before completing.', { cause });
+      }
+      // A failed exchange or malformed handoff: the full-page redirect's
+      // error-card UX already handles every failure mode.
+      this.clearPending();
+      this.closeSignInPopup(popup);
+      location.assign(authorizeUrl);
+      return undefined;
+    }
+  }
+
+  /** Standalone installed PWAs (Android) can't run the popup handoff reliably. */
+  private canUsePopup(): boolean {
+    if (typeof window.open !== 'function') return false;
+    if (typeof window.matchMedia !== 'function') return true;
+    return !window.matchMedia('(display-mode: standalone)').matches;
+  }
+
+  private openSignInPopup(authorizeUrl: string): Window | null {
+    return window.open(
+      authorizeUrl,
+      'guito-signin',
+      `popup=yes,width=${POPUP_WIDTH},height=${POPUP_HEIGHT}`,
+    );
+  }
+
+  private closeSignInPopup(popup: Window): void {
+    try {
+      if (!popup.closed) popup.close();
+    } catch {
+      // A cross-origin popup late in its lifecycle may refuse close() — harmless.
+    }
+  }
+
+  /**
+   * Wait for the popup's /auth/callback page to post the authorization code
+   * back. Only messages from OUR popup on OUR origin count; anything else is
+   * ignored and the wait continues.
+   */
+  private waitForPopupHandoff(popup: Window): Promise<{ code: string; state: string }> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const onMessage = (event: MessageEvent): void => {
+        if (settled || event.origin !== location.origin || event.source !== popup) return;
+        const data = event.data as {
+          source?: unknown;
+          code?: unknown;
+          state?: unknown;
+        } | null;
+        if (!data || data.source !== AUTH_POPUP_HANDOFF) return;
+        settled = true;
+        window.removeEventListener('message', onMessage);
+        clearInterval(poll);
+        clearTimeout(timeout);
+        if (typeof data.code === 'string' && typeof data.state === 'string') {
+          resolve({ code: data.code, state: data.state });
+        } else {
+          reject(new Error('Popup sign-in handoff was malformed.'));
+        }
+      };
+      const poll = setInterval(() => {
+        if (settled) return;
+        if (popup.closed) {
+          settled = true;
+          window.removeEventListener('message', onMessage);
+          clearInterval(poll);
+          clearTimeout(timeout);
+          reject(new PopupAbandoned('popup window was closed'));
+        }
+      }, POPUP_POLL_INTERVAL_MS);
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('message', onMessage);
+        clearInterval(poll);
+        clearTimeout(timeout);
+        reject(new Error('Popup sign-in handoff timed out.'));
+      }, POPUP_TIMEOUT_MS);
+      window.addEventListener('message', onMessage);
+    });
+  }
+
+  private async buildAuthorizeUrl(pending: PendingSignIn): Promise<string> {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.env.googleClientId,
       redirect_uri: this.redirectUri(),
       scope: 'openid email profile',
       state: pending.state,
-      code_challenge: await codeChallenge(verifier),
+      code_challenge: await codeChallenge(pending.verifier),
       code_challenge_method: 'S256',
     });
-    location.assign(`${AUTHORIZE_URL}?${params}`);
+    return `${AUTHORIZE_URL}?${params}`;
   }
 
   /**

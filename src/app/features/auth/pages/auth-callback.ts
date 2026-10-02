@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { AuthError, AuthService } from '../../../core/auth/auth-service';
+import { AUTH_POPUP_HANDOFF, AuthError, AuthService } from '../../../core/auth/auth-service';
 
 /**
  * Landing for the Google OAuth redirect (`/auth/callback`). Exchanges the
@@ -55,6 +55,7 @@ export class AuthCallback {
   }
 
   async complete(): Promise<void> {
+    if (this.handoffToOpener()) return;
     if (this.error()) {
       this.message.set(`Google sign-in failed: ${this.error()}`);
       return;
@@ -70,6 +71,28 @@ export class AuthCallback {
         cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
       );
     }
+  }
+
+  /**
+   * Popup-mode branch: this page is running inside the sign-in popup, so it
+   * doesn't exchange anything — it posts the code back to the opener (the
+   * main window validates origin + source) and closes itself. Returns true
+   * when the handoff was performed.
+   */
+  private handoffToOpener(): boolean {
+    const opener = window.opener;
+    if (!opener || opener === window) return false;
+    opener.postMessage(
+      {
+        source: AUTH_POPUP_HANDOFF,
+        code: this.code(),
+        state: this.state(),
+        error: this.error(),
+      },
+      location.origin,
+    );
+    window.close();
+    return true;
   }
 
   retry(): void {

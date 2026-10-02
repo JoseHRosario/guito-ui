@@ -55,6 +55,21 @@ function okTokenResponse() {
 }
 
 let assign: ReturnType<typeof vi.fn>;
+let openFn: ReturnType<typeof vi.fn>;
+
+interface FakePopup {
+  closed: boolean;
+  close: ReturnType<typeof vi.fn>;
+}
+
+function fakePopup(): FakePopup & Window {
+  return { closed: false, close: vi.fn() } as unknown as FakePopup & Window;
+}
+
+function postFromPopup(popup: Window, data: unknown, origin = 'https://app.example.com'): void {
+  const event = new MessageEvent('message', { data, origin, source: popup });
+  window.dispatchEvent(event);
+}
 
 beforeEach(() => {
   assign = vi.fn();
@@ -64,6 +79,10 @@ beforeEach(() => {
     assign,
   });
   vi.stubGlobal('fetch', vi.fn(async () => okTokenResponse()));
+  // Default: no popup available → the full-page redirect fallback runs, which
+  // is what the existing signIn expectations (location.assign) describe.
+  openFn = vi.fn(() => null);
+  vi.stubGlobal('open', openFn);
 });
 
 describe('AuthService initialization', () => {
@@ -93,6 +112,129 @@ describe('AuthService initialization', () => {
       }),
     });
     expect(auth.isAuthenticated()).toBe(false);
+  });
+});
+
+describe('AuthService.signIn — popup flow (issue #36 desktop Back)', () => {
+  it('opens a popup with the authorize URL and completes sign-in from the handoff message', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    const popup = fakePopup();
+    openFn.mockReturnValue(popup);
+
+    const startPromise = auth.signIn('/expenses');
+    await vi.waitFor(() => expect(openFn).toHaveBeenCalledTimes(1));
+    const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+    const popupUrl = new URL(openFn.mock.calls[0][0] as string);
+    expect(popupUrl.origin + popupUrl.pathname).toBe(AUTHORIZE_HOST);
+    expect(popupUrl.searchParams.get('state')).toBe(pkce.state);
+
+    postFromPopup(popup, {
+      source: 'guito-auth-popup-handoff',
+      code: 'abc',
+      state: pkce.state,
+    });
+
+    expect(await startPromise).toBe('/expenses');
+    expect(assign).not.toHaveBeenCalled();
+    expect(auth.isAuthenticated()).toBe(true);
+    expect(storage['session:guito.auth.pkce']).toBeUndefined();
+  });
+
+  it('ignores handoff messages that do not come from its own popup or origin', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    const popup = fakePopup();
+    openFn.mockReturnValue(popup);
+
+    const startPromise = auth.signIn();
+    await vi.waitFor(() => expect(openFn).toHaveBeenCalledTimes(1));
+    const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+
+    // Wrong origin and wrong source: must be ignored, sign-in keeps waiting.
+    postFromPopup(popup, { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state }, 'https://evil.example.com');
+    const wrongWindow = fakePopup();
+    postFromPopup(wrongWindow, { source: 'guito-auth-popup-handoff', code: 'x', state: pkce.state });
+
+    postFromPopup(popup, { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state });
+    await startPromise;
+    expect(assign).not.toHaveBeenCalled();
+    expect(auth.isAuthenticated()).toBe(true);
+  });
+
+  it('falls back to the full-page redirect when the popup is blocked', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+
+    await auth.signIn('/expenses');
+
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(new URL(assign.mock.calls[0][0] as string).host).toBe('accounts.google.com');
+    // Pending PKCE survives: the full-page callback completes the flow.
+    expect(JSON.parse(storage['session:guito.auth.pkce']).returnUrl).toBe('/expenses');
+  });
+
+  it('redirects straight to the full-page flow in standalone (installed PWA) mode', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const popup = fakePopup();
+    openFn.mockReturnValue(popup);
+
+    await auth.signIn();
+
+    expect(openFn).not.toHaveBeenCalled();
+    expect(assign).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts with an AuthError when the user closes the popup', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    const popup = fakePopup();
+    openFn.mockReturnValue(popup);
+
+    const startPromise = auth.signIn();
+    await vi.waitFor(() => expect(openFn).toHaveBeenCalledTimes(1));
+    popup.closed = true;
+
+    await expect(startPromise).rejects.toThrowError(/closed/i);
+    expect(assign).not.toHaveBeenCalled();
+    expect(storage['session:guito.auth.pkce']).toBeUndefined();
+  });
+
+  it('falls back to the full-page redirect when no handoff arrives within the timeout', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    const popup = fakePopup();
+    openFn.mockReturnValue(popup);
+    vi.useFakeTimers();
+    try {
+      const startPromise = auth.signIn();
+      await vi.advanceTimersByTimeAsync(0);
+
+      await vi.advanceTimersByTimeAsync(121_000);
+      await startPromise;
+      expect(assign).toHaveBeenCalledTimes(1);
+      expect(new URL(assign.mock.calls[0][0] as string).host).toBe('accounts.google.com');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('falls back to the full-page redirect when the exchange rejects the handoff code', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    const popup = fakePopup();
+    openFn.mockReturnValue(popup);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })));
+
+    const startPromise = auth.signIn();
+    await vi.waitFor(() => expect(openFn).toHaveBeenCalledTimes(1));
+    const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+    postFromPopup(popup, { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state });
+
+    await startPromise;
+    expect(assign).toHaveBeenCalledTimes(1);
   });
 });
 

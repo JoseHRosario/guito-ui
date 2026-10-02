@@ -71,4 +71,22 @@ describe('AuthCallback', () => {
     await create({ code: 'abc', state: 'st' });
     expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
   });
+
+  it('hands the code to the opener window and closes itself when running inside the popup', async () => {
+    const opener = { postMessage: vi.fn() };
+    Object.defineProperty(window, 'opener', { configurable: true, value: opener });
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {});
+    try {
+      await create({ code: 'abc', state: 'st' });
+      expect(opener.postMessage).toHaveBeenCalledWith(
+        { source: 'guito-auth-popup-handoff', code: 'abc', state: 'st', error: '' },
+        location.origin,
+      );
+      expect(auth.completeSignIn).not.toHaveBeenCalled();
+      expect(closeSpy).toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'opener', { configurable: true, value: null });
+      closeSpy.mockRestore();
+    }
+  });
 });
