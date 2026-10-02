@@ -54,7 +54,12 @@
 
       <div class="grid w-full grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <div class="flex flex-col items-start gap-2">
+          <div class="flex w-full items-center justify-between gap-2">
           <label class="text-base leading-snug text-base-content" for="amount">Amount</label>
+          @if (voiceSuggested().has('amount')) {
+            <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-amount">AI suggested</span>
+          }
+        </div>
           <input
             id="amount"
             [class.input-error]="errors().amount !== ''"
@@ -63,7 +68,7 @@
             inputmode="decimal"
             placeholder="65,55"
             [value]="amount()"
-            (input)="amount.set($any($event.target).value)"
+            (input)="onAmount($any($event.target).value)"
             data-testid="amount-input"
           />
           @if (errors().amount; as message) {
@@ -72,7 +77,12 @@
         </div>
 
         <div class="flex flex-col items-start gap-2">
+          <div class="flex w-full items-center justify-between gap-2">
           <label class="text-base leading-snug text-base-content" for="date">Date</label>
+          @if (voiceSuggested().has('date')) {
+            <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-date">AI suggested</span>
+          }
+        </div>
           <input
             id="date"
             [class.input-error]="errors().date !== ''"
@@ -88,7 +98,12 @@
         </div>
 
         <div class="flex flex-col items-start gap-2 lg:col-span-2">
+          <div class="flex w-full items-center justify-between gap-2">
           <label class="text-base leading-snug text-base-content" for="description">Description</label>
+          @if (voiceSuggested().has('description')) {
+            <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-description">AI suggested</span>
+          }
+        </div>
           <input
             id="description"
             [class.input-error]="errors().description !== ''"
@@ -96,7 +111,7 @@
             type="text"
             placeholder="Veggies and fruit"
             [value]="description()"
-            (input)="description.set($any($event.target).value)"
+            (input)="onDescription($any($event.target).value)"
             data-testid="description-input"
           />
           @if (errors().description; as message) {
@@ -105,12 +120,17 @@
         </div>
 
         <div class="flex flex-col items-start gap-2">
+          <div class="flex w-full items-center justify-between gap-2">
           <label class="text-base leading-snug text-base-content" for="category">Category</label>
+          @if (voiceSuggested().has('category')) {
+            <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-category">AI suggested</span>
+          }
+        </div>
           <select
             id="category"
             [class.select-error]="errors().category !== ''"
             class="select h-10 w-full rounded-lg border-base-content/20 bg-base-100 pl-4"
-            (change)="category.set($any($event.target).value)"
+            (change)="onCategory($any($event.target).value)"
             data-testid="category-select"
           >
             @for (name of categories(); track name) {

@@ -66,18 +66,36 @@
     >
       <button
         type="button"
-        class="flex items-center gap-2 rounded-full bg-base-100 px-4 py-2.5 text-sm font-semibold text-base-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
-        [disabled]="favoriteSaving() !== null"
+        class="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
+        [disabled]="dialBusy()"
         (click)="createExpense()"
         data-testid="speed-dial-manual"
       >
         Manual
       </button>
+      <!-- Voice pill (frames 3141:2 / 3141:180): speak icon while listening,
+           spinner while /AI/extract runs; visible-but-disabled with a note on
+           browsers without the Web Speech API (issue #44). -->
+      <button
+        type="button"
+        class="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
+        [disabled]="!voiceSupported || dialBusy()"
+        [attr.aria-label]="voiceState() === 'listening' ? 'Listening — speak your expense' : 'Create an expense by voice'"
+        (click)="startVoice()"
+        data-testid="speed-dial-voice"
+      >
+        @if (voiceState() === 'extracting') {
+          <span class="loading loading-sm" data-testid="voice-spinner"></span>
+        } @else if (voiceState() === 'listening') {
+          <g-icon name="audio-lines" class="size-4" data-testid="voice-speak-icon" />
+        }
+        Voice
+      </button>
       @for (favorite of favorites; track favorite.name) {
         <button
           type="button"
           class="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
-          [disabled]="favoriteSaving() !== null"
+          [disabled]="dialBusy()"
           [attr.data-testid]="'speed-dial-favorite-' + favoriteSlug(favorite.name)"
           (click)="createFavorite(favorite)"
         >
@@ -87,8 +105,13 @@
           {{ favorite.name }}
         </button>
       }
+      @if (!voiceSupported) {
+        <p class="max-w-56 rounded-xl bg-primary px-3 py-2 text-xs leading-normal text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]" data-testid="voice-unsupported-note">
+          Voice input isn't supported in this browser — use Chrome or Edge.
+        </p>
+      }
       @if (favoriteError(); as error) {
-        <p class="max-w-64 rounded-xl bg-base-100 px-3 py-2 text-xs leading-normal text-error shadow-[0_4px_12px_rgba(0,0,0,0.25)]" role="alert" data-testid="speed-dial-error">
+        <p class="max-w-64 rounded-xl bg-primary px-3 py-2 text-xs leading-normal text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]" role="alert" data-testid="speed-dial-error">
           {{ error }}
         </p>
       }
@@ -114,6 +137,17 @@
     >
       <g-icon name="check" class="size-4" />
       Expense saved
+    </div>
+  }
+
+  <!-- Voice failure toast (issue #44): same pill as the save toast, error role -->
+  @if (voiceToast(); as voiceError) {
+    <div
+      class="fixed bottom-24 left-1/2 z-20 flex h-11 w-fit -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-content shadow-lg lg:bottom-10"
+      role="alert"
+      data-testid="voice-toast"
+    >
+      {{ voiceError }}
     </div>
   }
 

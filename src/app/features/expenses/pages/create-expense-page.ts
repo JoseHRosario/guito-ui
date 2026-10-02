@@ -4,11 +4,25 @@ import { Router } from '@angular/router';
 import { CategoryApi } from '../services/category-api';
 import { ExpenseApi } from '../services/expense-api';
 import { parseAmount, validateExpenseInput, type ExpenseFieldErrors } from '../services/validate-expense';
+import type { ExtractedExpense } from '../services/ai-extract';
 
 /** Local date as ISO yyyy-MM-dd (the date input's wire format). */
 function todayIso(): string {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
+/** pt-PT decimal comma display for a prefilled amount (2.3 → '2,30'). */
+function amountText(amount: number): string {
+  return amount.toFixed(2).replace('.', ',');
+}
+
+/** Fields the voice path may mark as AI suggested; keeps template lookups type-checked. */
+export type VoiceField = 'amount' | 'date' | 'description' | 'category';
+
+/** history.state payload left by the voice capture path (issue #44). */
+export interface VoicePrefillState {
+  voicePrefill: ExtractedExpense;
 }
 
 /**
@@ -37,22 +51,66 @@ export class CreateExpensePage {
   protected readonly errors = signal<ExpenseFieldErrors>({ amount: '', description: '', date: '', category: '' });
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
+  /** AI proposal fields carry "AI suggested" markers until the user edits them (frame 3134:10053). */
+  protected readonly voiceSuggested = signal<ReadonlySet<VoiceField>>(new Set());
 
   constructor() {
+    // Voice capture (issue #44) lands here with history.state.voicePrefill.
+    const prefill = this.router.getCurrentNavigation()?.extras?.state?.['voicePrefill'] as ExtractedExpense | undefined;
     void this.categoryApi.list().then(
       (names) => {
         this.categories.set(names);
-        if (names.length > 0) this.category.set(names[0]);
+        if (prefill) {
+          // The AI-proposed category only preselects when the API offers it.
+          const match = names.find((name) => name.toLowerCase() === prefill.category.toLowerCase());
+          this.category.set(match ?? (names.length > 0 ? names[0] : ''));
+          if (match) this.voiceSuggested.update((set) => new Set([...set, 'category' as VoiceField]));
+        } else if (names.length > 0) {
+          this.category.set(names[0]);
+        }
       },
       () => {
         /* category load failure: leave the select empty; validation flags it */
       },
     );
+    if (prefill) {
+      this.amount.set(amountText(prefill.amount));
+      this.description.set(prefill.description);
+      if (prefill.date) this.isoDate.set(prefill.date);
+      // 'date' only when the proposal actually carried one (marker/value drift guard).
+      const fields: VoiceField[] = ['amount', 'description'];
+      if (prefill.date) fields.push('date');
+      this.voiceSuggested.set(new Set(fields));
+    }
   }
 
   /** daisyUI date input emits ISO yyyy-MM-dd directly ('' when cleared). */
   protected onDate(event: Event): void {
     this.isoDate.set((event.target as HTMLInputElement).value);
+    this.clearSuggested('date');
+  }
+
+  protected onAmount(value: string): void {
+    this.amount.set(value);
+    this.clearSuggested('amount');
+  }
+
+  protected onDescription(value: string): void {
+    this.description.set(value);
+    this.clearSuggested('description');
+  }
+
+  protected onCategory(value: string): void {
+    this.category.set(value);
+    this.clearSuggested('category');
+  }
+
+  private clearSuggested(field: VoiceField): void {
+    this.voiceSuggested.update((set) => {
+      const next = new Set(set);
+      next.delete(field);
+      return next;
+    });
   }
 
   protected save(): void {

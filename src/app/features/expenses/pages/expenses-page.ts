@@ -54,6 +54,9 @@ function monthLabelOf(expenses: readonly Expense[]): string {
 }
 import type { Expense } from '../models/expense';
 import { ExpenseApi } from '../services/expense-api';
+import { AiExtractApi } from '../services/ai-extract';
+import type { VoicePrefillState } from './create-expense-page';
+import { SpeechCapture, speechSupported } from '../services/speech-capture';
 import { FAVORITES } from '../services/favorites';
 import type { Favorite } from '../services/favorites';
 import { GIcon } from '../../../shared/gicon';
@@ -75,6 +78,7 @@ import { SummaryBar } from '../components/summary-bar';
 })
 export class ExpensesPage {
   private readonly expenseApi = inject(ExpenseApi);
+  private readonly aiExtract = inject(AiExtractApi);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private destroyed = false;
@@ -102,14 +106,85 @@ export class ExpensesPage {
   protected readonly favoriteSaving = signal<string | null>(null);
   protected readonly favoriteError = signal<string | null>(null);
 
+  /** Voice capture state machine (issue #44): idle → listening → extracting. */
+  protected readonly voiceState = signal<'idle' | 'listening' | 'extracting'>('idle');
+  /** "Couldn't understand" toast (frame 3141:180 → failure path): bottom-center, auto-dismiss. */
+  protected readonly voiceToast = signal<string | null>(null);
+  /** Bumps on every state reset — stale extract responses become no-ops. */
+  private voiceSequence = 0;
+  private voiceToastTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Firefox/Safari: Voice pill visible but disabled with a note (approved frame). */
+  protected readonly voiceSupported = speechSupported();
+  private readonly speech = new SpeechCapture();
+
+  /** One guard for every dial action while a voice capture or favorite create is in flight. */
+  protected readonly dialBusy = computed(() => this.favoriteSaving() !== null || this.voiceState() !== 'idle');
+
   protected toggleSpeedDial(): void {
     this.favoriteError.set(null);
     this.speedDialOpen.update((open) => !open);
   }
 
   protected closeSpeedDial(): void {
+    // Closing the dial cancels the in-flight voice capture (issue #44):
+    // listening aborts the recording; a running extract is invalidated by the
+    // sequence bump so its success can no longer navigate.
+    this.voiceSequence++;
+    if (this.voiceState() === 'listening') this.speech.cancel();
     this.speedDialOpen.set(false);
     this.favoriteError.set(null);
+  }
+
+  /**
+   * Voice path (issue #44, approved frames 3141:2/3141:180): pill shows the
+   * speak icon while listening; recording auto-stops on silence; the pill's
+   * icon swaps to a spinner while POST /AI/extract runs; success closes the
+   * dial and navigates to the create form prefilled (user still saves
+   * explicitly). Failure/unusable result → toast + stay on the list.
+   */
+  protected startVoice(): void {
+    if (this.dialBusy() || !this.voiceSupported) return;
+    this.favoriteError.set(null);
+    this.voiceState.set('listening');
+    const seq = this.voiceSequence;
+    void this.speech.start().then(
+      (transcript) => {
+        if (this.destroyed || seq !== this.voiceSequence) return;
+        // Empty transcript = silence or cancelled: back to idle, no error.
+        if (transcript === '') {
+          this.voiceState.set('idle');
+          return;
+        }
+        this.voiceState.set('extracting');
+        void this.aiExtract.extract(transcript).then(
+          (prefill) => {
+            if (this.destroyed || seq !== this.voiceSequence) return;
+            this.voiceState.set('idle');
+            this.speedDialOpen.set(false);
+            void this.router.navigate(['/expenses/create'], { state: { voicePrefill: prefill } satisfies VoicePrefillState });
+          },
+          () => {
+            if (this.destroyed || seq !== this.voiceSequence) return;
+            this.voiceFailed("Couldn't understand — try again or create manually.");
+          },
+        );
+      },
+      () => {
+        if (this.destroyed || seq !== this.voiceSequence) return;
+        this.voiceFailed("Couldn't hear you — try again.");
+      },
+    );
+  }
+
+  private voiceFailed(message: string): void {
+    this.voiceState.set('idle');
+    if (this.destroyed) return;
+    this.voiceToast.set(message);
+    if (this.voiceToastTimer !== null) clearTimeout(this.voiceToastTimer);
+    this.voiceToastTimer = setTimeout(() => {
+      this.voiceToastTimer = null;
+      if (!this.destroyed) this.voiceToast.set(null);
+    }, 4000);
   }
 
   /** url-safe slug for the per-favorite data-testid (e.g. 'Morning Coffee' → 'morning-coffee'). */
@@ -119,7 +194,7 @@ export class ExpensesPage {
 
   /** Instant-creates an Expense from a favorite: date = today, amount as-is (ADR 0010 positive). */
   protected createFavorite(favorite: Favorite): void {
-    if (this.favoriteSaving() !== null) return;
+    if (this.dialBusy()) return;
     this.favoriteError.set(null);
     this.favoriteSaving.set(favorite.name);
     const today = new Date();
@@ -145,7 +220,10 @@ export class ExpensesPage {
   }
 
   constructor() {
-    this.destroyRef.onDestroy(() => (this.destroyed = true));
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      if (this.voiceToastTimer !== null) clearTimeout(this.voiceToastTimer);
+    });
     this.load();
     // The create page lands back here with saved=1 → show the toast once, then clear the param.
     this.router.events.subscribe((event) => {
