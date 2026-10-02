@@ -83,9 +83,8 @@
         >
           @if (favoriteSaving() === favorite.name) {
             <span class="loading loading-sm" data-testid="favorite-spinner"></span>
-          } @else {
-            {{ favorite.name }}
           }
+          {{ favorite.name }}
         </button>
       }
       @if (favoriteError(); as error) {

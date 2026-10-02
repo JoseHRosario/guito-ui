@@ -231,9 +231,8 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     favoriteButton.click();
     fixture.detectChanges();
 
-    // in-flight feedback: the pressed pill swaps its label for a spinner
+    // in-flight feedback: a spinner joins the label inside the pressed pill
     expect(el.querySelector('[data-testid="favorite-spinner"]')).not.toBeNull();
-    expect(favoriteButton.textContent?.trim()).toBe('');
 
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.method).toBe('POST');
