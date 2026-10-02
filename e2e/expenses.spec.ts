@@ -46,7 +46,7 @@ test.describe('app shell + expense list (stubbed data, signed in)', () => {
     await expect(page.locator('[data-testid="expense-row"]:visible')).toHaveCount(7);
     const firstRow = page.locator('[data-testid="expense-row"]:visible').first();
     await expect(firstRow).toContainText('H&M');
-    await expect(firstRow).toContainText('-65,55 €');
+    await expect(firstRow).toContainText('65,55 €');
 
     // Footer + sidebar (desktop-only regions)
     await expect(page.getByText('Guito · Personal Expense Tracker')).toBeVisible();

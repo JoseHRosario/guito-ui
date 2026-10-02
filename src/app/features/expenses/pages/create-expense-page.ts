@@ -1,9 +1,15 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CategoryApi } from '../services/category-api';
 import { ExpenseApi } from '../services/expense-api';
 import { parseAmount, validateExpenseInput, type ExpenseFieldErrors } from '../services/validate-expense';
+
+/** Local date as ISO yyyy-MM-dd (the date input's wire format). */
+function todayIso(): string {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
 
 /**
  * Create Expense screen (issue #32): implements the approved Figma frame set
@@ -26,26 +32,13 @@ export class CreateExpensePage {
   protected readonly category = signal('');
   protected readonly amount = signal('');
   protected readonly description = signal('');
-  protected readonly day = signal('');
-  protected readonly month = signal('');
-  protected readonly year = signal('');
+  /** ISO yyyy-MM-dd (daisyUI date input); defaults to today. */
+  protected readonly isoDate = signal(todayIso());
   protected readonly errors = signal<ExpenseFieldErrors>({ amount: '', description: '', date: '', category: '' });
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
 
-  /** dd/mm/yyyy → ISO yyyy-MM-dd; '' while segments are incomplete. */
-  protected readonly isoDate = computed(() => {
-    const d = this.day().padStart(2, '0');
-    const m = this.month().padStart(2, '0');
-    const y = this.year();
-    return /^\d{2}$/.test(d) && /^\d{2}$/.test(m) && /^\d{4}$/.test(y) ? `${y}-${m}-${d}` : '';
-  });
-
   constructor() {
-    const today = new Date();
-    this.day.set(String(today.getDate()).padStart(2, '0'));
-    this.month.set(String(today.getMonth() + 1).padStart(2, '0'));
-    this.year.set(String(today.getFullYear()));
     void this.categoryApi.list().then(
       (names) => {
         this.categories.set(names);
@@ -57,13 +50,9 @@ export class CreateExpensePage {
     );
   }
 
-  /** Segment inputs carry digits only (frame: dd/mm/yyyy three-segment control).
-   * Deliberate DOM write-back: sanitizing the input in place (no state bypass). */
-  protected onDateSegment(segment: 'day' | 'month' | 'year', event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const digits = input.value.replace(/\D/g, '').slice(0, segment === 'year' ? 4 : 2);
-    input.value = digits;
-    this[segment].set(digits);
+  /** daisyUI date input emits ISO yyyy-MM-dd directly ('' when cleared). */
+  protected onDate(event: Event): void {
+    this.isoDate.set((event.target as HTMLInputElement).value);
   }
 
   protected save(): void {
@@ -84,9 +73,9 @@ export class CreateExpensePage {
     void this.expenseApi
       .create({
         date: this.isoDate(),
-        // Expenses are outflows: the API stores Amount verbatim and the list
-        // renders it verbatim, so post the negative (approved list convention).
-        amount: -parsedAmount,
+        // ADR 0010: amounts are stored positive — the outflow is implied by
+        // the record being an Expense. Post the parsed amount as-is.
+        amount: parsedAmount,
         description: this.description().trim(),
         category: this.category(),
       })

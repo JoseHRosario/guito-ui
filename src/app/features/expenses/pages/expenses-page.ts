@@ -32,15 +32,12 @@ function groupExpensesByDay(expenses: readonly Expense[]): ExpenseDayGroup[] {
     });
 }
 
-/** EXPENSE = outflows, INCOME = inflows, TOTAL = net; the API has no summary endpoint. */
+/** EXPENSE rows are outflows — ADR 0010: amounts are stored positive and the
+ * outflow is implied by the record being an Expense; TOTAL = net. */
 function expenseSummary(expenses: readonly Expense[]): MonthSummary {
   let outflow = 0;
-  let inflow = 0;
-  for (const expense of expenses) {
-    if (expense.amount < 0) outflow += -expense.amount;
-    else inflow += expense.amount;
-  }
-  return { expense: outflow, income: inflow, total: inflow - outflow };
+  for (const expense of expenses) outflow += expense.amount;
+  return { expense: outflow, income: 0, total: -outflow };
 }
 
 const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long' });
@@ -57,6 +54,8 @@ function monthLabelOf(expenses: readonly Expense[]): string {
 }
 import type { Expense } from '../models/expense';
 import { ExpenseApi } from '../services/expense-api';
+import { FAVORITES } from '../services/favorites';
+import type { Favorite } from '../services/favorites';
 import { GIcon } from '../../../shared/gicon';
 import { MonthNav } from '../components/month-nav';
 import { SummaryBar } from '../components/summary-bar';
@@ -95,6 +94,55 @@ export class ExpensesPage {
   protected readonly savedToast = signal(false);
 
   protected readonly amount = formatEur;
+
+  /** Favorites speed-dial (issue #43, ADR 0012): FAB toggles the action menu. */
+  protected readonly favorites = FAVORITES;
+  protected readonly speedDialOpen = signal(false);
+  /** The favorite name whose create POST is in flight (disables the dial buttons). */
+  protected readonly favoriteSaving = signal<string | null>(null);
+  protected readonly favoriteError = signal<string | null>(null);
+
+  protected toggleSpeedDial(): void {
+    this.favoriteError.set(null);
+    this.speedDialOpen.update((open) => !open);
+  }
+
+  protected closeSpeedDial(): void {
+    this.speedDialOpen.set(false);
+    this.favoriteError.set(null);
+  }
+
+  /** url-safe slug for the per-favorite data-testid (e.g. 'Morning Coffee' → 'morning-coffee'). */
+  protected favoriteSlug(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
+  /** Instant-creates an Expense from a favorite: date = today, amount as-is (ADR 0010 positive). */
+  protected createFavorite(favorite: Favorite): void {
+    if (this.favoriteSaving() !== null) return;
+    this.favoriteError.set(null);
+    this.favoriteSaving.set(favorite.name);
+    const today = new Date();
+    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    void this.expenseApi
+      .create({ date, amount: favorite.amount, description: favorite.description, category: favorite.category })
+      .then(
+        () => {
+          this.favoriteSaving.set(null);
+          this.closeSpeedDial();
+          if (!this.destroyed) {
+            // Navigating '/' → '/?saved=1' reuses this component (params-only
+            // change, no reconstruction), so refresh the list explicitly.
+            this.load();
+            void this.router.navigate(['/'], { queryParams: { saved: '1' } });
+          }
+        },
+        () => {
+          this.favoriteSaving.set(null);
+          this.favoriteError.set('Could not save the expense — check your connection and try again.');
+        },
+      );
+  }
 
   constructor() {
     this.destroyRef.onDestroy(() => (this.destroyed = true));
