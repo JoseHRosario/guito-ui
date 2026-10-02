@@ -57,3 +57,17 @@ The **interaction contract** (auth gate → Sign In → Expenses List → Create
 - **Never** commit secrets (`.env` holds the Figma PAT and is gitignored); never edit the Community Figma file; never push to `master`.
 - **Ask first** before: adding a dependency, deviating from a token color (document each deviation in the PR body), changing the deploy pipeline, or touching the token mapping (`tools/tokens/figma.json`).
 - **Always** run the full local suite before pushing; keep this file current — add a rule whenever an agent correction recurs, prune stale ones in the same commit.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on this repo (`gh` CLI); one branch per issue, PR closes #N. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles used as-is: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
