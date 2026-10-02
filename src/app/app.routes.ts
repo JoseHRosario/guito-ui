@@ -4,7 +4,7 @@ import { CreateExpensePage } from './features/expenses/pages/create-expense-page
 import { SignIn } from './features/signin/pages/signin';
 import { AuthCallback } from './features/auth/pages/auth-callback';
 import { Shell } from './features/shell/components/shell';
-import { authGuard } from './core/auth/auth-guard';
+import { authGuard, signedInGuard } from './core/auth/auth-guard';
 
 export const routes: Routes = [
   {
@@ -25,9 +25,21 @@ export const routes: Routes = [
       },
     ],
   },
-  // OAuth redirect landing — must exist outside the auth gate (ADR 0011).
-  { path: 'auth/callback', component: AuthCallback, title: 'Guito · Signing in' },
-  { path: 'signin', component: SignIn, title: 'Guito · Sign in' },
+  // OAuth redirect landing — must exist outside the auth gate (ADR 0011);
+  // an already-authenticated visitor is sent to the root, never back into the
+  // exchange (issue #36: stale callback history entries, PWA cold start).
+  {
+    path: 'auth/callback',
+    component: AuthCallback,
+    canActivate: [signedInGuard],
+    title: 'Guito · Signing in',
+  },
+  {
+    path: 'signin',
+    component: SignIn,
+    canActivate: [signedInGuard],
+    title: 'Guito · Sign in',
+  },
   // Unknown URLs redirect to '' which is auth-gated itself — the guard still applies.
   { path: '**', redirectTo: '' },
 ];

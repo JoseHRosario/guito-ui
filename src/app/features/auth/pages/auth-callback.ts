@@ -64,7 +64,7 @@ export class AuthCallback {
         code: this.code(),
         state: this.state(),
       }));
-      await this.router.navigateByUrl(returnUrl);
+      await this.router.navigateByUrl(returnUrl, { replaceUrl: true });
     } catch (cause) {
       this.message.set(
         cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
