@@ -49,7 +49,7 @@ The **interaction contract** (auth gate → Sign In → Expenses List → Create
 
 ## Deployment
 
-- `deploy.yml` on push to `master` (e2e-gated) → OIDC-assumes `arn:aws:iam::497087877832:role/guito-ui-deploy` → S3 sync + CloudFront invalidation → **deployed smoke** (`smoke` job): runs `e2e/deployed-smoke.spec.ts` with `SMOKE_URL` = the live URL — same stubbed sign-in flow, real prod build + CloudFront SPA fallback for deep links (Google/token exchange stay stubbed). `workflow_dispatch` can deploy any branch for review-before-merge.
+- `deploy.yml` on push to `master` (e2e-gated) → OIDC-assumes `arn:aws:iam::497087877832:role/guito-ui-deploy` → S3 sync + CloudFront invalidation → **deployed smoke** (`smoke` job): runs `e2e/deployed-smoke.spec.ts` with `SMOKE_URL` = the live URL — same stubbed sign-in flow, real prod build + CloudFront SPA fallback for deep links (Google/token exchange stay stubbed). `workflow_dispatch` can deploy any branch for review-before-merge. Pushes to `feature/**` / `bug/**` branches AUTO-deploy to staging (`guito-staging.web.kerumirembora.com`, staging build config) — one shared distribution, last push wins, and staging runs can never cancel a production deploy.
 - Live demo: https://guito.web.kerumirembora.com/
 
 ## Boundaries

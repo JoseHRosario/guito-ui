@@ -7,7 +7,7 @@ name: deploy
 
 on:
   push:
-    branches: [master]
+    branches: [master, 'feature/**', 'bug/**']
   workflow_dispatch:
     inputs:
       environment:
@@ -21,9 +21,15 @@ permissions:
   contents: read
   id-token: write # required by the AWS OIDC credential action
 
+# Two independent lanes so branch pushes can never cancel a production deploy:
+# - deploy-prod (master pushes): queued, never cancelled.
+# - deploy-staging (feature/bug pushes): one SHARED staging distribution —
+#   concurrent branch deploys supersede each other, so cancel-in-progress makes
+#   the NEWEST branch push win instead of a stale queue ordering.
+# Manual dispatches get their own per-ref lane.
 concurrency:
-  group: deploy-main
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/master' && 'deploy-prod' || 'deploy-staging') || format('deploy-dispatch-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref != 'refs/heads/master' }}
 
 env:
   AWS_REGION: eu-west-1
@@ -78,7 +84,12 @@ jobs:
         id: resolve-target
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            TARGET=production
+            # Master pushes → production; any other pushed branch → staging.
+            if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+              TARGET=production
+            else
+              TARGET=staging
+            fi
           else
             TARGET="${{ inputs.environment }}"
           fi
