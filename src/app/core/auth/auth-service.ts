@@ -8,6 +8,7 @@ import {
   SESSION_STORAGE_KEY,
 } from './auth-session';
 import { codeChallenge, createCodeVerifier, generateState } from './pkce';
+import { revokeAccessToken } from './revoke-access-token';
 
 /** Thrown for any sign-in failure the callback component should surface. */
 export class AuthError extends Error {}
@@ -275,8 +276,23 @@ export class AuthService {
     return pending.returnUrl;
   }
 
-  /** Clear auth state (localStorage + signal). Returns the redirect target. */
+  /**
+   * Clear auth state (localStorage + signal) and revoke the session's Google
+   * access token server-side (guito-api#64: POST /Auth/logout collapses the
+   * copied-token validity window to ~0). Fire-and-forget: a failed/unreachable
+   * endpoint NEVER blocks or delays the local sign-out. Returns the redirect
+   * target.
+   */
   signOut(): string {
+    const session = this.session();
+    if (session !== null) {
+      // Headers carry the ID TOKEN (edge authorizer validates it); the ACCESS
+      // token rides in the body — it's the one being revoked (guito-api#64).
+      void revokeAccessToken(this.env.apiBaseUrl, session.idToken, session.accessToken, fetch).then(
+        () => undefined,
+        () => undefined,
+      );
+    }
     localStorage.removeItem(SESSION_STORAGE_KEY);
     this.session.set(null);
     return SIGN_OUT_REDIRECT;

@@ -356,7 +356,7 @@ describe('AuthService.completeSignIn', () => {
 });
 
 describe('AuthService.signOut', () => {
-  it('clears the persisted session and the auth state', async () => {
+  it('clears the persisted session and the auth state, then revokes the Google access token (guito-api#64)', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
     await auth.signIn();
@@ -364,15 +364,44 @@ describe('AuthService.signOut', () => {
     await auth.completeSignIn({ code: 'abc', state: pkce.state });
     expect(auth.isAuthenticated()).toBe(true);
 
-    auth.signOut();
+    const redirect = auth.signOut();
 
+    expect(redirect).toBe('/signin');
     expect(auth.isAuthenticated()).toBe(false);
     expect(auth.session()).toBeNull();
     expect(storage['guito.auth.session']).toBeUndefined();
+    const fetchMock = vi.mocked(fetch);
+    const logoutCall = fetchMock.mock.calls.find(([u]) => u === 'https://api.example.com/Auth/logout');
+    expect(logoutCall).toBeTruthy();
+    const [, init] = logoutCall!;
+    expect(init?.method).toBe('POST');
+    // Both headers carry the ID TOKEN (edge authorizer contract); the access
+    // token rides in the body — it's the one being revoked.
+    expect(init?.headers).toEqual(expect.objectContaining({
+      Authorization: 'Bearer new.id.token',
+      'x-google-idtoken': 'new.id.token',
+    }));
+    expect(JSON.parse(init?.body as string)).toEqual({ accessToken: 'new.at' });
   });
 
-  it('returns the /signin redirect target', () => {
+  it('still signs out locally when the revocation endpoint is unreachable or fails', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+    await auth.signIn();
+    const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+    await auth.completeSignIn({ code: 'abc', state: pkce.state });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })));
+
+    expect(auth.signOut()).toBe('/signin');
+    expect(auth.isAuthenticated()).toBe(false);
+    // The failure must not become an unhandled rejection.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(storage['guito.auth.session']).toBeUndefined();
+  });
+
+  it('returns the /signin redirect target without revoking when signed out with no session', () => {
     const auth = serviceWithStorage({});
     expect(auth.signOut()).toBe('/signin');
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
