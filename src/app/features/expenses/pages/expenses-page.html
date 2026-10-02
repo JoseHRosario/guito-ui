@@ -49,12 +49,55 @@
     <ng-container *ngTemplateOutlet="expenseList" />
   </div>
 
-  <!-- Mobile floating action button -->
+  <!-- Mobile floating action button + favorites speed-dial (issue #43, ADR 0012) -->
+  @if (speedDialOpen()) {
+    <!-- scrim z-[9] sits UNDER the FAB's z-10 deliberately: the FAB stays
+         clickable above the scrim so one tap on it also closes the dial -->
+    <button
+      type="button"
+      class="fixed inset-0 z-[9] cursor-default bg-base-content/20 lg:hidden"
+      aria-label="Close actions"
+      (click)="closeSpeedDial()"
+      data-testid="speed-dial-scrim"
+    ></button>
+    <div
+      class="fixed right-3 bottom-[calc(6rem+4.25rem)] z-10 flex flex-col items-end gap-2 lg:hidden"
+      data-testid="speed-dial-menu"
+    >
+      <button
+        type="button"
+        class="btn btn-sm h-11 rounded-full bg-base-100 px-4 text-base-content shadow-lg"
+        [disabled]="favoriteSaving() !== null"
+        (click)="createExpense()"
+        data-testid="speed-dial-manual"
+      >
+        <g-icon name="plus" class="size-4" />
+        Manual
+      </button>
+      @for (favorite of favorites; track favorite.name) {
+        <button
+          type="button"
+          class="btn btn-sm h-11 rounded-full bg-primary px-4 text-primary-content shadow-lg"
+          [disabled]="favoriteSaving() !== null"
+          [attr.data-testid]="'speed-dial-favorite-' + favoriteSlug(favorite.name)"
+          (click)="createFavorite(favorite)"
+        >
+          {{ favorite.name }} · {{ amount(favorite.amount) }}
+        </button>
+      }
+      @if (favoriteError(); as error) {
+        <p class="max-w-64 rounded-xl bg-base-100 px-3 py-2 text-xs leading-normal text-error shadow-lg" role="alert" data-testid="speed-dial-error">
+          {{ error }}
+        </p>
+      }
+    </div>
+  }
   <button
     type="button"
     class="fixed right-3 bottom-24 z-10 flex size-14 items-center justify-center rounded-full bg-primary text-primary-content shadow-lg lg:hidden"
     aria-label="Add expense"
-    (click)="createExpense()"
+    [attr.aria-expanded]="speedDialOpen()"
+    (click)="toggleSpeedDial()"
     data-testid="add-expense-fab"
   >
     <g-icon name="plus" class="size-7" />

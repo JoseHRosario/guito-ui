@@ -84,9 +84,9 @@ export class CreateExpensePage {
     void this.expenseApi
       .create({
         date: this.isoDate(),
-        // Expenses are outflows: the API stores Amount verbatim and the list
-        // renders it verbatim, so post the negative (approved list convention).
-        amount: -parsedAmount,
+        // ADR 0010: amounts are stored positive — the outflow is implied by
+        // the record being an Expense. Post the parsed amount as-is.
+        amount: parsedAmount,
         description: this.description().trim(),
         category: this.category(),
       })
