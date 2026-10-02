@@ -81,7 +81,11 @@
           [attr.data-testid]="'speed-dial-favorite-' + favoriteSlug(favorite.name)"
           (click)="createFavorite(favorite)"
         >
-          {{ favorite.name }}
+          @if (favoriteSaving() === favorite.name) {
+            <span class="loading loading-sm" data-testid="favorite-spinner"></span>
+          } @else {
+            {{ favorite.name }}
+          }
         </button>
       }
       @if (favoriteError(); as error) {

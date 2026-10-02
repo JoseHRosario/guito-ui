@@ -231,6 +231,10 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     favoriteButton.click();
     fixture.detectChanges();
 
+    // in-flight feedback: the pressed pill swaps its label for a spinner
+    expect(el.querySelector('[data-testid="favorite-spinner"]')).not.toBeNull();
+    expect(favoriteButton.textContent?.trim()).toBe('');
+
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.method).toBe('POST');
     const body = req.request.body as { amount: number; description: string; date: string; category: string };
@@ -239,6 +243,7 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     expect(body.category).toBe('Eating out');
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     req.flush({ id: 77 });
+    fixture.detectChanges();
 
     // The success path refreshes the list in place (component reuse on
     // '/' → '/?saved=1'), so the reload request fires here too. The create
@@ -247,6 +252,11 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
 
     await vi.waitFor(() => expect(navSpy).toHaveBeenCalledWith(['/'], { queryParams: { saved: '1' } }));
+
+    // feedback clears once the create settles (the finally chain runs after navigation)
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="favorite-spinner"]')).toBeNull();
   });
 
   it('the scrim closes the speed-dial without navigating', () => {
