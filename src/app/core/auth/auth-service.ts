@@ -286,7 +286,9 @@ export class AuthService {
   signOut(): string {
     const session = this.session();
     if (session !== null) {
-      void revokeAccessToken(this.env.apiBaseUrl, session.accessToken, fetch).then(
+      // Headers carry the ID TOKEN (edge authorizer validates it); the ACCESS
+      // token rides in the body — it's the one being revoked (guito-api#64).
+      void revokeAccessToken(this.env.apiBaseUrl, session.idToken, session.accessToken, fetch).then(
         () => undefined,
         () => undefined,
       );

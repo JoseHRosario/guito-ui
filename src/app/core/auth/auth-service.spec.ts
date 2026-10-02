@@ -375,9 +375,11 @@ describe('AuthService.signOut', () => {
     expect(logoutCall).toBeTruthy();
     const [, init] = logoutCall!;
     expect(init?.method).toBe('POST');
+    // Both headers carry the ID TOKEN (edge authorizer contract); the access
+    // token rides in the body — it's the one being revoked.
     expect(init?.headers).toEqual(expect.objectContaining({
-      Authorization: 'Bearer new.at',
-      'x-google-idtoken': 'new.at',
+      Authorization: 'Bearer new.id.token',
+      'x-google-idtoken': 'new.id.token',
     }));
     expect(JSON.parse(init?.body as string)).toEqual({ accessToken: 'new.at' });
   });

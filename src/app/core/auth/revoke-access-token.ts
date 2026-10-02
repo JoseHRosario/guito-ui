@@ -6,6 +6,7 @@
  */
 export async function revokeAccessToken(
   apiBaseUrl: string,
+  idToken: string,
   accessToken: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<undefined> {
@@ -14,10 +15,12 @@ export async function revokeAccessToken(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Human-auth contract (ADR-0003): BOTH headers on every API request.
-        Authorization: `Bearer ${accessToken}`,
-        'x-google-idtoken': accessToken,
+        // Human-auth contract (ADR-0003): BOTH headers carry the ID token —
+        // the edge authorizer validates it as a Google ID token.
+        Authorization: `Bearer ${idToken}`,
+        'x-google-idtoken': idToken,
       },
+      // The ACCESS token is what gets revoked.
       body: JSON.stringify({ accessToken }),
     });
     return undefined;
