@@ -40,7 +40,7 @@
   <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
     <div class="flex w-full items-center justify-between">
       <div class="w-[370px]"><g-month-nav [month]="month()" /></div>
-      <button type="button" class="btn btn-primary" aria-label="Add expense">
+      <button type="button" class="btn btn-primary" aria-label="Add expense" (click)="createExpense()" data-testid="add-expense-desktop">
         <g-icon name="plus" class="size-5" />
         Add Expense
       </button>
@@ -54,9 +54,23 @@
     type="button"
     class="fixed right-3 bottom-24 z-10 flex size-14 items-center justify-center rounded-full bg-primary text-primary-content shadow-lg lg:hidden"
     aria-label="Add expense"
+    (click)="createExpense()"
+    data-testid="add-expense-fab"
   >
     <g-icon name="plus" class="size-7" />
   </button>
+
+  <!-- Save-success toast (frame 3094:10243): dark pill + check, bottom-center above the nav -->
+  @if (savedToast()) {
+    <div
+      class="fixed bottom-24 left-1/2 z-20 flex h-11 w-fit -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-content shadow-lg lg:bottom-10"
+      role="status"
+      data-testid="saved-toast"
+    >
+      <g-icon name="check" class="size-4" />
+      Expense saved
+    </div>
+  }
 
   <!-- Shared expense list card -->
   <ng-template #expenseList>

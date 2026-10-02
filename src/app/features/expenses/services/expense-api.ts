@@ -33,7 +33,7 @@ function categoryIcon(category: string): IconName {
   return ICONS[category.toLowerCase()] ?? 'tag';
 }
 
-/** The deployed API's latest-expenses list (guito-api#9). */
+/** The latest-expenses list and create endpoints of the deployed API (guito-api#9, guito-ui#32). */
 @Injectable({ providedIn: 'root' })
 export class ExpenseApi {
   private readonly http = inject(HttpClient);
@@ -51,5 +51,13 @@ export class ExpenseApi {
       category: dto.category ?? '',
       icon: categoryIcon(dto.category ?? ''),
     }));
+  }
+
+  /** Creates an expense (`POST /Expense`); resolves the opaque Expense Id (ADR-0009). */
+  async create(input: { date: string; amount: number; description: string; category: string }): Promise<number> {
+    const response = await firstValueFrom(
+      this.http.post<{ id?: number | null }>(`${this.env.apiBaseUrl}/Expense`, input),
+    );
+    return response.id ?? 0;
   }
 }

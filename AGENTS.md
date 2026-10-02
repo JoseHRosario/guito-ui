@@ -49,6 +49,7 @@ Deploy gate on every PR (CI): tokens → build → Vitest → Playwright. Run al
 ## Testing rules
 
 - Unit specs live next to the code (Vitest, jsdom). jsdom applies no CSS: both responsive branches render in tests — use `:visible` scoping in e2e and duplicate-tolerant counts in unit tests.
+- **The unit-test builder runs vitest with `isolate: false`** — spec files in the same worker share one environment, so `vi.stubGlobal` stubs (storage, location, fetch) leak into whatever file the worker runs next. Any spec that stubs globals must `vi.unstubAllGlobals()` in an `afterEach` (file scheduling can shift when new specs are added, turning a latent leak into an unrelated file's failure — see PR #33).
 - e2e specs in `e2e/` against the built app; every `data-testid` must have an assertion using it.
 - Route-data-bound inputs must have defaults (required inputs throw NG0950 before the router binding lands in tests).
 

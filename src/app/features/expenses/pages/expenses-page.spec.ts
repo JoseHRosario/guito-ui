@@ -4,10 +4,13 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
 import { ExpensesPage } from './expenses-page';
+import { CreateExpensePage } from './create-expense-page';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
+const CATEGORIES_RESPONSE = { categories: [{ name: 'Clothing' }, { name: 'Food' }] };
 
 const API_RESPONSE = {
   expenses: [
@@ -40,6 +43,7 @@ describe('ExpensesPage (live API, guito-api#9)', () => {
       providers: [
         provideHttpClient(withInterceptors([])),
         provideHttpClientTesting(),
+        provideRouter([]),
         { provide: APP_ENVIRONMENT, useValue: TEST_ENV },
       ],
     });
@@ -101,5 +105,75 @@ describe('ExpensesPage (live API, guito-api#9)', () => {
     });
     expect(pageEl.querySelector('[data-testid="expense-row"]')).toBeNull();
     expect(pageEl.querySelector('[data-testid="expenses-error"]')).toBeNull();
+  });
+});
+
+describe('ExpensesPage — FAB navigation + save toast (issue #32, frame 3094:10243)', () => {
+  let http: HttpTestingController;
+  let fixture: ComponentFixture<ExpensesPage>;
+
+  beforeEach(() => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      serializeSession({ idToken: 'id-token', accessToken: 'access', expiresAt: Date.now() + 3_600_000 }),
+    );
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([])),
+        provideHttpClientTesting(),
+        provideRouter([{ path: '', component: ExpensesPage }, { path: 'expenses/create', component: CreateExpensePage }]),
+        { provide: APP_ENVIRONMENT, useValue: TEST_ENV },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    try {
+      http.verify();
+    } finally {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  });
+
+  it('FAB and desktop Add Expense button navigate to /expenses/create', async () => {
+    const router = TestBed.inject(Router);
+    fixture = TestBed.createComponent(ExpensesPage);
+    fixture.detectChanges();
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="add-expense-fab"]') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(router.url).toBe('/expenses/create'));
+  });
+
+  it('desktop Add Expense button also navigates to /expenses/create', async () => {
+    const router = TestBed.inject(Router);
+    fixture = TestBed.createComponent(ExpensesPage);
+    fixture.detectChanges();
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="add-expense-desktop"]') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(router.url).toBe('/expenses/create'));
+  });
+
+  it('navigating back with saved=1 shows the toast, auto-dismisses ~3s and clears the param', async () => {
+    vi.useFakeTimers();
+    try {
+      const router = TestBed.inject(Router);
+      fixture = TestBed.createComponent(ExpensesPage);
+      fixture.detectChanges();
+      http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="saved-toast"]')).toBeNull();
+      await router.navigateByUrl('/?saved=1');
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="saved-toast"]')?.textContent).toContain('Expense saved');
+      vi.advanceTimersByTime(3100);
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="saved-toast"]')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
