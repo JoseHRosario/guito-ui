@@ -72,42 +72,16 @@
         </div>
 
         <div class="flex flex-col items-start gap-2">
-          <label class="text-base leading-snug text-base-content" for="date-day">Date</label>
-          <div class="flex w-full items-start gap-2">
-            <input
-              id="date-day"
-              [class.input-error]="errors().date !== ''"
-              class="input h-10 min-w-0 flex-1 rounded-lg border-base-content/20 bg-base-100 px-4"
-              type="text"
-              inputmode="numeric"
-              placeholder="dd"
-              [value]="day()"
-              (input)="onDateSegment('day', $event)"
-              data-testid="date-day"
-            />
-            <input
-              aria-label="Month"
-              [class.input-error]="errors().date !== ''"
-              class="input h-10 min-w-0 flex-1 rounded-lg border-base-content/20 bg-base-100 px-4"
-              type="text"
-              inputmode="numeric"
-              placeholder="mm"
-              [value]="month()"
-              (input)="onDateSegment('month', $event)"
-              data-testid="date-month"
-            />
-            <input
-              aria-label="Year"
-              [class.input-error]="errors().date !== ''"
-              class="input h-10 min-w-0 flex-1 rounded-lg border-base-content/20 bg-base-100 px-4"
-              type="text"
-              inputmode="numeric"
-              placeholder="yyyy"
-              [value]="year()"
-              (input)="onDateSegment('year', $event)"
-              data-testid="date-year"
-            />
-          </div>
+          <label class="text-base leading-snug text-base-content" for="date">Date</label>
+          <input
+            id="date"
+            [class.input-error]="errors().date !== ''"
+            class="input h-10 w-full rounded-lg border-base-content/20 bg-base-100 px-4"
+            type="date"
+            [value]="isoDate()"
+            (input)="onDate($event)"
+            data-testid="date-input"
+          />
           @if (errors().date; as message) {
             <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
           }

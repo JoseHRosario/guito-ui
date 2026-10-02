@@ -71,7 +71,6 @@
         (click)="createExpense()"
         data-testid="speed-dial-manual"
       >
-        <g-icon name="plus" class="size-4" />
         Manual
       </button>
       @for (favorite of favorites; track favorite.name) {
@@ -82,7 +81,7 @@
           [attr.data-testid]="'speed-dial-favorite-' + favoriteSlug(favorite.name)"
           (click)="createFavorite(favorite)"
         >
-          {{ favorite.name }} · {{ amount(favorite.amount) }}
+          {{ favorite.name }}
         </button>
       }
       @if (favoriteError(); as error) {

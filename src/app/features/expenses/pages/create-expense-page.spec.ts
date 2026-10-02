@@ -60,25 +60,20 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     const el = boot();
     await loadCategories();
     expect(el.querySelector('[data-testid="create-title"]')?.textContent).toContain('Create Expense');
-    for (const id of ['amount-input', 'description-input', 'date-day', 'date-month', 'date-year']) {
+    for (const id of ['amount-input', 'description-input', 'date-input']) {
       expect(el.querySelector(`[data-testid="${id}"]`)).not.toBeNull();
     }
     expect(el.querySelector('[data-testid="save-expense"]')?.textContent).toContain('Save Expense');
   });
 
-  it('date defaults to today (dd/mm/yyyy segments)', async () => {
+  it('date is a single daisyUI date input defaulting to today (ISO yyyy-MM-dd)', async () => {
     const el = boot();
     await loadCategories();
+    const date = el.querySelector('[data-testid="date-input"]') as HTMLInputElement;
+    expect(date.type).toBe('date');
     const today = new Date();
-    expect((el.querySelector('[data-testid="date-day"]') as HTMLInputElement).value).toBe(
-      String(today.getDate()).padStart(2, '0'),
-    );
-    expect((el.querySelector('[data-testid="date-month"]') as HTMLInputElement).value).toBe(
-      String(today.getMonth() + 1).padStart(2, '0'),
-    );
-    expect((el.querySelector('[data-testid="date-year"]') as HTMLInputElement).value).toBe(
-      String(today.getFullYear()),
-    );
+    const expected = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    expect(date.value).toBe(expected);
   });
 
   it('invalid submit shows inline errors and never calls POST /Expense', async () => {
