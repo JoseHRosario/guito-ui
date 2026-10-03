@@ -20,9 +20,14 @@ import { GIcon } from '../../../shared/gicon';
         class="rounded-full bg-base-200 p-2"
         aria-label="Refresh expenses"
         data-testid="refresh-expenses"
+        [disabled]="refreshing()"
         (click)="refreshed.emit()"
       >
-        <g-icon name="refresh-cw" class="size-5" />
+        @if (refreshing()) {
+          <span class="loading loading-sm" data-testid="refresh-spinner"></span>
+        } @else {
+          <g-icon name="refresh-cw" class="size-5" />
+        }
       </button>
     </div>
   `,
@@ -31,4 +36,6 @@ export class MonthNav {
   readonly month = input.required<string>();
   /** Manual reload of the latest expenses (issue #47 follow-up). */
   readonly refreshed = output<void>();
+  /** While the reload runs, the icon swaps to a spinner and the button disables. */
+  readonly refreshing = input(false);
 }

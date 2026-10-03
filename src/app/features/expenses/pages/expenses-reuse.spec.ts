@@ -8,6 +8,7 @@ import { TitlePage } from '../../../shared/title-page';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, RouteReuseStrategy, withComponentInputBinding } from '@angular/router';
 import { By } from '@angular/platform-browser';
+import { ChangeDetectorRef } from '@angular/core';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ExpensesRouteReuseStrategy } from '../../../core/route-reuse/expenses-reuse-strategy';
@@ -78,13 +79,38 @@ describe('Expenses page survives tab navigation (issue #47 follow-up)', () => {
   it('ShouldReissueTheLatestRequest_WhenTheRefreshButtonIsClicked', async () => {
     await landOnExpenses();
 
-    const refreshBtn = harness.fixture.debugElement.query(By.css('button[aria-label="Refresh expenses"]'));
+    // The harness's root-level detectChanges does NOT refresh the detached
+    // OnPush child after a signal write (zoneless-test quirk) — drive CD at the
+    // child and assert state, falling back to DOM only after child-level CD.
+    const pageDebug = harness.fixture.debugElement.query(By.css('g-expenses-page'));
+    const pageInstance = pageDebug.componentInstance as {
+      refreshing(): boolean;
+      refresh(): void;
+    };
+    const refreshBtn = pageDebug.query(By.css('button[aria-label="Refresh expenses"]'));
     expect(refreshBtn).not.toBeNull();
+
+    // Let the initial load settle, then click.
+    await vi.waitFor(() => expect(pageInstance.refreshing()).toBe(false));
+    expect(refreshBtn.nativeElement.disabled).toBe(false);
     refreshBtn.nativeElement.click();
+    expect(pageInstance.refreshing()).toBe(true);
+
+    // In-flight: icon swapped for the spinner, button disabled (favorite-pill pattern).
+    pageDebug.injector.get(ChangeDetectorRef).markForCheck();
+    harness.detectChanges();
+    expect(pageDebug.nativeElement.querySelector('[data-testid="refresh-spinner"]')).not.toBeNull();
+    expect(refreshBtn.nativeElement.disabled).toBe(true);
 
     const req = http.expectOne('https://api.test/Expense/latest/20');
     req.flush(API_RESPONSE);
+    await vi.waitFor(() => expect(pageInstance.refreshing()).toBe(false));
+
+    // Settled: spinner gone, button enabled again.
+    pageDebug.injector.get(ChangeDetectorRef).markForCheck();
     harness.detectChanges();
+    expect(pageDebug.nativeElement.querySelector('[data-testid="refresh-spinner"]')).toBeNull();
+    expect(pageDebug.query(By.css('button[aria-label="Refresh expenses"]')).nativeElement.disabled).toBe(false);
   });
 
   it('ShouldDetachTheExpensesComponent_WhenAnotherTabActivates', async () => {

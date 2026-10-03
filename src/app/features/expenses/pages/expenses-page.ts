@@ -78,6 +78,8 @@ export class ExpensesPage {
   /** null = loading; empty array = loaded with no expenses. */
   protected readonly expenses = signal<readonly Expense[] | null>(null);
   protected readonly loadError = signal<string | null>(null);
+  /** True while a latest-expenses request is in flight (refresh-button spinner). */
+  protected readonly refreshing = signal(false);
 
   protected readonly month = computed(() => monthLabelOf(this.expenses() ?? []));
   protected readonly groups = computed(() => groupExpensesByDay(this.expenses() ?? []));
@@ -236,8 +238,14 @@ export class ExpensesPage {
     void this.router.navigate(['/expenses/create']);
   }
 
+  /** Refresh-button reload: spinner feedback while the request runs. */
+  protected refresh(): void {
+    this.load();
+  }
+
   protected load(): void {
     this.loadError.set(null);
+    this.refreshing.set(true);
     const seq = ++this.loadSequence;
     void this.expenseApi.latest().then(
       (expenses) => {
@@ -248,6 +256,9 @@ export class ExpensesPage {
           this.loadError.set('Could not load your expenses — check your connection and try again.');
         }
       },
-    );
+    ).finally(() => {
+      // Spinner clears when THIS request settles (a newer reload may have started).
+      if (!this.destroyed && seq === this.loadSequence) this.refreshing.set(false);
+    });
   }
 }
