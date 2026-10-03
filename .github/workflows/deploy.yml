@@ -41,6 +41,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # deploy/version.sh derives the build version from git tags+history
+          # (issue #49) — a depth-1 checkout would produce a wrong/missing stamp.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -52,6 +56,15 @@ jobs:
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
+
+      - name: Compute version stamp (issue #49)
+        run: |
+          VERSION=$(./deploy/version.sh)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Building version: $VERSION"
+
+      - name: Stamp version into environments
+        run: ./deploy/stamp.sh
 
       - name: Build
         run: npm run build
@@ -71,6 +84,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # deploy/version.sh derives the build version from git tags+history
+          # (issue #49) — a depth-1 checkout would produce a wrong/missing stamp.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -110,6 +127,9 @@ jobs:
           # smoke_url output must be echoed from the local variable here.
           echo "SMOKE_URL=$SMOKE_URL" >> "$GITHUB_ENV"
           echo "smoke_url=$SMOKE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version into environments (issue #49)
+        run: ./deploy/stamp.sh
 
       - name: Build (tokens + Angular build, ${{ env.BUILD_CONFIGURATION }})
         run: npm run build -- --configuration "${{ env.BUILD_CONFIGURATION }}"
