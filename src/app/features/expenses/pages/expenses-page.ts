@@ -214,10 +214,13 @@ export class ExpensesPage {
       if (this.voiceToastTimer !== null) clearTimeout(this.voiceToastTimer);
     });
     this.load();
-    // The create page lands back here with saved=1 → show the toast once, then clear the param.
+    // The create page lands back here with saved=1 → reload the list (route reuse
+    // means the component was detached during the create flow — no constructor load
+    // fires on return), show the toast once, then clear the param.
     this.router.events.subscribe((event) => {
       if (this.destroyed || !(event instanceof NavigationEnd)) return;
       if (this.router.parseUrl(event.urlAfterRedirects).queryParams['saved'] === '1') {
+        this.load();
         this.savedToast.set(true);
         setTimeout(() => {
           if (!this.destroyed) {

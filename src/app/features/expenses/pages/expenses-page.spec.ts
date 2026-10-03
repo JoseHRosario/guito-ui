@@ -168,6 +168,8 @@ describe('ExpensesPage — FAB navigation + save toast (issue #32, frame 3094:10
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelector('[data-testid="saved-toast"]')).toBeNull();
       await router.navigateByUrl('/?saved=1');
+      // saved=1 now also reloads the list (route-reuse follow-up) — flush that request.
+      http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
       fixture.detectChanges();
       expect(el.querySelector('[data-testid="saved-toast"]')?.textContent).toContain('Expense saved');
       vi.advanceTimersByTime(3100);

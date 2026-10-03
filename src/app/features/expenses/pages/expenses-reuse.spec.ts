@@ -11,6 +11,9 @@ import { By } from '@angular/platform-browser';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ExpensesRouteReuseStrategy } from '../../../core/route-reuse/expenses-reuse-strategy';
+import { routes } from '../../../app.routes';
+import { Shell } from '../../shell/components/shell';
+import { appConfig } from '../../../app.config';
 
 const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 
@@ -35,10 +38,7 @@ describe('Expenses page survives tab navigation (issue #47 follow-up)', () => {
         provideHttpClient(withInterceptors([])),
         provideHttpClientTesting(),
         provideRouter(
-          [
-            { path: '', component: ExpensesPage, data: { reuse: true } },
-            { path: 'budgets', component: TitlePage },
-          ],
+          routes,
           withComponentInputBinding(),
         ),
         { provide: RouteReuseStrategy, useExisting: ExpensesRouteReuseStrategy },
@@ -57,18 +57,18 @@ describe('Expenses page survives tab navigation (issue #47 follow-up)', () => {
     }
   });
 
-  async function landOnExpenses(): Promise<ExpensesPage> {
-    const page = await harness.navigateByUrl('/', ExpensesPage);
+  async function landOnExpenses(): Promise<void> {
+    // The root outlet ALWAYS renders the Shell layout; the Expenses page is a child outlet.
+    await harness.navigateByUrl('/', Shell);
     const req = http.expectOne('https://api.test/Expense/latest/20');
     req.flush(API_RESPONSE);
     harness.detectChanges();
-    return page;
   }
 
   it('ShouldNotReissueTheLatestRequest_WhenUserLeavesAndReturnsToTheExpensesTab', async () => {
     await landOnExpenses();
-    await harness.navigateByUrl('/budgets', TitlePage);
-    await harness.navigateByUrl('/', ExpensesPage);
+    await harness.navigateByUrl('/budgets', Shell);
+    await harness.navigateByUrl('/', Shell);
 
     // No second GET /Expense/latest/20 — the detached component was reused.
     http.expectNone('https://api.test/Expense/latest/20');
@@ -89,7 +89,17 @@ describe('Expenses page survives tab navigation (issue #47 follow-up)', () => {
 
   it('ShouldDetachTheExpensesComponent_WhenAnotherTabActivates', async () => {
     await landOnExpenses();
-    await harness.navigateByUrl('/budgets', TitlePage);
+    await harness.navigateByUrl('/budgets', Shell);
     expect(ExpensesRouteReuseStrategy.hasDetachedRoute()).toBe(true);
+  });
+
+  it('ShouldWireTheReuseStrategy_IntoTheRealAppConfig', () => {
+    // Regression guard: the strategy must be provided in the real app config,
+    // not only in specs — a missing provider silently falls back to BaseRouteReuseStrategy
+    // (found live on staging: tab switches re-issued the request).
+    const wired = (appConfig.providers as Array<{ provide?: unknown }>).some(
+      (provider) => provider?.provide === RouteReuseStrategy,
+    );
+    expect(wired).toBe(true);
   });
 });
