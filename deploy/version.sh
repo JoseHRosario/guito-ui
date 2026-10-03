@@ -1,34 +1,20 @@
 #!/usr/bin/env bash
-# Issue #49 (phase 1): compute the build version string stamped into the UI
-# environment files. Same scheme as guito-api's deploy/version.sh (independent
-# semver per repo):
-#   0.2.1-beta.N+20261003T1422Z.1a2b3c4
-#   • base semver — the last v* git tag, patch-bumped, plus a -beta pre-release
-#     suffix: a tag v0.2.0 yields 0.2.1-beta.*; no tag yields 0.1.0-beta.*.
-#     When HEAD IS the tag (release build), the plain tag version is used.
-#   • .N — merged commits since that tag (per-repo counter, works locally and in CI).
-#   • +timestamp.sha — UTC second-resolution timestamp (disambiguates same-day
-#     builds) + short commit SHA. Build metadata, semver-compliant.
-# Requires a checkout with tags and history (CI: checkout fetch-depth: 0).
-# Never hand-edited in the repo: the version is a build artifact (issue #49).
+# Issue #53 (amends #49): the build version is DECLARED in package.json
+# ("version") — no git tags, no manual steps; the agent bumps it on the
+# feature branch as a visible one-line PR diff. This script emits the full
+# stamp:  <packageVersion>+<UTCts>.<shortSha>
+# The +metadata (UTC second-resolution timestamp, short commit SHA) makes
+# same-day builds and repeated deploys of the same version distinguishable.
+# Fail-closed: no declared version → no stamp → the build must not ship.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-TAG=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)
-if [ -n "$TAG" ]; then
-  BASE="${TAG#v}"
-  MAJOR=${BASE%%.*}; REST=${BASE#*.}; MINOR=${REST%%.*}; PATCH=${REST#*.}
-  if [ "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "$TAG")" ]; then
-    # Release build of a tagged commit: the plain tag version, no suffix.
-    echo "$BASE"
-    exit 0
-  fi
-  BASE_VERSION="$MAJOR.$MINOR.$((PATCH + 1))-beta"
-  COMMITS=$(git rev-list --count "$TAG"..HEAD)
-else
-  BASE_VERSION="0.1.0-beta"
-  COMMITS=$(git rev-list --count HEAD)
-fi
+BASE=$(node -p "require('./package.json').version")
+[ -n "$BASE" ] || { echo "FATAL: package.json has no version — refusing to stamp." >&2; exit 1; }
+case "$BASE" in
+  [0-9]*.[0-9]*.[0-9]*) ;; # plain semver x.y.z — no pre-release suffixes by design
+  *) echo "FATAL: package.json version '$BASE' is not a plain x.y.z semver." >&2; exit 1 ;;
+esac
 TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 SHA=$(git rev-parse --short HEAD)
-echo "${BASE_VERSION}.${COMMITS}+${TIMESTAMP}.${SHA}"
+echo "${BASE}+${TIMESTAMP}.${SHA}"
