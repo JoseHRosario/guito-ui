@@ -16,20 +16,21 @@
       </a>
     </div>
 
-    <!-- Desktop pill nav -->
+    <!-- Desktop pill nav (issue #47: real links, route-driven active state) -->
     <nav class="hidden items-center gap-6 lg:flex" aria-label="Main navigation">
       @for (item of nav; track item.label) {
-        @if (item.enabled) {
-          <a
-            routerLink="/"
-            routerLinkActive="bg-base-200 text-base-content font-semibold"
-            class="rounded-full px-4 py-2 font-normal text-base-content/50 hover:text-base-content"
-            [attr.aria-current]="item.label === 'Dashboard' ? 'page' : null"
-            >{{ item.label }}</a
-          >
-        } @else {
-          <span aria-disabled="true" class="rounded-full px-4 py-2 font-normal text-base-content/50">{{ item.label }}</span>
-        }
+        <a
+          [routerLink]="item.path"
+          routerLinkActive
+          [routerLinkActiveOptions]="{ exact: true }"
+          #rla="routerLinkActive"
+          [class]="
+            'rounded-full px-4 py-2 font-normal ' +
+            (rla.isActive ? 'bg-base-200 text-base-content font-semibold' : 'text-base-content/50 hover:text-base-content')
+          "
+          [attr.aria-current]="rla.isActive ? 'page' : null"
+          >{{ item.label }}</a
+        >
       }
     </nav>
 
@@ -65,13 +66,22 @@
 
   <main class="flex-1 pb-[86px] lg:pb-0"><router-outlet /></main>
 
-  <!-- Mobile bottom navigation (fixed — always visible, content scrolls beneath) -->
+  <!-- Mobile bottom navigation (fixed — always visible, content scrolls beneath; real links, issue #47) -->
   <nav class="fixed inset-x-0 bottom-0 z-20 flex items-center justify-between border-t border-base-content/10 bg-base-100 pt-3 pb-6 lg:hidden" aria-label="Bottom navigation">
     @for (item of nav; track item.label) {
-      <div class="flex min-w-0 flex-1 flex-col items-center gap-1 p-1">
-        <g-icon [name]="item.icon" class="size-6" [class]="tabClass(item.label)" />
-        <p class="text-sm leading-none font-semibold" [class]="tabClass(item.label)">{{ item.label }}</p>
-      </div>
+      <a
+        [routerLink]="item.path"
+        routerLinkActive
+        [routerLinkActiveOptions]="{ exact: true }"
+        #rla="routerLinkActive"
+        [class]="
+          'flex min-w-0 flex-1 flex-col items-center gap-1 p-1 ' + (rla.isActive ? 'text-primary' : 'text-base-content/60')
+        "
+        [attr.aria-current]="rla.isActive ? 'page' : null"
+      >
+        <g-icon [name]="item.icon" class="size-6" />
+        <p class="text-sm leading-none font-semibold">{{ item.label }}</p>
+      </a>
     }
   </nav>
 

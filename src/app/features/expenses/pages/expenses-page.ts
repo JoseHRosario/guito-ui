@@ -2,7 +2,6 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { formatEur } from '../services/money';
-import type { MonthSummary } from '../models/month-summary';
 
 // --- list-model helpers (folded single-consumer helpers, guito-api#40/#9) ---
 
@@ -32,14 +31,6 @@ function groupExpensesByDay(expenses: readonly Expense[]): ExpenseDayGroup[] {
     });
 }
 
-/** EXPENSE rows are outflows — ADR 0010: amounts are stored positive and the
- * outflow is implied by the record being an Expense; TOTAL = net. */
-function expenseSummary(expenses: readonly Expense[]): MonthSummary {
-  let outflow = 0;
-  for (const expense of expenses) outflow += expense.amount;
-  return { expense: outflow, income: 0, total: -outflow };
-}
-
 const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long' });
 
 /** The list's month label (e.g. "January, 2021"), from the newest expense; '' when empty. */
@@ -61,7 +52,6 @@ import { FAVORITES } from '../services/favorites';
 import type { Favorite } from '../services/favorites';
 import { GIcon } from '../../../shared/gicon';
 import { MonthNav } from '../components/month-nav';
-import { SummaryBar } from '../components/summary-bar';
 
 /**
  * Latest-expenses screen, LIVE from the deployed API (guito-api#9): loads
@@ -74,7 +64,7 @@ import { SummaryBar } from '../components/summary-bar';
   templateUrl: './expenses-page.html',
   styleUrl: './expenses-page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MonthNav, SummaryBar, GIcon, NgTemplateOutlet],
+  imports: [MonthNav, GIcon, NgTemplateOutlet],
 })
 export class ExpensesPage {
   private readonly expenseApi = inject(ExpenseApi);
@@ -88,9 +78,10 @@ export class ExpensesPage {
   /** null = loading; empty array = loaded with no expenses. */
   protected readonly expenses = signal<readonly Expense[] | null>(null);
   protected readonly loadError = signal<string | null>(null);
+  /** True while a latest-expenses request is in flight (refresh-button spinner). */
+  protected readonly refreshing = signal(false);
 
   protected readonly month = computed(() => monthLabelOf(this.expenses() ?? []));
-  protected readonly summary = computed<MonthSummary>(() => expenseSummary(this.expenses() ?? []));
   protected readonly groups = computed(() => groupExpensesByDay(this.expenses() ?? []));
   protected readonly sidebarWallet = computed(() => formatEur(12450, { signed: true }));
 
@@ -225,10 +216,13 @@ export class ExpensesPage {
       if (this.voiceToastTimer !== null) clearTimeout(this.voiceToastTimer);
     });
     this.load();
-    // The create page lands back here with saved=1 → show the toast once, then clear the param.
+    // The create page lands back here with saved=1 → reload the list (route reuse
+    // means the component was detached during the create flow — no constructor load
+    // fires on return), show the toast once, then clear the param.
     this.router.events.subscribe((event) => {
       if (this.destroyed || !(event instanceof NavigationEnd)) return;
       if (this.router.parseUrl(event.urlAfterRedirects).queryParams['saved'] === '1') {
+        this.load();
         this.savedToast.set(true);
         setTimeout(() => {
           if (!this.destroyed) {
@@ -244,8 +238,14 @@ export class ExpensesPage {
     void this.router.navigate(['/expenses/create']);
   }
 
+  /** Refresh-button reload: spinner feedback while the request runs. */
+  protected refresh(): void {
+    this.load();
+  }
+
   protected load(): void {
     this.loadError.set(null);
+    this.refreshing.set(true);
     const seq = ++this.loadSequence;
     void this.expenseApi.latest().then(
       (expenses) => {
@@ -256,6 +256,9 @@ export class ExpensesPage {
           this.loadError.set('Could not load your expenses — check your connection and try again.');
         }
       },
-    );
+    ).finally(() => {
+      // Spinner clears when THIS request settles (a newer reload may have started).
+      if (!this.destroyed && seq === this.loadSequence) this.refreshing.set(false);
+    });
   }
 }

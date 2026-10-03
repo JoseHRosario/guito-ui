@@ -71,11 +71,8 @@ describe('ExpensesPage (live API, guito-api#9)', () => {
     const headers = [...pageEl.querySelectorAll('[data-testid="group-header"]')].map((n) => n.textContent?.trim());
     expect(headers.slice(0, 2)).toEqual(['Jan 03, Sunday', 'Jan 02, Saturday']);
     expect(headers.length).toBe(4);
-    // Summary derived from data (ADR 0010: every Expense is an outflow —
-    // amounts stored positive): 65.55 + 30 outflow / 0 income / -95.55 total.
-    expect(pageEl.querySelector('[data-testid="summary-expense"]')?.textContent).toContain('95,55');
-    expect(pageEl.querySelector('[data-testid="summary-income"]')?.textContent).toContain('0,00');
-    expect(pageEl.querySelector('[data-testid="summary-total"]')?.textContent).toContain('-95,55');
+    // Issue #47: the summary bar is retired from the Expenses page (returns on Dashboard later).
+    expect(pageEl.querySelector('[data-testid="summary-expense"]')).toBeNull();
   });
 
   it('shows the error card with a retry that re-requests the API', async () => {
@@ -171,6 +168,8 @@ describe('ExpensesPage — FAB navigation + save toast (issue #32, frame 3094:10
       const el = fixture.nativeElement as HTMLElement;
       expect(el.querySelector('[data-testid="saved-toast"]')).toBeNull();
       await router.navigateByUrl('/?saved=1');
+      // saved=1 now also reloads the list (route-reuse follow-up) — flush that request.
+      http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
       fixture.detectChanges();
       expect(el.querySelector('[data-testid="saved-toast"]')?.textContent).toContain('Expense saved');
       vi.advanceTimersByTime(3100);

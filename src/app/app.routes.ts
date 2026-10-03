@@ -4,6 +4,7 @@ import { CreateExpensePage } from './features/expenses/pages/create-expense-page
 import { SignIn } from './features/signin/pages/signin';
 import { AuthCallback } from './features/auth/pages/auth-callback';
 import { Shell } from './features/shell/components/shell';
+import { TitlePage } from './shared/title-page';
 import { authGuard, signedInGuard } from './core/auth/auth-guard';
 
 export const routes: Routes = [
@@ -14,9 +15,32 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       {
+        // The expense list IS the Expenses section (issue #47) — and the app's default route.
+        // data.reuse marks it for the ExpensesRouteReuseStrategy: tab switches must NOT
+        // reload it; the month-nav refresh button and the saved=1 path are the triggers.
         path: '',
         component: ExpensesPage,
+        data: { reuse: true },
+        title: 'Guito · Expenses',
+      },
+      {
+        // Blank scaffolds (issue #47): title-only pages until the real screens are designed.
+        path: 'dashboard',
+        component: TitlePage,
+        data: { title: 'Dashboard' },
         title: 'Guito · Dashboard',
+      },
+      {
+        path: 'budgets',
+        component: TitlePage,
+        data: { title: 'Budgets' },
+        title: 'Guito · Budgets',
+      },
+      {
+        path: 'settings',
+        component: TitlePage,
+        data: { title: 'Settings' },
+        title: 'Guito · Settings',
       },
       {
         path: 'expenses/create',

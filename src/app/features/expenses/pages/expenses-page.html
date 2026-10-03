@@ -1,8 +1,7 @@
 <div class="relative flex w-full flex-col lg:flex-row lg:items-start lg:gap-8 lg:px-12 lg:pt-10 lg:pb-16">
   <!-- Mobile body -->
   <div class="flex flex-1 flex-col items-start gap-4 p-4 lg:hidden">
-    <g-month-nav [month]="month()" />
-    <g-summary-bar class="w-full" [summary]="summary()" />
+    <g-month-nav [month]="month()" [refreshing]="refreshing()" (refreshed)="refresh()" />
     <ng-container *ngTemplateOutlet="expenseList" />
   </div>
 
@@ -39,13 +38,12 @@
   <!-- Desktop: main panel -->
   <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
     <div class="flex w-full items-center justify-between">
-      <div class="w-[370px]"><g-month-nav [month]="month()" /></div>
+      <div class="w-[370px]"><g-month-nav [month]="month()" [refreshing]="refreshing()" (refreshed)="refresh()" /></div>
       <button type="button" class="btn btn-primary" aria-label="Add expense" (click)="createExpense()" data-testid="add-expense-desktop">
         <g-icon name="plus" class="size-5" />
         Add Expense
       </button>
     </div>
-    <g-summary-bar class="w-full" [summary]="summary()" />
     <ng-container *ngTemplateOutlet="expenseList" />
   </div>
 
@@ -66,7 +64,7 @@
     >
       <button
         type="button"
-        class="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
+        class="flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-base font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
         [disabled]="dialBusy()"
         (click)="createExpense()"
         data-testid="speed-dial-manual"
@@ -78,7 +76,7 @@
            browsers without the Web Speech API (issue #44). -->
       <button
         type="button"
-        class="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
+        class="flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-base font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
         [disabled]="!voiceSupported || dialBusy()"
         [attr.aria-label]="voiceState() === 'listening' ? 'Listening — speak your expense' : 'Create an expense by voice'"
         (click)="startVoice()"
@@ -94,7 +92,7 @@
       @for (favorite of favorites; track favorite.name) {
         <button
           type="button"
-          class="flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
+          class="flex items-center gap-2 rounded-full bg-primary px-5 py-3.5 text-base font-semibold text-primary-content shadow-[0_4px_12px_rgba(0,0,0,0.25)]"
           [disabled]="dialBusy()"
           [attr.data-testid]="'speed-dial-favorite-' + favoriteSlug(favorite.name)"
           (click)="createFavorite(favorite)"

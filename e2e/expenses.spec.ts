@@ -19,13 +19,13 @@ async function seedSession(page: Page): Promise<void> {
 }
 
 test.describe('app shell + expense list (stubbed data, signed in)', () => {
-  test('desktop: header nav, avatar, sidebar, summary bar and grouped list render', async ({ page }) => {
+  test('desktop: header nav, avatar, sidebar and grouped list render', async ({ page }) => {
     await stubExpensesApi(page);
     await seedSession(page);
     await page.setViewportSize({ width: 1440, height: 1033 });
     await page.goto('/');
 
-    await expect(page).toHaveTitle(/Guito/);
+    await expect(page).toHaveTitle(/Guito · Expenses/);
 
     // Header shell: logo, nav, signed-in avatar (sign-out menu is a future iteration)
     await expect(page.getByRole('link', { name: 'Guito home' })).toBeVisible();
@@ -35,10 +35,8 @@ test.describe('app shell + expense list (stubbed data, signed in)', () => {
     }
     await expect(page.getByTestId('header-avatar')).toBeVisible();
 
-    // Summary derives from the loaded data: 7 outflows → 579.70 €, no income, net -579.70 €
-    await expect(page.getByTestId('summary-expense').first()).toHaveText(/579,70\s+€/);
-    await expect(page.getByTestId('summary-income').first()).toHaveText(/0,00\s+€/);
-    await expect(page.getByTestId('summary-total').first()).toHaveText(/-579,70\s+€/);
+    // Issue #47: no summary bar on the Expenses page (returns on Dashboard later).
+    await expect(page.getByTestId('summary-expense')).toHaveCount(0);
 
     // Grouped list mirrors the approved frames
     const headers = page.locator('[data-testid="group-header"]:visible');
@@ -51,6 +49,29 @@ test.describe('app shell + expense list (stubbed data, signed in)', () => {
     // Footer + sidebar (desktop-only regions)
     await expect(page.getByText('Guito · Personal Expense Tracker')).toBeVisible();
     await expect(page.getByTestId('sidebar-wallet').first()).toHaveText(/\+12[ .\u00a0\u202f]450,00\s+€/);
+  });
+
+  test('bottom nav links to the blank sections (issue #47)', async ({ page }) => {
+    await stubExpensesApi(page);
+    await seedSession(page);
+    await page.setViewportSize({ width: 402, height: 874 });
+    await page.goto('/');
+
+    const bottomNav = page.getByRole('navigation', { name: 'Bottom navigation' });
+    await bottomNav.getByText('Dashboard').click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByTestId('page-title')).toHaveText('Dashboard');
+    await bottomNav.getByText('Budgets').click();
+    await expect(page).toHaveURL(/\/budgets$/);
+    await expect(page.getByTestId('page-title')).toHaveText('Budgets');
+
+    await bottomNav.getByText('Settings').click();
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByTestId('page-title')).toHaveText('Settings');
+
+    await bottomNav.getByText('Expenses').click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('[data-testid="expense-row"]:visible').first()).toBeVisible();
   });
 
   test('mobile: hamburger header, bottom nav, FAB and list render', async ({ page }) => {
