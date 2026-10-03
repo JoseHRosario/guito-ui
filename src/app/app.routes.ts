@@ -16,8 +16,11 @@ export const routes: Routes = [
     children: [
       {
         // The expense list IS the Expenses section (issue #47) — and the app's default route.
+        // data.reuse marks it for the ExpensesRouteReuseStrategy: tab switches must NOT
+        // reload it; the month-nav refresh button and the saved=1 path are the triggers.
         path: '',
         component: ExpensesPage,
+        data: { reuse: true },
         title: 'Guito · Expenses',
       },
       {

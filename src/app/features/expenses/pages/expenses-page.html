@@ -1,7 +1,7 @@
 <div class="relative flex w-full flex-col lg:flex-row lg:items-start lg:gap-8 lg:px-12 lg:pt-10 lg:pb-16">
   <!-- Mobile body -->
   <div class="flex flex-1 flex-col items-start gap-4 p-4 lg:hidden">
-    <g-month-nav [month]="month()" />
+    <g-month-nav [month]="month()" (refreshed)="load()" />
     <ng-container *ngTemplateOutlet="expenseList" />
   </div>
 
@@ -38,7 +38,7 @@
   <!-- Desktop: main panel -->
   <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
     <div class="flex w-full items-center justify-between">
-      <div class="w-[370px]"><g-month-nav [month]="month()" /></div>
+      <div class="w-[370px]"><g-month-nav [month]="month()" (refreshed)="load()" /></div>
       <button type="button" class="btn btn-primary" aria-label="Add expense" (click)="createExpense()" data-testid="add-expense-desktop">
         <g-icon name="plus" class="size-5" />
         Add Expense

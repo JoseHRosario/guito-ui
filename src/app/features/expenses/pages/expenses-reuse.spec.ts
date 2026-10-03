@@ -1,0 +1,95 @@
+import '@angular/compiler';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
+import { ExpensesPage } from './expenses-page';
+import { TitlePage } from '../../../shared/title-page';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router, RouteReuseStrategy, withComponentInputBinding } from '@angular/router';
+import { By } from '@angular/platform-browser';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ExpensesRouteReuseStrategy } from '../../../core/route-reuse/expenses-reuse-strategy';
+
+const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
+
+const API_RESPONSE = {
+  expenses: [
+    { storedOrder: 12, date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
+  ],
+};
+
+describe('Expenses page survives tab navigation (issue #47 follow-up)', () => {
+  let http: HttpTestingController;
+  let harness: RouterTestingHarness;
+
+  beforeEach(async () => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      serializeSession({ idToken: 'id-token', accessToken: 'access', expiresAt: Date.now() + 3_600_000 }),
+    );
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([])),
+        provideHttpClientTesting(),
+        provideRouter(
+          [
+            { path: '', component: ExpensesPage, data: { reuse: true } },
+            { path: 'budgets', component: TitlePage },
+          ],
+          withComponentInputBinding(),
+        ),
+        { provide: RouteReuseStrategy, useExisting: ExpensesRouteReuseStrategy },
+        { provide: APP_ENVIRONMENT, useValue: TEST_ENV },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    harness = await RouterTestingHarness.create();
+  });
+
+  afterEach(() => {
+    try {
+      http.verify();
+    } finally {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  });
+
+  async function landOnExpenses(): Promise<ExpensesPage> {
+    const page = await harness.navigateByUrl('/', ExpensesPage);
+    const req = http.expectOne('https://api.test/Expense/latest/20');
+    req.flush(API_RESPONSE);
+    harness.detectChanges();
+    return page;
+  }
+
+  it('ShouldNotReissueTheLatestRequest_WhenUserLeavesAndReturnsToTheExpensesTab', async () => {
+    await landOnExpenses();
+    await harness.navigateByUrl('/budgets', TitlePage);
+    await harness.navigateByUrl('/', ExpensesPage);
+
+    // No second GET /Expense/latest/20 — the detached component was reused.
+    http.expectNone('https://api.test/Expense/latest/20');
+    expect(harness.fixture.nativeElement.querySelector('[data-testid="expense-row"]')).not.toBeNull();
+  });
+
+  it('ShouldReissueTheLatestRequest_WhenTheRefreshButtonIsClicked', async () => {
+    await landOnExpenses();
+
+    const refreshBtn = harness.fixture.debugElement.query(By.css('button[aria-label="Refresh expenses"]'));
+    expect(refreshBtn).not.toBeNull();
+    refreshBtn.nativeElement.click();
+
+    const req = http.expectOne('https://api.test/Expense/latest/20');
+    req.flush(API_RESPONSE);
+    harness.detectChanges();
+  });
+
+  it('ShouldDetachTheExpensesComponent_WhenAnotherTabActivates', async () => {
+    await landOnExpenses();
+    await harness.navigateByUrl('/budgets', TitlePage);
+    expect(ExpensesRouteReuseStrategy.hasDetachedRoute()).toBe(true);
+  });
+});
