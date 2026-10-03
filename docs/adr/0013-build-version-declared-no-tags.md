@@ -1,0 +1,11 @@
+# Build version: declared in package.json, no release ceremony
+
+Every deployed build reports its version. The UI stamps its build with `<version>+<UTC timestamp>.<short SHA>` (injected into the environment files behind the `APP_ENVIRONMENT` token by `deploy/stamp.sh`) and the Settings page shows it next to the API's version (read once at bootstrap from the `X-Api-Version` response header, guito-ui#51 / guito-api#75). The purpose (José's acceptance test): opening the deployed app — staging or prod — shows the exact release being tested or used, with **zero doubt and zero manual steps**.
+
+**The version is declared in the repo, not derived from git tags.** The single source of truth is `package.json` `"version"` (API equivalent: the csproj `<Version>` property, guito-api ADR 0012). The stamp script validates it is plain `x.y.z`, fails closed when it is missing, and appends build metadata itself — so same-day builds and repeated staging deploys of the same release are distinguishable by metadata alone. There are **no git tags, no pre-release suffixes, no build counters, and no manual release ceremony**: a merge to master *is* the release, and prod reports exactly the declared version of that commit.
+
+An earlier iteration (issue #49, superseded by #53) derived the base semver from the last `v*` tag plus a `-beta.N` suffix. It failed the acceptance test: a feature under test in staging displayed the *previous* release's number with a `-beta` suffix — noise for the tester, and it made tagging a manual step José explicitly removed from the loop.
+
+**Who bumps the version**: the agent, when implementing an issue — the issue's *Proposed version* (a mandatory template field) is committed onto the feature branch as a visible one-line diff, so the bump is reviewable in the PR and José keeps oversight without doing anything. Two features in flight with the same declared version is fine; metadata disambiguates their builds.
+
+**Consequences**: tag parsing and `fetch-depth: 0` checkouts are deleted from the deploy workflow; the `0.0.0-dev` environment placeholder remains only as the unstamped-local-build fallback and is asserted semver-shaped by `app-environment.spec.ts`; the fail-closed rule survives (a non-semver or missing declared version aborts the stamp, so an unstamped build never ships).

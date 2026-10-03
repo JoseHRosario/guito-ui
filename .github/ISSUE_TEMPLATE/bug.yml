@@ -16,6 +16,14 @@ body:
       description: Minimal, verifiable steps from a clean state.
     validations:
       required: true
+  - type: input
+    id: proposed-version
+    attributes:
+      label: Proposed version
+      description: "Semver this fix ships as (usually a patch bump — declared version, package.json \"version\", ADR 0013; the agent bumps it on the bug branch)."
+      placeholder: "0.2.1"
+    validations:
+      required: true
   - type: textarea
     id: acceptance
     attributes:
