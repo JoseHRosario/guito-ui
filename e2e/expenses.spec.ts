@@ -58,6 +58,9 @@ test.describe('app shell + expense list (stubbed data, signed in)', () => {
     await page.goto('/');
 
     const bottomNav = page.getByRole('navigation', { name: 'Bottom navigation' });
+    await bottomNav.getByText('Dashboard').click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByTestId('page-title')).toHaveText('Dashboard');
     await bottomNav.getByText('Budgets').click();
     await expect(page).toHaveURL(/\/budgets$/);
     await expect(page.getByTestId('page-title')).toHaveText('Budgets');

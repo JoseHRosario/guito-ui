@@ -1,5 +1,4 @@
-import { provideRouter, withComponentInputBinding } from '@angular/router';
-import { Router } from '@angular/router';
+import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -37,6 +36,11 @@ describe('Shell nav wiring (issue #47)', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
     setup(LIVE_SESSION);
+  });
+
+  afterEach(() => {
+    // Global-stub rule (CONVENTIONS testing): never leak stubs past this file — isolate:false.
+    vi.unstubAllGlobals();
   });
 
   it('ShouldLinkAllFourTabsInTheBottomNav_WhenRendered', () => {
