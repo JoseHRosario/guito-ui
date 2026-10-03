@@ -6,6 +6,7 @@ import { environment } from '../environments/environment';
 import { APP_ENVIRONMENT } from './core/app-environment';
 import { authInterceptor } from './core/auth/auth-interceptor';
 import { provideWarmUp } from './core/warm-up/warm-up-initializer';
+import { provideApiVersion } from './core/api-version/api-version-initializer';
 import { provideBfcacheGuard } from './core/auth/bfcache-guard-initializer';
 import { ExpensesRouteReuseStrategy } from './core/route-reuse/expenses-reuse-strategy';
 
@@ -16,6 +17,7 @@ export const appConfig: ApplicationConfig = {
     { provide: RouteReuseStrategy, useExisting: ExpensesRouteReuseStrategy },
     provideHttpClient(withInterceptors([authInterceptor])),
     provideWarmUp(),
+    provideApiVersion(),
     provideBfcacheGuard(),
     { provide: APP_ENVIRONMENT, useValue: environment },
   ],

@@ -67,7 +67,8 @@ test.describe('app shell + expense list (stubbed data, signed in)', () => {
 
     await bottomNav.getByText('Settings').click();
     await expect(page).toHaveURL(/\/settings$/);
-    await expect(page.getByTestId('page-title')).toHaveText('Settings');
+    // Real page since #51 (version block) — no longer a blank title-only scaffold.
+    await expect(page.locator('h1')).toHaveText('Settings');
 
     await bottomNav.getByText('Expenses').click();
     await expect(page).toHaveURL(/\/$/);

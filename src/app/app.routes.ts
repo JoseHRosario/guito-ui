@@ -5,6 +5,7 @@ import { SignIn } from './features/signin/pages/signin';
 import { AuthCallback } from './features/auth/pages/auth-callback';
 import { Shell } from './features/shell/components/shell';
 import { TitlePage } from './shared/title-page';
+import { SettingsPage } from './features/settings/pages/settings-page';
 import { authGuard, signedInGuard } from './core/auth/auth-guard';
 
 export const routes: Routes = [
@@ -38,8 +39,7 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
-        component: TitlePage,
-        data: { title: 'Settings' },
+        component: SettingsPage,
         title: 'Guito · Settings',
       },
       {
