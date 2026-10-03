@@ -51,8 +51,8 @@ describe('App shell + expenses list (stubbed, authed session)', () => {
     const rows = el.querySelectorAll('[data-testid="expense-row"]');
     expect(rows.length).toBe(14);
     expect(el.textContent).toContain('65,55');
-    // Summary derives from the loaded data: 5 outflows sum to 579.70 (pt-PT, ungrouped under 1000).
-    expect(el.textContent).toContain('579,70');
+    // Issue #47: no summary bar on the Expenses page — it returns on Dashboard later.
+    expect(el.querySelector('[data-testid="summary-expense"]')).toBeNull();
   });
 });
 

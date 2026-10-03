@@ -8,16 +8,14 @@ export interface NavItem {
   label: string;
   path: string;
   icon: IconName;
-  /** Placeholder sections render inert (no route yet in this stub). */
-  enabled: boolean;
 }
 
 /** Unified nav labels (José's settled design): Dashboard/Expenses/Budgets/Settings. */
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: 'credit-card', enabled: true },
-  { label: 'Expenses', path: '/', icon: 'dollar-sign', enabled: false },
-  { label: 'Budgets', path: '/', icon: 'shopping-bag', enabled: false },
-  { label: 'Settings', path: '/', icon: 'menu', enabled: false },
+  { label: 'Dashboard', path: '/dashboard', icon: 'credit-card' },
+  { label: 'Expenses', path: '/', icon: 'dollar-sign' },
+  { label: 'Budgets', path: '/budgets', icon: 'shopping-bag' },
+  { label: 'Settings', path: '/settings', icon: 'menu' },
 ];
 
 @Component({
@@ -46,10 +44,7 @@ export class Shell {
     return s === null ? 'G' : avatarInitials(s.idToken);
   });
 
-  /** Active tab paints with the primary token; the rest stay muted. */
-  protected tabClass(label: string): string {
-    return label === 'Dashboard' ? 'text-primary' : 'text-base-content/60';
-  }
+  /** The route's active state drives the highlight (issue #47) — no hardcoded tab. */
 
   protected toggleMenu(): void {
     this.menuOpen.update((open) => !open);

@@ -2,7 +2,6 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { formatEur } from '../services/money';
-import type { MonthSummary } from '../models/month-summary';
 
 // --- list-model helpers (folded single-consumer helpers, guito-api#40/#9) ---
 
@@ -32,14 +31,6 @@ function groupExpensesByDay(expenses: readonly Expense[]): ExpenseDayGroup[] {
     });
 }
 
-/** EXPENSE rows are outflows — ADR 0010: amounts are stored positive and the
- * outflow is implied by the record being an Expense; TOTAL = net. */
-function expenseSummary(expenses: readonly Expense[]): MonthSummary {
-  let outflow = 0;
-  for (const expense of expenses) outflow += expense.amount;
-  return { expense: outflow, income: 0, total: -outflow };
-}
-
 const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long' });
 
 /** The list's month label (e.g. "January, 2021"), from the newest expense; '' when empty. */
@@ -61,7 +52,6 @@ import { FAVORITES } from '../services/favorites';
 import type { Favorite } from '../services/favorites';
 import { GIcon } from '../../../shared/gicon';
 import { MonthNav } from '../components/month-nav';
-import { SummaryBar } from '../components/summary-bar';
 
 /**
  * Latest-expenses screen, LIVE from the deployed API (guito-api#9): loads
@@ -74,7 +64,7 @@ import { SummaryBar } from '../components/summary-bar';
   templateUrl: './expenses-page.html',
   styleUrl: './expenses-page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MonthNav, SummaryBar, GIcon, NgTemplateOutlet],
+  imports: [MonthNav, GIcon, NgTemplateOutlet],
 })
 export class ExpensesPage {
   private readonly expenseApi = inject(ExpenseApi);
@@ -90,7 +80,6 @@ export class ExpensesPage {
   protected readonly loadError = signal<string | null>(null);
 
   protected readonly month = computed(() => monthLabelOf(this.expenses() ?? []));
-  protected readonly summary = computed<MonthSummary>(() => expenseSummary(this.expenses() ?? []));
   protected readonly groups = computed(() => groupExpensesByDay(this.expenses() ?? []));
   protected readonly sidebarWallet = computed(() => formatEur(12450, { signed: true }));
 
