@@ -48,10 +48,11 @@
   </div>
 
   <ng-template #pendingList>
-    @if (linkedCount() !== null) {
-      <!-- Landing after the EB consent → API callback 302 (issue #64, guito-api#117). -->
+    @if (linkedConfirmed(); as linkedAccounts) {
+      <!-- Landing after the EB consent → API callback 302 (issue #64, guito-api#117).
+           A 0-account landing renders NO banner (the lazy probe drives the empty state instead). -->
       <p class="w-full rounded-2xl border border-base-content/10 bg-base-100 px-4 py-3 text-sm font-medium text-success" data-testid="bank-linked-confirm">
-        Bank connected — {{ linkedCount() === 1 ? '1 account' : linkedCount() + ' accounts' }} linked.
+        Bank connected — {{ linkedAccounts === 1 ? '1 account' : linkedAccounts + ' accounts' }} linked.
       </p>
     }
     @if (syncResult() !== null) {

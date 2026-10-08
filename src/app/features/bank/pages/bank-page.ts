@@ -91,6 +91,12 @@ export class BankPage {
     return value === undefined ? null : Math.max(0, Math.trunc(Number(value)) || 0);
   });
 
+  /** Accounts to confirm (null = no confirmation): a 0-account callback landing must NOT show success. */
+  protected readonly linkedConfirmed = computed(() => {
+    const count = this.linkedCount();
+    return count !== null && count > 0 ? count : null;
+  });
+
   /** Groups newest-first so the review starts at the most recent booking day. */
   protected readonly groups = computed<TransactionGroup[]>(() => {
     const today = new Date();

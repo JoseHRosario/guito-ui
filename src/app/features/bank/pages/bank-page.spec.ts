@@ -153,6 +153,19 @@ describe('BankPage (issue #61)', () => {
     expect(el.querySelector('[data-testid=bank-row]')).not.toBeNull();
   });
 
+  it('a 0-account callback landing (?linked=0) renders NO success banner (review regression)', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    fixture.componentRef.setInput('linked', '0');
+    await flushUnlinked(http);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = (fixture.nativeElement as HTMLElement);
+    expect(el.querySelector('[data-testid=bank-linked-confirm]')).toBeNull();
+    // the probe drives the unlinked empty state instead
+    expect(el.querySelector('[data-testid=bank-not-linked]')).not.toBeNull();
+  });
+
   it('sync 409 surfaces "No bank connected — open Settings to link your bank", never "Sync failed"', async () => {
     const fixture = TestBed.createComponent(BankPage);
     await flushUnlinked(http);

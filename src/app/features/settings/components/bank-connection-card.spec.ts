@@ -67,6 +67,8 @@ describe('BankConnectionCard (issue #64)', () => {
 
   it('unlinked: shows the no-bank status, the hardcoded ASPSP line and the generic consent note', async () => {
     const { fixture, el } = make();
+    // the transient loading line renders BEFORE the response settles (assertion per CONVENTIONS.md)
+    expect(el.querySelector('[data-testid=bank-connection-loading]')).not.toBeNull();
     flushConnections([]);
     await settle(fixture, () => el.querySelector('[data-testid=bank-status]') !== null);
 
@@ -87,6 +89,7 @@ describe('BankConnectionCard (issue #64)', () => {
     expect(rows.length).toBe(2);
     expect(rows[0].textContent).toContain('Conta Casa');
     expect(rows[0].textContent).toContain('•••• 1234');
+    expect(el.querySelector('[data-testid=bank-account-list]')).not.toBeNull();
     expect(el.querySelector('[data-testid=bank-status]')).toBeNull();
     expect(el.querySelector('[data-testid=bank-consent-note]')!.textContent!.trim()).toBe(
       'Consent expires 06/01/2027 — re-link from here.',
@@ -100,6 +103,24 @@ describe('BankConnectionCard (issue #64)', () => {
       .flush({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
     await settle(fixture, () => el.querySelector('[data-testid=bank-connection-error]') !== null);
     expect(el.querySelector('[data-testid=bank-connection-error]')).not.toBeNull();
+  });
+
+  it('an expired consent (past expiry date) shows the re-link line (issue #64 AC5 edge)', async () => {
+    const { fixture, el } = make();
+    flushConnections([{ ...ACCOUNT, consentExpiresAt: '2020-01-01T00:00:00Z' }]);
+    await settle(fixture, () => el.querySelectorAll('[data-testid=bank-account]').length === 1);
+    expect(el.querySelector('[data-testid=bank-consent-note]')!.textContent!.trim()).toBe(
+      'Consent expired — link your bank again.',
+    );
+  });
+
+  it('an EXPIRED consent status shows the re-link line even with a future date', async () => {
+    const { fixture, el } = make();
+    flushConnections([{ ...ACCOUNT, consentStatus: 'EXPIRED', consentExpiresAt: '2099-01-01T00:00:00Z' }]);
+    await settle(fixture, () => el.querySelectorAll('[data-testid=bank-account]').length === 1);
+    expect(el.querySelector('[data-testid=bank-consent-note]')!.textContent!.trim()).toBe(
+      'Consent expired — link your bank again.',
+    );
   });
 
   it('Link your bank fetches GET /BankAuth/url?aspsp=Activo Bank&country=PT and redirects the whole tab', async () => {

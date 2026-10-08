@@ -2,9 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { BankApi } from '../../bank/services/bank-api';
 import type { BankConnection } from '../../bank/models/bank-connection';
 
-/** Hardcoded MVP ASPSP (issue #64 out of scope: ASPSP list proxy). */
-const ASPSP = 'Activo Bank';
-const COUNTRY = 'PT';
+/** Shown before the accounts load (and when none carry an expiry date). */
+const GENERIC_EXPIRY_NOTE = 'Consent expires 90–180 days after linking — re-link from here.';
 
 /**
  * Bank connection card of the Settings page (approved frame
@@ -64,16 +63,23 @@ export class BankConnectionCard {
     }
   }
 
-  /** Expiry note for the linked state; dd/mm/yyyy like every other date in the app. */
+  /** Expiry note; dd/mm/yyyy like every other date in the app. Expired consent gets its own line. */
   protected expiryNote(): string {
     const accounts = this.accounts();
-    if (accounts === null) return 'Consent expires 90–180 days after linking — re-link from here.';
+    if (accounts === null) return GENERIC_EXPIRY_NOTE;
+    const now = Date.now();
+    const expired = accounts.some(
+      (a) =>
+        a.consentStatus.toUpperCase() === 'EXPIRED' ||
+        (a.consentExpiresAt !== null && a.consentExpiresAt !== '' && Date.parse(a.consentExpiresAt) < now),
+    );
+    if (expired) return 'Consent expired — link your bank again.';
     const iso = accounts
       .map((a) => a.consentExpiresAt)
       .filter((v): v is string => v !== null && v !== '')
       .sort()
       .at(-1);
-    if (iso === undefined) return 'Consent expires 90–180 days after linking — re-link from here.';
+    if (iso === undefined) return GENERIC_EXPIRY_NOTE;
     const d = new Date(iso);
     const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
     return `Consent expires ${date} — re-link from here.`;
