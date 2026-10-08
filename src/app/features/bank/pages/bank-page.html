@@ -1,0 +1,105 @@
+<div class="relative flex w-full flex-col lg:flex-row lg:items-start lg:gap-8 lg:px-12 lg:pt-10 lg:pb-16">
+  <!-- Mobile body -->
+  <div class="flex flex-1 flex-col items-start gap-4 p-4 lg:hidden">
+    <div class="flex w-full items-center justify-between py-3">
+      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Pending transactions</h2>
+      <g-sync-button [syncing]="syncing()" (syncRequested)="sync()" />
+    </div>
+    <ng-container *ngTemplateOutlet="pendingList" />
+  </div>
+
+  <!-- Desktop: sidebar (same chrome as the expense list frame) -->
+  <aside class="hidden w-80 shrink-0 flex-col gap-6 lg:flex">
+    <div class="flex w-full flex-col items-start gap-4 rounded-2xl border border-base-content/10 bg-base-100 p-6">
+      <div class="flex items-center gap-3">
+        <span class="flex size-12 items-center justify-center rounded-full bg-neutral text-neutral-content">
+          <span class="text-lg leading-none">JD</span>
+        </span>
+        <div class="flex flex-col items-start gap-1">
+          <p class="text-base font-semibold leading-snug text-base-content">John Doe</p>
+          <p class="text-xs leading-normal text-base-content/50">Premium Tier Member</p>
+        </div>
+      </div>
+      <hr class="w-full border-base-content/10" />
+      <div class="flex w-full items-start justify-between text-sm">
+        <p class="text-base-content/50">Main Wallet</p>
+        <p class="font-bold text-success" data-testid="sidebar-wallet">+12.450,00 €</p>
+      </div>
+    </div>
+
+    <div class="flex w-full flex-col items-start gap-4 rounded-2xl bg-primary p-6">
+      <p class="min-w-full max-w-fit text-2xl leading-tight font-semibold tracking-tight text-primary-content">
+        Get complete clarity on your spendings
+      </p>
+      <p class="min-w-full max-w-fit text-[13px] leading-normal text-primary-content/80">
+        Create smart budget targets to save up to 25% more every month.
+      </p>
+      <button type="button" class="btn btn-neutral btn-sm">Setup Budget</button>
+    </div>
+  </aside>
+
+  <!-- Desktop: main panel -->
+  <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
+    <div class="flex w-full items-center gap-6">
+      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Pending transactions</h2>
+      <g-sync-button [syncing]="syncing()" (syncRequested)="sync()" />
+    </div>
+    <ng-container *ngTemplateOutlet="pendingList" />
+  </div>
+
+  <ng-template #pendingList>
+    @if (syncResult() !== null) {
+      <p class="w-full text-sm text-base-content/60" data-testid="sync-result">{{ syncResult() }}</p>
+    }
+    @if (loadError()) {
+      <p class="w-full text-sm text-error" data-testid="bank-error">
+        Could not load pending transactions. Check your connection and sync again.
+      </p>
+    }
+    @if (!loading() && !loadError() && transactions().length === 0) {
+      <div class="w-full rounded-2xl border border-base-content/10 bg-base-100 p-8 text-center" data-testid="bank-empty">
+        <p class="text-base font-semibold text-base-content">No pending transactions</p>
+        <p class="mt-1 text-sm text-base-content/60">Sync to pull the latest bookings from your bank.</p>
+      </div>
+    }
+    @if (!loading()) {
+      @for (group of groups(); track group.date) {
+        <section class="w-full rounded-2xl border border-base-content/10 bg-base-100" data-testid="bank-group">
+          <header class="border-b border-base-content/10 px-4 pb-2.5 pt-4">
+            <h3 class="text-sm font-semibold text-base-content/80" [attr.data-date]="group.date">{{ group.label }}</h3>
+          </header>
+          @for (tx of group.transactions; track tx.id) {
+            <article
+              class="flex items-center gap-3 border-b border-base-content/5 px-4 py-3 last:border-b-0"
+              data-testid="bank-row"
+              [attr.data-tx-id]="tx.id"
+            >
+              <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-success/20 text-success">
+                <g-icon [name]="iconFor(tx)" class="size-5" />
+              </span>
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <p class="break-words text-sm font-medium leading-snug text-base-content">{{ tx.description }}</p>
+                <p class="text-xs leading-none" [class.text-base-content/50]="tx.suggestedCategory === null">
+                  {{ tx.suggestedCategory?.name ?? 'No suggestion' }}
+                </p>
+              </div>
+              <span class="shrink-0 text-sm font-semibold text-base-content" data-testid="bank-amount">
+                {{ amountFor(tx) }}
+              </span>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm shrink-0 rounded-full px-4"
+                data-testid="accept-transaction"
+                (click)="accept(tx)"
+              >
+                Accept
+              </button>
+            </article>
+          }
+        </section>
+      }
+    } @else {
+      <div class="flex w-full justify-center py-8"><span class="loading loading-lg" data-testid="bank-loading"></span></div>
+    }
+  </ng-template>
+</div>

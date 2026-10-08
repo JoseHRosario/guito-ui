@@ -10,11 +10,12 @@ export interface NavItem {
   icon: IconName;
 }
 
-/** Unified nav labels (José's settled design): Dashboard/Expenses/Budgets/Settings. */
+/** Unified nav labels (José's settled design) + Bank (issue #61, frame 3201:270: 5th item, Briefcase glyph). */
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: 'credit-card' },
   { label: 'Expenses', path: '/', icon: 'dollar-sign' },
   { label: 'Budgets', path: '/budgets', icon: 'shopping-bag' },
+  { label: 'Bank', path: '/bank', icon: 'briefcase' },
   { label: 'Settings', path: '/settings', icon: 'menu' },
 ];
 
