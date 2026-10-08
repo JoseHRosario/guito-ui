@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { AuthError, AuthService } from '../../../core/auth/auth-service';
+import { AuthError, AuthService, StaleSignInError } from '../../../core/auth/auth-service';
 import { AuthCallback } from './auth-callback';
 
 const auth = {
@@ -70,6 +70,18 @@ describe('AuthCallback', () => {
     auth.completeSignIn.mockResolvedValue('https://evil.example.com/steal');
     await create({ code: 'abc', state: 'st' });
     expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+  });
+
+  it('recovers a stale callback by routing to /signin instead of the error card (issue #57)', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    auth.completeSignIn.mockRejectedValue(
+      new StaleSignInError('No sign-in in progress — stale callback'),
+    );
+    const fixture = await create({ code: 'spent', state: 'st' });
+    expect(navigate).toHaveBeenCalledWith('/signin', { replaceUrl: true });
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('[data-testid="auth-error"]')).toBeNull();
   });
 
   it('hands the code to the opener window and closes itself when running inside the popup', async () => {

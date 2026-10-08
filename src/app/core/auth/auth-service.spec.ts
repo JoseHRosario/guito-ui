@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { APP_ENVIRONMENT } from '../app-environment';
-import { AuthService, popupTiming } from './auth-service';
+import { AuthService, popupTiming, StaleSignInError } from './auth-service';
 
 const TEST_ENV = {
   production: false,
@@ -305,6 +305,20 @@ describe('AuthService.completeSignIn', () => {
     await expect(
       auth.completeSignIn({ code: 'abc', state: 'forged-state' }),
     ).rejects.toThrowError(/state/i);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(storage['guito.auth.session']).toBeUndefined();
+  });
+
+  it('rejects a stale callback (no pending state) with StaleSignInError (issue #57)', async () => {
+    const storage: Record<string, string> = {};
+    const auth = serviceWithStorage(storage);
+
+    await expect(
+      auth.completeSignIn({ code: 'already-spent', state: 'whatever' }),
+    ).rejects.toThrowError(StaleSignInError);
+    // Every variant — spent code, Google error redirect, bare callback —
+    // recovers the same way instead of a dead-end error card.
+    await expect(auth.completeSignIn({})).rejects.toThrowError(StaleSignInError);
     expect(fetch).not.toHaveBeenCalled();
     expect(storage['guito.auth.session']).toBeUndefined();
   });
