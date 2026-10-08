@@ -234,10 +234,11 @@ export class AuthService {
   async completeSignIn(params: Record<string, string>): Promise<string> {
     const pending = this.pending();
     if (!pending) {
-      if (params['code']) {
-        throw new StaleSignInError('No sign-in in progress — stale callback');
-      }
-      throw new AuthError('No sign-in in progress');
+      // No code/error variant distinction matters: any callback without the
+      // pending PKCE pair is stale or replayed (Android PWA cold start on an
+      // old /auth/callback URL, or the pair died with the session) — the
+      // callback component restarts the flow (issue #57).
+      throw new StaleSignInError('No sign-in in progress — stale callback');
     }
 
     const error = params['error'];

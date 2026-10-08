@@ -309,13 +309,16 @@ describe('AuthService.completeSignIn', () => {
     expect(storage['guito.auth.session']).toBeUndefined();
   });
 
-  it('rejects a stale callback (code present, no pending state) with StaleSignInError (issue #57)', async () => {
+  it('rejects a stale callback (no pending state) with StaleSignInError (issue #57)', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
 
     await expect(
       auth.completeSignIn({ code: 'already-spent', state: 'whatever' }),
     ).rejects.toThrowError(StaleSignInError);
+    // Every variant — spent code, Google error redirect, bare callback —
+    // recovers the same way instead of a dead-end error card.
+    await expect(auth.completeSignIn({})).rejects.toThrowError(StaleSignInError);
     expect(fetch).not.toHaveBeenCalled();
     expect(storage['guito.auth.session']).toBeUndefined();
   });
