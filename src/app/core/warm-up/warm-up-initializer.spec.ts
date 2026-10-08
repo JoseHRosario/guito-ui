@@ -7,7 +7,7 @@ import { stubFetch } from './fetch-stub';
 const TEST_ENV = { production: false, googleClientId: 'cid', apiBaseUrl: 'https://api.test' };
 
 describe('provideWarmUp (app initializer)', () => {
-  it('fires exactly one /healthz request to the configured apiBaseUrl at bootstrap', async () => {
+  it('fires exactly one /warm request to the configured apiBaseUrl at bootstrap', async () => {
     const { fetch, calls, restore } = stubFetch(() => Promise.resolve(new Response('{}', { status: 200 })));
     globalThis.fetch = fetch;
     try {
@@ -15,7 +15,7 @@ describe('provideWarmUp (app initializer)', () => {
         providers: [provideWarmUp(), { provide: APP_ENVIRONMENT, useValue: TEST_ENV }],
       });
       await TestBed.inject(ApplicationInitStatus).donePromise;
-      expect(calls).toEqual(['https://api.test/healthz']);
+      expect(calls).toEqual(['https://api.test/warm']);
     } finally {
       restore();
     }
@@ -29,7 +29,7 @@ describe('provideWarmUp (app initializer)', () => {
         providers: [provideWarmUp(), { provide: APP_ENVIRONMENT, useValue: TEST_ENV }],
       });
       await TestBed.inject(ApplicationInitStatus).donePromise; // resolves despite the rejected fetch
-      expect(calls).toEqual(['https://api.test/healthz']); // one attempt, no retry loop
+      expect(calls).toEqual(['https://api.test/warm']); // one attempt, no retry loop
     } finally {
       restore();
     }
