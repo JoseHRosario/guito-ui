@@ -128,7 +128,14 @@ test.describe('favorites speed-dial (stubbed API, signed in)', () => {
 
     await page.locator(vis('add-expense-fab')).click();
     await expect(page.locator(vis('speed-dial-menu'))).toBeVisible();
+    // Wait for the create POST to actually land before asserting on the
+    // recorded payload — asserting synchronously after the click races the
+    // request's first tick and flakes under CI load (PR #60's red run).
+    const postCreated = page.waitForResponse(
+      (r) => r.url().endsWith('/Expense') && r.request().method() === 'POST',
+    );
     await page.locator(vis('speed-dial-favorite-morning-coffee')).click();
+    await postCreated;
 
     // The preset posts as-is: positive amount, today's date, exact description/category.
     const today = new Date();
