@@ -8,7 +8,14 @@ describe('warmUpApi', () => {
     expect(calls).toEqual(['https://api.test/warm']);
   });
 
-  it('swallows a rejected fetch — resolves, no retry, no second call', async () => {
+  it('resolves with the response so the version header can ride the same call (issue #59)', async () => {
+    const response = new Response('{}', { status: 200, headers: { 'X-Api-Version': '0.3.0' } });
+    const { fetch, calls } = stubFetch(() => Promise.resolve(response));
+    await expect(warmUpApi('https://api.test', fetch)).resolves.toBe(response);
+    expect(calls).toEqual(['https://api.test/warm']);
+  });
+
+  it('swallows a rejected fetch — resolves undefined, no retry, no second call', async () => {
     const { fetch, calls } = stubFetch(() => Promise.reject(new TypeError('network down')));
     await expect(warmUpApi('https://api.test', fetch)).resolves.toBeUndefined();
     expect(calls).toEqual(['https://api.test/warm']);
