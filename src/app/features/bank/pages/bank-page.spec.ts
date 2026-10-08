@@ -38,6 +38,19 @@ function flushPending(http: HttpTestingController, rows: object = PENDING): void
   http.expectOne('https://api.test/BankTransaction').flush(rows);
 }
 
+/** Wait a macrotask so the page's own async chain advances before the next expectOne. */
+async function tick(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 0));
+}
+
+/** Empty pending list: flush the pending GET, wait for the lazy link probe, flush it. */
+async function flushUnlinked(http: HttpTestingController, accounts: object[] = []): Promise<void> {
+  flushPending(http, []);
+  await tick();
+  http.expectOne('https://api.test/BankConnection').flush({ accounts });
+  await tick();
+}
+
 describe('BankPage (issue #61)', () => {
   let http: HttpTestingController;
   let router: Router;
@@ -79,17 +92,125 @@ describe('BankPage (issue #61)', () => {
     expect(el.querySelectorAll('[data-testid=sidebar-wallet]')[0].textContent).toContain('+12.450,00 €');
   });
 
-  it('empty pending list shows the empty state card', async () => {
+  it('empty pending list shows the empty state card and, when unlinked, the Bank connection section with Open Settings', async () => {
     const fixture = TestBed.createComponent(BankPage);
-    flushPending(http, []);
+    await flushUnlinked(http);
     await fixture.whenStable();
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=bank-empty]')).not.toBeNull();
+
+    const el = (fixture.nativeElement as HTMLElement);
+    const empty = el.querySelectorAll('[data-testid=bank-empty]');
+    expect(empty.length).toBe(2); // both responsive branches render in jsdom
+    for (const card of Array.from(empty)) {
+      expect(card.querySelector('[data-testid=bank-not-linked]')!.textContent!.trim()).toBe(
+        'No bank connected — open Settings to link your bank.',
+      );
+      expect(card.querySelector('[data-testid=open-settings]')).not.toBeNull();
+    }
+  });
+
+  it('empty pending list with a linked account shows the plain empty state (no Open Settings)', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    await flushUnlinked(http, [{ name: 'Conta Casa', ibanMasked: '•••• 1234' }]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=open-settings]')).toBeNull();
+  });
+
+  it('Open Settings routes to /settings — linking lives on Settings (issue #64)', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    await flushUnlinked(http);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid=open-settings]')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(navigate).toHaveBeenCalledWith(['/settings']);
+  });
+
+  it('a 409 on the pending GET also implies no bank connection (issue #64)', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    http.expectOne('https://api.test/BankTransaction').flush({ title: 'No bank connection' }, { status: 409, statusText: 'Conflict' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = (fixture.nativeElement as HTMLElement);
+    expect(el.querySelector('[data-testid=bank-not-linked]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=bank-error]')).toBeNull();
+  });
+
+  it('landing via ?linked=N shows the consent confirmation above the pending list', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    fixture.componentRef.setInput('linked', '1');
+    flushPending(http, [PENDING[0]]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = (fixture.nativeElement as HTMLElement);
+    const confirms = el.querySelectorAll('[data-testid=bank-linked-confirm]');
+    expect(confirms.length).toBe(2); // both responsive branches render in jsdom
+    expect(confirms[0].textContent).toContain('Bank connected — 1 account linked.');
+    expect(el.querySelector('[data-testid=bank-row]')).not.toBeNull();
+  });
+
+  it('a 0-account callback landing (?linked=0) renders NO success banner (review regression)', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    fixture.componentRef.setInput('linked', '0');
+    await flushUnlinked(http);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = (fixture.nativeElement as HTMLElement);
+    expect(el.querySelector('[data-testid=bank-linked-confirm]')).toBeNull();
+    // the probe drives the unlinked empty state instead
+    expect(el.querySelector('[data-testid=bank-not-linked]')).not.toBeNull();
+  });
+
+  it('sync 409 surfaces "No bank connected — open Settings to link your bank", never "Sync failed"', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    await flushUnlinked(http);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    http
+      .expectOne('https://api.test/BankTransaction/sync')
+      .flush({ title: 'No bank connection' }, { status: 409, statusText: 'Conflict' });
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    const el = (fixture.nativeElement as HTMLElement);
+    const results = el.querySelectorAll('[data-testid=sync-result]');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].textContent!.trim()).toBe('No bank connected — open Settings to link your bank.');
+    expect(el.textContent).not.toContain('Sync failed');
+    expect(el.querySelector('[data-testid=open-settings]')).not.toBeNull();
+  });
+
+  it('a non-409 sync failure keeps the generic message', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    await flushUnlinked(http);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    http.expectOne('https://api.test/BankTransaction/sync').flush({ title: 'boom' }, { status: 500, statusText: 'Server Error' });
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=sync-result]')!.textContent!.trim()).toBe(
+      'Sync failed — try again',
+    );
   });
 
   it('the sync button disables and swaps to a spinner while the sync is in flight', async () => {
     const fixture = TestBed.createComponent(BankPage);
-    flushPending(http, []);
+    await flushUnlinked(http);
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -106,7 +227,10 @@ describe('BankPage (issue #61)', () => {
     await fixture.whenStable();
     await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
+    // the post-sync reload re-issues the lazy link probe on an empty list
     flushPending(http, []);
+    await new Promise((r) => setTimeout(r, 0));
+    http.expectOne('https://api.test/BankConnection').flush({ accounts: [] });
     await fixture.whenStable();
     await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
@@ -125,7 +249,7 @@ describe('BankPage (issue #61)', () => {
 
   it('sync button POSTs /BankTransaction/sync then reloads the pending list', async () => {
     const fixture = TestBed.createComponent(BankPage);
-    flushPending(http, []);
+    await flushUnlinked(http);
     await fixture.whenStable();
     fixture.detectChanges();
 

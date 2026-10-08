@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { ApiVersionService } from '../../../core/api-version/api-version-service';
+import { BankConnectionCard } from '../components/bank-connection-card';
 
 /** Build-stamp fragment: semver core + muted 'built …' line (approved frame, issue #51). */
 interface VersionParts {
@@ -21,6 +22,7 @@ interface VersionParts {
   templateUrl: './settings-page.html',
   styleUrl: './settings-page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [BankConnectionCard],
 })
 export class SettingsPage {
   private readonly env = inject(APP_ENVIRONMENT);

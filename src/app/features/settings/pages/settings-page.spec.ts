@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { ApiVersionService } from '../../../core/api-version/api-version-service';
+import { BankApi } from '../../bank/services/bank-api';
 import { SettingsPage } from './settings-page';
 
 const STAMP = '0.1.0-beta.12+20261003T142230Z.1a2b3c4';
@@ -12,6 +13,10 @@ const TEST_ENV = {
   version: STAMP,
 };
 
+// BankApi is stubbed at the service: the card's HTTP transport is covered by
+// bank-connection-card.spec — this suite owns the page composition.
+const BANK_API_STUB = { connections: async () => [], authUrl: async () => 'https://consent.test' };
+
 describe('SettingsPage', () => {
   function make(env = TEST_ENV, apiVersion?: string) {
     TestBed.configureTestingModule({
@@ -19,6 +24,7 @@ describe('SettingsPage', () => {
       providers: [
         provideRouter([]),
         { provide: APP_ENVIRONMENT, useValue: env },
+        { provide: BankApi, useValue: BANK_API_STUB },
       ],
     });
     const fixture = TestBed.createComponent(SettingsPage);
@@ -60,5 +66,12 @@ describe('SettingsPage', () => {
     const fixture = make();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('h1')!.textContent!.trim()).toBe('Settings');
+  });
+
+  it('renders the bank connection card below the version block (issue #64)', () => {
+    const fixture = make();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('g-bank-connection-card [data-testid=bank-connection-card]')).not.toBeNull();
+    expect(el.querySelector('g-bank-connection-card [data-testid=link-bank]')).not.toBeNull();
   });
 });

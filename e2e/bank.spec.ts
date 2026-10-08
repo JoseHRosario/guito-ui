@@ -78,3 +78,69 @@ test.describe('Bank review page (issue #61, stubbed data, signed in)', () => {
     await expect(page.getByTestId('sync-result').first()).toContainText('+3 new');
   });
 });
+test.describe('Bank link flow (issue #64: linking lives on Settings; Bank page routes there)', () => {
+  test('mobile: unlinked empty state offers Open Settings, which routes to the Settings card', async ({ page }) => {
+    await stubExpensesApi(page);
+    await seedSession(page);
+    await page.setViewportSize({ width: 402, height: 874 });
+    await page.route('**/BankTransaction', (route: Route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ title: 'No bank connection' }) });
+      }
+      return route.continue();
+    });
+    await page.route('**/BankConnection', (route: Route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accounts: [] }) }),
+    );
+    await page.route('**/Category', (route: Route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ categories: [{ name: 'Clothing' }] }) }),
+    );
+    await page.goto('/bank');
+
+    const empty = page.locator('[data-testid="bank-empty"]:visible');
+    await expect(empty).toBeVisible();
+    await expect(empty).toContainText('No bank connected — open Settings to link your bank.');
+
+    await empty.locator('[data-testid="open-settings"]').click();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(page.locator('[data-testid="link-bank"]:visible')).toBeVisible();
+  });
+
+  test('mobile: landing from the consent callback (?linked=1) confirms and shows the pending list', async ({ page }) => {
+    await stubExpensesApi(page);
+    await stubBankApi(page);
+    await seedSession(page);
+    await page.setViewportSize({ width: 402, height: 874 });
+    await page.route('**/BankConnection', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ accounts: [{ name: 'Conta Casa', ibanMasked: '•••• 1234', consentStatus: 'VALID' }] }),
+      }),
+    );
+    await page.goto('/bank?linked=1');
+
+    await expect(page.locator('[data-testid="bank-linked-confirm"]:visible')).toContainText('Bank connected — 1 account linked.');
+    await expect(page.locator('[data-testid="bank-row"]:visible').first()).toBeVisible();
+  });
+
+  test('mobile: Settings "Link your bank" redirects the tab to the EB consent URL', async ({ page }) => {
+    await stubExpensesApi(page);
+    await seedSession(page);
+    await page.setViewportSize({ width: 402, height: 874 });
+    await page.route('**/BankConnection', (route: Route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accounts: [] }) }),
+    );
+    await page.route('**/BankAuth/url*', (route: Route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://consent.eb.test/authorize' }) }),
+    );
+    await page.route('https://consent.eb.test/**', (route: Route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>EB consent</h1>' }),
+    );
+    await page.goto('/settings');
+
+    await expect(page.locator('[data-testid="bank-status"]:visible')).toContainText('No bank connected');
+    await page.locator('[data-testid="link-bank"]:visible').click();
+    await expect(page).toHaveURL('https://consent.eb.test/authorize');
+  });
+});
