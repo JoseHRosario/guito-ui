@@ -1,6 +1,11 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { AUTH_POPUP_HANDOFF, AuthError, AuthService } from '../../../core/auth/auth-service';
+import {
+  AUTH_POPUP_HANDOFF,
+  AuthError,
+  AuthService,
+  StaleSignInError,
+} from '../../../core/auth/auth-service';
 
 /**
  * Landing for the Google OAuth redirect (`/auth/callback`). Exchanges the
@@ -67,6 +72,14 @@ export class AuthCallback {
       }));
       await this.router.navigateByUrl(returnUrl, { replaceUrl: true });
     } catch (cause) {
+      if (cause instanceof StaleSignInError) {
+        // Stale/replayed callback (Android PWA cold start on an old
+        // /auth/callback?code=… URL): the code is spent and no PKCE state
+        // exists — restart the flow instead of the dead-end error card
+        // (issue #57). replaceUrl so the stale URL leaves the task history.
+        await this.router.navigateByUrl('/signin', { replaceUrl: true });
+        return;
+      }
       this.message.set(
         cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
       );

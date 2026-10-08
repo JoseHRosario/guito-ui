@@ -13,6 +13,15 @@ import { revokeAccessToken } from './revoke-access-token';
 /** Thrown for any sign-in failure the callback component should surface. */
 export class AuthError extends Error {}
 
+/**
+ * The callback page ran with an authorization code but no pending PKCE state:
+ * the callback URL outlived the sign-in that created it (Android PWA restores
+ * the task on the stale `/auth/callback?code=…` URL, or the pending pair died
+ * with the session). Recoverable — the callback component restarts the flow
+ * instead of showing the dead-end error card (issue #57).
+ */
+export class StaleSignInError extends AuthError {}
+
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const PKCE_STORAGE_KEY = 'guito.auth.pkce';
 const AUTH_CALLBACK_PATH = '/auth/callback';
@@ -225,6 +234,9 @@ export class AuthService {
   async completeSignIn(params: Record<string, string>): Promise<string> {
     const pending = this.pending();
     if (!pending) {
+      if (params['code']) {
+        throw new StaleSignInError('No sign-in in progress — stale callback');
+      }
       throw new AuthError('No sign-in in progress');
     }
 
