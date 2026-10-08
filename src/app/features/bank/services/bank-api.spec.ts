@@ -107,4 +107,67 @@ describe('BankApi', () => {
     req.flush({ fetched: 12, new: 3 });
     expect(await promise).toEqual({ fetched: 12, new: 3 });
   });
+
+  it('connections() maps the wrapped account list tolerantly', async () => {
+    const promise = TestBed.inject(BankApi).connections();
+    const req = http.expectOne('https://api.test/BankConnection');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer id-token');
+    req.flush({
+      accounts: [
+        null,
+        {
+          name: 'Conta Casa',
+          ibanMasked: '•••• 1234',
+          currency: 'EUR',
+          aspspName: 'Activo Bank',
+          aspspCountry: 'PT',
+          consentStatus: 'VALID',
+          consentExpiresAt: '2027-01-06T12:00:00Z',
+        },
+        { name: 'Conta 2' },
+      ],
+    });
+    expect(await promise).toEqual([
+      {
+        name: 'Conta Casa',
+        ibanMasked: '•••• 1234',
+        currency: 'EUR',
+        aspspName: 'Activo Bank',
+        aspspCountry: 'PT',
+        consentStatus: 'VALID',
+        consentExpiresAt: '2027-01-06T12:00:00Z',
+      },
+      {
+        name: 'Conta 2',
+        ibanMasked: '',
+        currency: '',
+        aspspName: '',
+        aspspCountry: '',
+        consentStatus: '',
+        consentExpiresAt: null,
+      },
+    ]);
+  });
+
+  it('connections() resolves an empty list for a missing/null wrapper', async () => {
+    const promise = TestBed.inject(BankApi).connections();
+    http.expectOne('https://api.test/BankConnection').flush({ accounts: null });
+    expect(await promise).toEqual([]);
+  });
+
+  it('authUrl() asks for Activo Bank / PT and resolves the consent URL', async () => {
+    const promise = TestBed.inject(BankApi).authUrl();
+    const req = http.expectOne('https://api.test/BankAuth/url?aspsp=Activo%20Bank&country=PT');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer id-token');
+    req.flush({ url: 'https://consent.enablebanking.com/...' });
+    expect(await promise).toBe('https://consent.enablebanking.com/...');
+  });
+
+  it('authUrl() rejects when the API returns no URL', async () => {
+    const promise = TestBed.inject(BankApi).authUrl();
+    http.expectOne('https://api.test/BankAuth/url?aspsp=Activo%20Bank&country=PT').flush({ url: '' });
+    await expect(promise).rejects.toThrow();
+  });
 });

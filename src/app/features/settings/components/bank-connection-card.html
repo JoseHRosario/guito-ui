@@ -1,0 +1,45 @@
+<div class="rounded-2xl bg-base-100 p-4 lg:p-6" data-testid="bank-connection-card">
+  <p class="text-sm font-semibold text-base-content/60">Bank connection</p>
+
+  @if (accounts() === null && !loadFailed()) {
+    <p class="mt-1 text-sm text-base-content/60" data-testid="bank-connection-loading">Checking bank connection…</p>
+  } @else if (loadFailed()) {
+    <p class="mt-1 text-sm text-error" data-testid="bank-connection-error">Bank connection status unavailable</p>
+  } @else if ((accounts() ?? []).length === 0) {
+    <p class="mt-1 text-base font-medium text-base-content" data-testid="bank-status">No bank connected</p>
+  } @else {
+    <ul class="mt-1 flex flex-col gap-1" data-testid="bank-account-list">
+      @for (account of accounts(); track account.name + account.ibanMasked) {
+        <li class="text-base font-medium text-base-content" data-testid="bank-account">
+          {{ account.name }}@if (account.ibanMasked) { <span class="text-base-content/60"> · {{ account.ibanMasked }}</span> }
+        </li>
+      }
+    </ul>
+  }
+
+  <p class="mt-3 text-sm leading-normal text-base-content/60">
+    Activo Bank · Portugal — link to pull transactions
+  </p>
+  <p class="mt-1 text-sm leading-normal text-base-content/60" data-testid="bank-consent-note">
+    {{ expiryNote() }}
+  </p>
+
+  <button
+    type="button"
+    class="btn btn-primary btn-sm mt-4 rounded-full px-5"
+    data-testid="link-bank"
+    [disabled]="linking()"
+    (click)="link()"
+  >
+    @if (linking()) {
+      <span class="loading loading-sm" data-testid="link-spinner"></span>
+    }
+    Link your bank
+  </button>
+
+  @if (linkFailed()) {
+    <p class="mt-2 text-sm text-error" data-testid="bank-link-error">
+      Could not start the bank link — try again.
+    </p>
+  }
+</div>

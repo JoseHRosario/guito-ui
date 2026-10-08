@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { NgTemplateOutlet } from '@angular/common';
 import { GIcon, type IconName } from '../../../shared/gicon';
 import { SyncButton } from '../components/sync-button';
@@ -45,6 +46,11 @@ interface TransactionGroup {
   transactions: BankTransaction[];
 }
 
+/** Type-narrowing helper: `error` is an HttpErrorResponse with that status. */
+function isHttp(error: unknown, status: number): boolean {
+  return error instanceof HttpErrorResponse && error.status === status;
+}
+
 /**
  * Bank review page (issue #61): pending (unmatched) bank transactions with
  * sync and accept-to-expense, per the approved Figma frames (mobile 3201:270,
@@ -69,6 +75,21 @@ export class BankPage {
   protected readonly syncing = signal(false);
   /** Result of the last sync, e.g. '+3 new · 12 fetched'; null hides the line. */
   protected readonly syncResult = signal<string | null>(null);
+  /**
+   * No linked bank account (issue #64): probed via GET /BankConnection only
+   * when the pending list is empty, and forced on a sync-409. Drives the
+   * empty-state 'Bank connection' section + Open Settings action.
+   */
+  protected readonly notLinked = signal(false);
+
+  /** `?linked=N` from the consent callback 302 (guito-api#117): N = accounts linked. */
+  readonly linked = input<string>();
+
+  /** Accounts linked by the consent flow, null when this is not a callback landing. */
+  protected readonly linkedCount = computed(() => {
+    const value = this.linked();
+    return value === undefined ? null : Math.max(0, Math.trunc(Number(value)) || 0);
+  });
 
   /** Groups newest-first so the review starts at the most recent booking day. */
   protected readonly groups = computed<TransactionGroup[]>(() => {
@@ -95,10 +116,26 @@ export class BankPage {
       const rows = await this.bankApi.pending();
       this.transactions.set(rows);
       this.loadError.set(false);
-    } catch {
-      this.loadError.set(true);
+      // Empty pending list may mean no linked account (issue #64) — probe the
+      // connection (not on every load; a 409 on the GET also implies it).
+      if (rows.length === 0) await this.probeLink();
+    } catch (error) {
+      if (isHttp(error, 409)) {
+        this.notLinked.set(true);
+      } else {
+        this.loadError.set(true);
+      }
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** GET /BankConnection: any linked account means the bank IS connected. */
+  private async probeLink(): Promise<void> {
+    try {
+      this.notLinked.set((await this.bankApi.connections()).length === 0);
+    } catch {
+      // Probe failure must not break the empty state — keep the last state.
     }
   }
 
@@ -109,11 +146,23 @@ export class BankPage {
       const result = await this.bankApi.sync();
       this.syncResult.set(`+${result.new} new · ${result.fetched} fetched`);
       await this.load();
-    } catch {
-      this.syncResult.set('Sync failed — try again');
+    } catch (error) {
+      // 409 = no link / expired consent (issue #64): route back to Settings,
+      // never surface the generic 'Sync failed' for this state.
+      if (isHttp(error, 409)) {
+        this.notLinked.set(true);
+        this.syncResult.set('No bank connected — open Settings to link your bank.');
+      } else {
+        this.syncResult.set('Sync failed — try again');
+      }
     } finally {
       this.syncing.set(false);
     }
+  }
+
+  /** Empty-state action: linking lives on Settings (issue #64). */
+  protected openSettings(): void {
+    void this.router.navigate(['/settings']);
   }
 
   /** Accept → the existing Create Expense form, prefilled from the bank row. */

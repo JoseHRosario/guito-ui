@@ -2,7 +2,19 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import type { BankConnection } from '../models/bank-connection';
 import type { BankSyncResult, BankTransaction } from '../models/bank-transaction';
+
+/** Wire shape of one linked account (guito-api#117): camelCase, tolerant mapping. */
+interface BankConnectionDto {
+  name?: string | null;
+  ibanMasked?: string | null;
+  currency?: string | null;
+  aspspName?: string | null;
+  aspspCountry?: string | null;
+  consentStatus?: string | null;
+  consentExpiresAt?: string | null;
+}
 
 /**
  * Wire shape of the pending bank-transaction rows (guito-api#91/#112).
@@ -52,5 +64,38 @@ export class BankApi {
       this.http.post<{ fetched?: number | null; new?: number | null }>(`${this.env.apiBaseUrl}/BankTransaction/sync`, {}),
     );
     return { fetched: response.fetched ?? 0, new: response.new ?? 0 };
+  }
+
+  /** Linked accounts for the Settings bank-connection card (guito-api#117); empty = no bank connected. */
+  async connections(): Promise<BankConnection[]> {
+    const response = await firstValueFrom(
+      this.http.get<{ accounts?: (BankConnectionDto | null)[] | null }>(`${this.env.apiBaseUrl}/BankConnection`),
+    );
+    return (response?.accounts ?? [])
+      .filter((dto): dto is BankConnectionDto => dto !== null && typeof dto === 'object')
+      .map((dto) => ({
+        name: dto.name ?? '',
+        ibanMasked: dto.ibanMasked ?? '',
+        currency: dto.currency ?? '',
+        aspspName: dto.aspspName ?? '',
+        aspspCountry: dto.aspspCountry ?? '',
+        consentStatus: dto.consentStatus ?? '',
+        consentExpiresAt: dto.consentExpiresAt ?? null,
+      }));
+  }
+
+  /**
+   * The Enable Banking consent URL for the link flow (issue #64, guito-api#89):
+   * Activo Bank / PT hardcoded MVP (guito-api#116 out of scope: ASPSP list proxy).
+   * Resolves the `{url}` payload; an empty URL cannot redirect, so it rejects.
+   */
+  async authUrl(): Promise<string> {
+    const params = `aspsp=${encodeURIComponent('Activo Bank')}&country=${encodeURIComponent('PT')}`;
+    const response = await firstValueFrom(
+      this.http.get<{ url?: string | null }>(`${this.env.apiBaseUrl}/BankAuth/url?${params}`),
+    );
+    const url = response?.url ?? '';
+    if (!url) throw new Error('BankAuth/url returned no consent URL');
+    return url;
   }
 }

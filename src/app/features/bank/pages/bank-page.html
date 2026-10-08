@@ -48,6 +48,12 @@
   </div>
 
   <ng-template #pendingList>
+    @if (linkedCount() !== null) {
+      <!-- Landing after the EB consent → API callback 302 (issue #64, guito-api#117). -->
+      <p class="w-full rounded-2xl border border-base-content/10 bg-base-100 px-4 py-3 text-sm font-medium text-success" data-testid="bank-linked-confirm">
+        Bank connected — {{ linkedCount() === 1 ? '1 account' : linkedCount() + ' accounts' }} linked.
+      </p>
+    }
     @if (syncResult() !== null) {
       <p class="w-full text-sm text-base-content/60" data-testid="sync-result">{{ syncResult() }}</p>
     }
@@ -57,9 +63,27 @@
       </p>
     }
     @if (!loading() && !loadError() && transactions().length === 0) {
-      <div class="w-full rounded-2xl border border-base-content/10 bg-base-100 p-8 text-center" data-testid="bank-empty">
-        <p class="text-base font-semibold text-base-content">No pending transactions</p>
+      <div class="w-full rounded-2xl border border-base-content/10 bg-base-100 p-6" data-testid="bank-empty">
+        <span class="flex size-12 items-center justify-center rounded-full bg-base-200 text-base-content/60">
+          <g-icon name="briefcase" class="size-6" />
+        </span>
+        <p class="mt-3 text-base font-semibold text-base-content">No pending transactions</p>
         <p class="mt-1 text-sm text-base-content/60">Sync to pull the latest bookings from your bank.</p>
+        @if (notLinked()) {
+          <hr class="mt-5 border-base-content/10" />
+          <p class="mt-4 text-sm font-semibold text-base-content/60">Bank connection</p>
+          <p class="mt-1 text-sm leading-normal text-base-content/60" data-testid="bank-not-linked">
+            No bank connected — open Settings to link your bank.
+          </p>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm mt-4 rounded-full px-5"
+            data-testid="open-settings"
+            (click)="openSettings()"
+          >
+            Open Settings
+          </button>
+        }
       </div>
     }
     @if (!loading()) {
