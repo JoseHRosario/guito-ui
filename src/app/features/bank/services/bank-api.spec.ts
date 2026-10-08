@@ -170,4 +170,24 @@ describe('BankApi', () => {
     http.expectOne('https://api.test/BankAuth/url?aspsp=Activo%20Bank&country=PT').flush({ url: '' });
     await expect(promise).rejects.toThrow();
   });
+
+  it('authUrl() uses the environment bank when the env carries one (sandbox Nordea/FI, issue #64 fix)', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: APP_ENVIRONMENT, useValue: { ...TEST_ENV, bankName: 'Nordea', bankCountry: 'FI' } },
+      ],
+    });
+    const http2 = TestBed.inject(HttpTestingController);
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      serializeSession({ idToken: 'id-token', accessToken: 'access', expiresAt: Date.now() + 3_600_000 }),
+    );
+    const promise = TestBed.inject(BankApi).authUrl();
+    const req = http2.expectOne('https://api.test/BankAuth/url?aspsp=Nordea&country=FI');
+    req.flush({ url: 'https://consent.enablebanking.com/...' });
+    expect(await promise).toBe('https://consent.enablebanking.com/...');
+  });
 });

@@ -123,6 +123,28 @@ describe('BankConnectionCard (issue #64)', () => {
     );
   });
 
+  it('the ASPSP copy comes from the environment (sandbox shows Nordea · Finland)', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [BankConnectionCard],
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: APP_ENVIRONMENT, useValue: { ...TEST_ENV, bankName: 'Nordea', bankCountryLabel: 'Finland' } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(BankConnectionCard);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    flushConnections([]);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid=bank-status]')).not.toBeNull();
+    });
+    expect(el.textContent).toContain('Nordea · Finland — link to pull transactions');
+  });
+
   it('Link your bank fetches GET /BankAuth/url?aspsp=Activo Bank&country=PT and redirects the whole tab', async () => {
     const { fixture, el } = make();
     flushConnections([]);
