@@ -6,6 +6,7 @@ import { AuthCallback } from './features/auth/pages/auth-callback';
 import { Shell } from './features/shell/components/shell';
 import { TitlePage } from './shared/title-page';
 import { SettingsPage } from './features/settings/pages/settings-page';
+import { BankPage } from './features/bank/pages/bank-page';
 import { authGuard, signedInGuard } from './core/auth/auth-guard';
 
 export const routes: Routes = [
@@ -36,6 +37,14 @@ export const routes: Routes = [
         component: TitlePage,
         data: { title: 'Budgets' },
         title: 'Guito · Budgets',
+      },
+      {
+        // Bank review page (issue #61): pending bank transactions with sync +
+        // accept-to-expense. NOT marked data.reuse — each visit reloads the
+        // pending list so freshly synced rows appear on tab switch.
+        path: 'bank',
+        component: BankPage,
+        title: 'Guito · Bank',
       },
       {
         path: 'settings',

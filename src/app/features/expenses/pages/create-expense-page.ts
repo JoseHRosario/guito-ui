@@ -25,6 +25,19 @@ export interface VoicePrefillState {
   voicePrefill: ExtractedExpense;
 }
 
+/** history.state payload left by the Bank accept path (issue #61). */
+export interface BankPrefillState {
+  bankPrefill: {
+    description: string;
+    /** Absolute positive amount from the bank row (guito-api#90 stores DBIT positive). */
+    amount: number;
+    /** ISO yyyy-MM-dd booking date. */
+    date: string;
+    /** Jev-suggested category name; '' when the API had no suggestion. */
+    category: string;
+  };
+}
+
 /**
  * Create Expense screen (issue #32): implements the approved Figma frame set
  * (mobile 3094:35, desktop 3094:9704, errors 3094:9937, save failure
@@ -55,8 +68,12 @@ export class CreateExpensePage {
   protected readonly voiceSuggested = signal<ReadonlySet<VoiceField>>(new Set());
 
   constructor() {
-    // Voice capture (issue #44) lands here with history.state.voicePrefill.
-    const prefill = this.router.getCurrentNavigation()?.extras?.state?.['voicePrefill'] as ExtractedExpense | undefined;
+    // Voice capture (issue #44) lands here with history.state.voicePrefill;
+    // the Bank accept path (issue #61) lands with history.state.bankPrefill.
+    const state = this.router.getCurrentNavigation()?.extras?.state;
+    const voice = state?.['voicePrefill'] as ExtractedExpense | undefined;
+    const bank = state?.['bankPrefill'] as BankPrefillState['bankPrefill'] | undefined;
+    const prefill: ExtractedExpense | undefined = voice ?? bank;
     void this.categoryApi.list().then(
       (names) => {
         this.categories.set(names);
@@ -78,9 +95,13 @@ export class CreateExpensePage {
       this.description.set(prefill.description);
       if (prefill.date) this.isoDate.set(prefill.date);
       // 'date' only when the proposal actually carried one (marker/value drift guard).
-      const fields: VoiceField[] = ['amount', 'description'];
-      if (prefill.date) fields.push('date');
-      this.voiceSuggested.set(new Set(fields));
+      // Bank-derived fields (issue #61) are bank data, not AI proposals — the markers
+      // stay off; the Jev-suggested CATEGORY marker is set in the category branch above.
+      if (!bank) {
+        const fields: VoiceField[] = ['amount', 'description'];
+        if (prefill.date) fields.push('date');
+        this.voiceSuggested.set(new Set(fields));
+      }
     }
   }
 

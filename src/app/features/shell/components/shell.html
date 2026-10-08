@@ -80,7 +80,8 @@
         [attr.aria-current]="rla.isActive ? 'page' : null"
       >
         <g-icon [name]="item.icon" class="size-6" />
-        <p class="text-sm leading-none font-semibold">{{ item.label }}</p>
+        <!-- 5 tabs (issue #61): 80px/tab — the label drops to 13px so 'Dashboard' fits its cell. -->
+        <p class="text-[13px] leading-none font-semibold">{{ item.label }}</p>
       </a>
     }
   </nav>

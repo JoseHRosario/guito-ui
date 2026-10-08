@@ -50,7 +50,7 @@ describe('Shell nav wiring (issue #47)', () => {
     const bottomNav = fixture.debugElement.query(By.css('nav[aria-label="Bottom navigation"]'));
     const links = bottomNav.queryAll(By.css('a'));
     const hrefs = links.map((l) => l.nativeElement.getAttribute('href'));
-    expect(hrefs).toEqual(['/dashboard', '/', '/budgets', '/settings']);
+    expect(hrefs).toEqual(['/dashboard', '/', '/budgets', '/bank', '/settings']);
   });
 
   it('ShouldLinkAllFourSectionsInTheDesktopNav_WhenRendered', () => {
@@ -59,7 +59,7 @@ describe('Shell nav wiring (issue #47)', () => {
 
     const desktopNav = fixture.debugElement.query(By.css('nav[aria-label="Main navigation"]'));
     const hrefs = desktopNav.queryAll(By.css('a')).map((l) => l.nativeElement.getAttribute('href'));
-    expect(hrefs).toEqual(['/dashboard', '/', '/budgets', '/settings']);
+    expect(hrefs).toEqual(['/dashboard', '/', '/budgets', '/bank', '/settings']);
   });
 
   it('ShouldHighlightBudgetsTab_WhenNavigatedToBudgets', async () => {
