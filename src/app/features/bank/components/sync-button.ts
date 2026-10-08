@@ -17,7 +17,7 @@ import { GIcon } from '../../../shared/gicon';
       aria-label="Sync bank transactions"
       data-testid="sync-bank"
       [disabled]="syncing()"
-      (click)="synced.emit()"
+      (click)="syncRequested.emit()"
     >
       @if (syncing()) {
         <span class="loading loading-sm" data-testid="sync-spinner"></span>
@@ -29,5 +29,6 @@ import { GIcon } from '../../../shared/gicon';
 })
 export class SyncButton {
   readonly syncing = input(false);
-  readonly synced = output<void>();
+  /** Click intent — the page owns the actual sync call. */
+  readonly syncRequested = output<void>();
 }

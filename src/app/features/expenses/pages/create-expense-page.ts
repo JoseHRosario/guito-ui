@@ -79,9 +79,15 @@ export class CreateExpensePage {
         this.categories.set(names);
         if (prefill) {
           // The AI-proposed category only preselects when the API offers it.
-          const match = names.find((name) => name.toLowerCase() === prefill.category.toLowerCase());
-          this.category.set(match ?? (names.length > 0 ? names[0] : ''));
-          if (match) this.voiceSuggested.update((set) => new Set([...set, 'category' as VoiceField]));
+          const match = prefill.category ? names.find((name) => name.toLowerCase() === prefill.category.toLowerCase()) : undefined;
+          if (bank && !bank.category) {
+            // Issue #61: a bank row with no Jev suggestion starts the dropdown EMPTY —
+            // the user picks manually (accept is never blocked).
+            this.category.set('');
+          } else {
+            this.category.set(match ?? (names.length > 0 ? names[0] : ''));
+            if (match) this.voiceSuggested.update((set) => new Set([...set, 'category' as VoiceField]));
+          }
         } else if (names.length > 0) {
           this.category.set(names[0]);
         }

@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
-import { firstValueFrom } from 'rxjs';
 import { GIcon, type IconName } from '../../../shared/gicon';
 import { SyncButton } from '../components/sync-button';
 import { formatEur } from '../../expenses/services/money';
@@ -9,7 +8,7 @@ import { BankApi } from '../services/bank-api';
 import type { BankTransaction } from '../models/bank-transaction';
 
 /** Suggested category → list-row lucide glyph; 'briefcase' fallback for unknown categories. */
-function categoryIcon(category: string | null): IconName {
+function categoryIcon(category: { name: string } | null): IconName {
   if (category === null) return 'briefcase';
   const ICONS: Readonly<Record<string, IconName>> = {
     clothing: 'tag',
@@ -21,7 +20,7 @@ function categoryIcon(category: string | null): IconName {
     health: 'heart',
     'eating out': 'utensils',
   };
-  return ICONS[category.toLowerCase()] ?? 'briefcase';
+  return ICONS[category.name.toLowerCase()] ?? 'briefcase';
 }
 
 /** Date-group header: 'Today · 02/10/2026' / 'Yesterday · …' / plain date. */
@@ -125,7 +124,7 @@ export class BankPage {
           description: transaction.description,
           amount: transaction.amount,
           date: transaction.date,
-          category: transaction.suggestedCategory ?? '',
+          category: transaction.suggestedCategory?.name ?? '',
         },
       },
     });

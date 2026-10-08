@@ -19,12 +19,18 @@ export interface BankTransaction {
   currency: string;
   /** Remittance information — the bank's raw description string. */
   description: string;
-  /** Jev-suggested category name (guito-api#112); null = no suggestion, accept stays open. */
-  suggestedCategory: string | null;
+  /** Jev-suggested category (guito-api#112), id + name; null = no suggestion, accept stays open. */
+  suggestedCategory: SuggestedCategory | null;
 }
 
 /** Result payload of `POST /BankTransaction/sync` (guito-api#90). */
 export interface BankSyncResult {
   fetched: number;
   new: number;
+}
+
+/** Suggested-category contract of the pending GET (guito-api#112): id AND name. */
+export interface SuggestedCategory {
+  id: string;
+  name: string;
 }

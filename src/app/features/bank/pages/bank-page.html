@@ -3,7 +3,7 @@
   <div class="flex flex-1 flex-col items-start gap-4 p-4 lg:hidden">
     <div class="flex w-full items-center justify-between py-3">
       <h2 class="text-2xl font-semibold tracking-tight text-base-content">Pending transactions</h2>
-      <g-sync-button [syncing]="syncing()" (synced)="sync()" />
+      <g-sync-button [syncing]="syncing()" (syncRequested)="sync()" />
     </div>
     <ng-container *ngTemplateOutlet="pendingList" />
   </div>
@@ -42,7 +42,7 @@
   <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
     <div class="flex w-full items-center gap-6">
       <h2 class="text-2xl font-semibold tracking-tight text-base-content">Pending transactions</h2>
-      <g-sync-button [syncing]="syncing()" (synced)="sync()" />
+      <g-sync-button [syncing]="syncing()" (syncRequested)="sync()" />
     </div>
     <ng-container *ngTemplateOutlet="pendingList" />
   </div>
@@ -80,7 +80,7 @@
               <div class="flex min-w-0 flex-1 flex-col gap-1">
                 <p class="break-words text-sm font-medium leading-snug text-base-content">{{ tx.description }}</p>
                 <p class="text-xs leading-none" [class.text-base-content/50]="tx.suggestedCategory === null">
-                  {{ tx.suggestedCategory ?? 'No suggestion' }}
+                  {{ tx.suggestedCategory?.name ?? 'No suggestion' }}
                 </p>
               </div>
               <span class="shrink-0 text-sm font-semibold text-base-content" data-testid="bank-amount">

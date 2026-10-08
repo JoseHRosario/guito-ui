@@ -133,6 +133,11 @@
             (change)="onCategory($any($event.target).value)"
             data-testid="category-select"
           >
+            @if (category() === '') {
+              <!-- no prefill suggestion (e.g. bank row without one, issue #61): the
+                   dropdown starts EMPTY — an empty option keeps the select unselected -->
+              <option value="" data-testid="category-empty"></option>
+            }
             @for (name of categories(); track name) {
               <option [value]="name" [selected]="name === category()">{{ name }}</option>
             }

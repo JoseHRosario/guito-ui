@@ -12,8 +12,8 @@ import { BankPage } from './bank-page';
 const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 
 const PENDING = [
-  { id: 7, bookingDate: '2026-10-02', amount: 58.93, currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategory: 'Shopping' },
-  { id: 8, bookingDate: '2026-10-02', amount: 12.4, currency: 'EUR', remittanceInformation: 'MB WAY PURCHASE 4477 LISBOA', suggestedCategory: 'Eating out' },
+  { id: 7, bookingDate: '2026-10-02', amount: 58.93, currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategoryId: 3, suggestedCategory: 'Shopping' },
+  { id: 8, bookingDate: '2026-10-02', amount: 12.4, currency: 'EUR', remittanceInformation: 'MB WAY PURCHASE 4477 LISBOA', suggestedCategoryId: 2, suggestedCategory: 'Eating out' },
   { id: 9, bookingDate: '2026-10-01', amount: 200, currency: 'EUR', remittanceInformation: 'TRF MB WAY PARA MARIA S', suggestedCategory: null },
 ];
 
@@ -72,6 +72,45 @@ describe('BankPage (issue #61)', () => {
     expect(rows.length).toBe(6);
     expect((rows[0].textContent ?? '')).toContain('CONTINENTE ONLINE 8831');
     expect((rows[2].textContent ?? '')).toContain('TRF MB WAY PARA MARIA S');
+    // amount rendering (testid assertion per CONVENTIONS.md)
+    const amounts = Array.from(el.querySelectorAll('[data-testid=bank-amount]'));
+    expect(amounts[0].textContent?.trim()).toMatch(/^58,93[ .\u00a0\u202f]€$/);
+    // desktop sidebar stub widget (both branches render in jsdom)
+    expect(el.querySelectorAll('[data-testid=sidebar-wallet]')[0].textContent).toContain('+12.450,00 €');
+  });
+
+  it('empty pending list shows the empty state card', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http, []);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=bank-empty]')).not.toBeNull();
+  });
+
+  it('the sync button disables and swaps to a spinner while the sync is in flight', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http, []);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
+    await fixture.whenStable();
+    const inFlight = http.expectOne('https://api.test/BankTransaction/sync');
+    // not flushed yet: the button must be disabled with the spinner visible
+    const el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    const button = el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]');
+    expect(button!.disabled).toBe(true);
+    expect(el.querySelector('[data-testid=sync-spinner]')).not.toBeNull();
+    inFlight.flush({ fetched: 12, new: 3 });
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+    flushPending(http, []);
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=sync-spinner]')).toBeNull();
   });
 
   it('shows the No suggestion meta for rows without a Jev category', async () => {

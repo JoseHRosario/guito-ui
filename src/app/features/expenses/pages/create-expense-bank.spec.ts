@@ -79,8 +79,8 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     harness.detectChanges();
 
     const select = el().querySelector<HTMLSelectElement>('select');
-    // no suggestion: falls back to the API's first category, no AI marker
-    expect(select?.value).toBe('Clothing');
+    // issue #61: no suggestion -> the dropdown starts EMPTY; user picks manually
+    expect(select?.value).toBe('');
     expect(el().textContent).not.toContain('AI suggested');
   });
 });

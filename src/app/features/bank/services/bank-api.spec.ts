@@ -17,7 +17,7 @@ const API_PENDING = [
     amount: 58.93,
     currency: 'EUR',
     remittanceInformation: 'CONTINENTE ONLINE 8831',
-    suggestedCategory: 'Shopping',
+    suggestedCategoryId: 3, suggestedCategory: 'Shopping',
     direction: 'DBIT',
     status: 'BOOK',
   },
@@ -71,7 +71,7 @@ describe('BankApi', () => {
         amount: 58.93,
         currency: 'EUR',
         description: 'CONTINENTE ONLINE 8831',
-        suggestedCategory: 'Shopping',
+        suggestedCategory: { id: '3', name: 'Shopping' },
       },
       {
         id: '8',
@@ -90,13 +90,13 @@ describe('BankApi', () => {
     req.flush([
       null,
       { bookingDate: '2026-10-03', amount: 5, currency: 'EUR', remittanceInformation: 'X' },
-      { id: 9, amount: null, currency: null, remittanceInformation: null, suggestedCategory: 'Bills' },
+      { id: 9, amount: null, currency: null, remittanceInformation: null, suggestedCategoryId: 5, suggestedCategory: 'Bills' },
     ]);
     const rows = await promise;
     expect(rows).toHaveLength(2);
     expect(rows[0]).toEqual({ id: '', date: '2026-10-03', amount: 5, currency: 'EUR', description: 'X', suggestedCategory: null });
     expect(rows[1].description).toBe('');
-    expect(rows[1].suggestedCategory).toBe('Bills');
+    expect(rows[1].suggestedCategory).toEqual({ id: '5', name: 'Bills' });
   });
 
   it('POST /BankTransaction/sync returns the fetched/new counts', async () => {

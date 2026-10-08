@@ -1,15 +1,13 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
-import { stubExpensesApi } from './helpers/stub-auth';
+import { stubExpensesApi, SESSION_KEY } from './helpers/stub-auth';
 
 // e2e for the Bank review page (issue #61): `GET /BankTransaction` and
 // `POST /BankTransaction/sync` are stubbed at the transport — the API endpoints
 // are not implemented yet (guito-api#91/#112); this spec freezes the UI contract.
 
-const SESSION_KEY = 'guito.auth.session';
-
 const STUB_PENDING = [
-  { id: 7, bookingDate: '2026-10-02', amount: 58.93, currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategory: 'Shopping' },
+  { id: 7, bookingDate: '2026-10-02', amount: 58.93, currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategoryId: 3, suggestedCategory: 'Shopping' },
   { id: 9, bookingDate: '2026-10-01', amount: 200, currency: 'EUR', remittanceInformation: 'TRF MB WAY PARA MARIA S', suggestedCategory: null },
 ];
 

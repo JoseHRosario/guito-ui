@@ -16,6 +16,9 @@ interface BankTransactionDto {
   amount?: number | null;
   currency?: string | null;
   remittanceInformation?: string | null;
+  /** FK id of the Jev-suggested category (guito-api#112). */
+  suggestedCategoryId?: number | string | null;
+  /** Category NAME resolved from the categories mirror table (guito-api#112). */
   suggestedCategory?: string | null;
 }
 
@@ -36,7 +39,10 @@ export class BankApi {
         amount: dto.amount ?? 0,
         currency: dto.currency ?? 'EUR',
         description: dto.remittanceInformation ?? '',
-        suggestedCategory: dto.suggestedCategory ?? null,
+        suggestedCategory:
+          dto.suggestedCategoryId !== null && dto.suggestedCategoryId !== undefined && dto.suggestedCategory
+            ? { id: String(dto.suggestedCategoryId), name: dto.suggestedCategory }
+            : null,
       }));
   }
 
