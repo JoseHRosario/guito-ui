@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { BankApi } from '../../bank/services/bank-api';
 import type { BankConnection } from '../../bank/models/bank-connection';
 
@@ -21,6 +22,11 @@ const GENERIC_EXPIRY_NOTE = 'Consent expires 90–180 days after linking — re-
 })
 export class BankConnectionCard {
   private readonly bankApi = inject(BankApi);
+  private readonly env = inject(APP_ENVIRONMENT);
+
+  /** The hardcoded MVP bank + country word (env-driven; prod fallback pair). */
+  protected readonly bankName = this.env.bankName ?? 'Activo Bank';
+  protected readonly bankCountryLabel = this.env.bankCountryLabel ?? 'Portugal';
 
   /** null = still loading; [] = no bank connected; else the linked accounts. */
   protected readonly accounts = signal<readonly BankConnection[] | null>(null);

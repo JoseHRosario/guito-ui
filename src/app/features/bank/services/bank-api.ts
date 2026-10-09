@@ -86,11 +86,16 @@ export class BankApi {
 
   /**
    * The Enable Banking consent URL for the link flow (issue #64, guito-api#89):
-   * Activo Bank / PT hardcoded MVP (guito-api#116 out of scope: ASPSP list proxy).
+   * one hardcoded bank per environment (guito-api#116 out of scope: ASPSP list
+   * proxy) — sandbox 'Nordea'/FI, production 'Activo Bank'/PT. EB rejects
+   * unknown names with 422 "Wrong ASPSP name provided", so the name must match
+   * the application's /aspsps list exactly.
    * Resolves the `{url}` payload; an empty URL cannot redirect, so it rejects.
    */
   async authUrl(): Promise<string> {
-    const params = `aspsp=${encodeURIComponent('Activo Bank')}&country=${encodeURIComponent('PT')}`;
+    const aspsp = this.env.bankName ?? 'Activo Bank';
+    const country = this.env.bankCountry ?? 'PT';
+    const params = `aspsp=${encodeURIComponent(aspsp)}&country=${encodeURIComponent(country)}`;
     const response = await firstValueFrom(
       this.http.get<{ url?: string | null }>(`${this.env.apiBaseUrl}/BankAuth/url?${params}`),
     );
