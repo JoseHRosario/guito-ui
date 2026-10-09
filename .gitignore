@@ -36,3 +36,9 @@ yarn-error.log*
 
 # Git worktrees for parallel agent sessions
 /.worktrees/
+
+# codebase-memory-mcp (CBM) local index artifacts — never commit
+.cbm/
+.cbmignore
+*.cbm
+codebase-memory-mcp.log
