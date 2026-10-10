@@ -1,6 +1,10 @@
 import { parseAmount, validateExpenseInput } from './validate-expense';
 
 describe('parseAmount (pt-PT comma decimal, issue #32)', () => {
+  it('rejects amounts that overflow to infinity', () => {
+    expect(parseAmount('9'.repeat(400))).toBeNull();
+  });
+
   it('accepts comma decimals like 65,55', () => {
     expect(parseAmount('65,55')).toBe(65.55);
   });
@@ -43,6 +47,20 @@ describe('validateExpenseInput (frame 3094:9937 rules)', () => {
   it('flags an absent or malformed date', () => {
     expect(validateExpenseInput({ ...valid, date: '' }).date).toBeTruthy();
     expect(validateExpenseInput({ ...valid, date: '2026-13-40' }).date).toBeTruthy();
+  });
+
+  it.each(['2026-02-31', '2026-02-29', '2026-04-31', '1900-02-29'])(
+    'rejects impossible calendar date %s',
+    (date) => expect(validateExpenseInput({ ...valid, date }).date).toBeTruthy(),
+  );
+
+  it.each(['2024-02-29', '2000-02-29', '2026-04-30', '2026-12-31'])(
+    'accepts real calendar date %s',
+    (date) => expect(validateExpenseInput({ ...valid, date })).toEqual(NONE),
+  );
+
+  it('flags an overflowing amount inline', () => {
+    expect(validateExpenseInput({ ...valid, amount: '9'.repeat(400) }).amount).toBeTruthy();
   });
 
   it('flags a missing category', () => {
