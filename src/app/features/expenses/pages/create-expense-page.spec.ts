@@ -6,7 +6,7 @@ import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
 import { CreateExpensePage } from './create-expense-page';
 
-const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
+const TEST_ENV = { expenseTimestampsEnabled: true, apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 const CATEGORIES = { categories: [{ name: 'Clothing' }, { name: 'Food' }] };
 
 describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)', () => {
@@ -21,6 +21,7 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
   }
 
   beforeEach(() => {
+    TEST_ENV.expenseTimestampsEnabled = true;
     localStorage.removeItem(SESSION_STORAGE_KEY);
     localStorage.setItem(
       SESSION_STORAGE_KEY,
@@ -47,6 +48,38 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
 
   afterEach(() => { http.verify(); vi.useRealTimers(); vi.restoreAllMocks(); localStorage.removeItem(SESSION_STORAGE_KEY); });
 
+  it('legacy capability hides time and posts date-only even on a DST gap day', async () => {
+    TEST_ENV.expenseTimestampsEnabled = false;
+    const el = boot();
+    await loadCategories();
+    expect(el.querySelector('[data-testid="time-input"]')).toBeNull();
+    for (const [id, value] of [['amount-input', '123456789,123456789'], ['description-input', 'Legacy'], ['date-input', '2026-03-29']]) {
+      const input = el.querySelector<HTMLInputElement>(`[data-testid="${id}"]`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    }
+    (el.querySelector('[data-testid="save-expense"]') as HTMLButtonElement).click();
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body).toEqual({ date: '2026-03-29', amount: '123456789.123456789', description: 'Legacy', category: 'Clothing' });
+    req.flush({ id: 12 });
+    await fixture.whenStable();
+  });
+
+  it.each(['123456789.123456789', '9007199254740993'])('posts exact manual decimal %s without Number rounding', async amount => {
+    const el = boot();
+    await loadCategories();
+    for (const [id, value] of [['amount-input', amount], ['description-input', 'Exact']]) {
+      const input = el.querySelector<HTMLInputElement>(`[data-testid="${id}"]`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    }
+    (el.querySelector('[data-testid="save-expense"]') as HTMLButtonElement).click();
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body.amount).toBe(amount);
+    req.flush({ id: 'exact' });
+    await fixture.whenStable();
+  });
+
   it('posts the edited Lisbon date and native time with a summer offset and unchanged positive amount', async () => {
     const el = boot();
     await loadCategories();
@@ -58,7 +91,7 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     }
     (el.querySelector('[data-testid="save-expense"]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toEqual({ date: '2026-07-01', occurredAt: '2026-07-01T09:30:00+01:00', currency: 'EUR', amount: 65.55, description: 'Lunch', category: 'Clothing' });
+    expect(req.request.body).toEqual({ date: '2026-07-01', occurredAt: '2026-07-01T09:30:00+01:00', currency: 'EUR', amount: '65.55', description: 'Lunch', category: 'Clothing' });
     req.flush({ id: 'opaque-expense-id' });
     await fixture.whenStable();
   });
@@ -135,8 +168,8 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     fixture.detectChanges();
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.method).toBe('POST');
-    const body = req.request.body as { amount: number; description: string; date: string; category: string };
-    expect(body.amount).toBe(65.55); // ADR 0010: amounts stored positive — no negation.
+    const body = req.request.body as { amount: string; description: string; date: string; category: string };
+    expect(body.amount).toBe('65.55'); // ADR 0010: amounts stored positive — no negation.
     expect(body.description).toBe('Veggies and fruit');
     expect(body.category).toBe('Clothing');
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);

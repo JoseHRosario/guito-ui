@@ -55,7 +55,25 @@ describe('ExpenseApi.latest', () => {
     ]);
   });
 
-  it('tolerates a missing expenses array', async () => {
+  it.each([undefined, false, true])('create centrally gates all callers with capability %s', async expenseTimestampsEnabled => {
+    const env = TestBed.inject(APP_ENVIRONMENT);
+    Object.assign(env, { expenseTimestampsEnabled });
+    const input = { date: '2026-07-02', occurredAt: '2026-07-02T05:45:27+05:30', currency: 'EUR' as const, amount: '9007199254740993', description: 'Exact', category: 'Food' };
+    const pending = TestBed.inject(ExpenseApi).create(input);
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body).toEqual(expenseTimestampsEnabled === true ? input : { date: input.date, amount: input.amount, description: input.description, category: input.category });
+    req.flush({ id: 'opaque' });
+    await expect(pending).resolves.toBe('opaque');
+    delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;
+  });
+
+  it('retains latest amountExact without converting it to a Number', async () => {
+    const pending = TestBed.inject(ExpenseApi).latest();
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [{ id: 'exact', amount: 9007199254740992, amountExact: '9007199254740993' }] });
+    expect((await pending)[0].amountExact).toBe('9007199254740993');
+  });
+
+  it('tolerates a missing expenses array' , async () => {
     const promise = TestBed.inject(ExpenseApi).latest();
     http.expectOne('https://api.test/Expense/latest/20').flush({});
     await expect(promise).resolves.toEqual([]);

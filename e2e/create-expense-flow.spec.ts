@@ -44,10 +44,10 @@ async function stubExpenseApis(page: Page): Promise<{ expenses: typeof SEED_EXPE
       await route.fulfill({ status: 405, body: 'method not allowed' });
       return;
     }
-    const body = route.request().postDataJSON() as { date: string; occurredAt: string; currency: string; amount: number; description: string; category: string };
+    const body = route.request().postDataJSON() as { date: string; occurredAt: string; currency: string; amount: string; description: string; category: string };
     state.created.push(body);
     state.expenses = [
-      { id: 'created-opaque-id', occurredAt: body.occurredAt, currency: body.currency, date: body.date, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
+      { id: 'created-opaque-id', occurredAt: body.occurredAt, currency: body.currency, date: body.date, amount: Number(body.amount), description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
       ...state.expenses,
     ];
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'created-opaque-id' }) });
@@ -140,8 +140,8 @@ test.describe('favorites speed-dial (stubbed API, signed in)', () => {
 
     // The preset posts as-is: positive amount, today's date, exact description/category.
     expect(state.created).toHaveLength(1);
-    expect(state.created[0]).toEqual({ date: '2026-07-02', occurredAt: '2026-07-02T00:15:42+01:00', currency: 'EUR', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
-    expect(state.created[0]['occurredAt']).toMatch(/T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+    expect(state.created[0]).toEqual({ date: '2026-07-02', ...(enabled ? { occurredAt: '2026-07-02T00:15:42+01:00', currency: 'EUR' } : {}), amount: '2.3', description: 'Coco Verde', category: 'Eating out' });
 
     await expect(page).toHaveURL(/\/\?saved=1$/);
     await expect(page.locator(vis('saved-toast'))).toContainText('Expense saved');

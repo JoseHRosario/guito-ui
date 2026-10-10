@@ -9,7 +9,7 @@ for (const [name, viewport, date, offset] of [
   ['mobile', { width: 402, height: 874 }, '2026-10-02', '+01:00'],
   ['desktop', { width: 1440, height: 1033 }, '2026-01-02', '+00:00'],
 ] as const) {
-  test(`${name}: Lisbon defaults, editable time, DST validation and one in-flight save`, async ({ page }) => {
+  test(`${name}: ${process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true' ? 'timestamp capability, Lisbon/DST and exact save' : 'production legacy date-only exact save'}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.clock.setFixedTime(new Date('2026-07-01T23:15:42Z'));
     await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub-id', accessToken: 'stub-access', expiresAt: Date.now() + 3600000 })), SESSION_KEY);
@@ -17,9 +17,26 @@ for (const [name, viewport, date, offset] of [
     await page.route('**/Category', route => route.fulfill({ json: { categories: [{ name: 'Clothing' }] } }));
     await page.goto('/expenses/create');
     await expect(page.locator(visible('date-input'))).toHaveValue('2026-07-02');
+    if (process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'true') {
+      await expect(page.getByTestId('time-input')).toHaveCount(0);
+      await expect(page.locator(visible('category-select'))).toHaveValue('Clothing');
+      await page.locator(visible('amount-input')).fill('123456789,123456789');
+      await page.locator(visible('description-input')).fill('Exact legacy');
+      await page.locator(visible('date-input')).fill('2026-03-29');
+      let body: unknown;
+      await page.route('**/Expense', async route => {
+        body = route.request().postDataJSON();
+        // Simulates Sheets' real timestamp conflict: legacy mode must avoid it.
+        await route.fulfill({ status: Object.hasOwn(body as object, 'occurredAt') ? 409 : 200, json: { id: 12 } });
+      });
+      await page.locator(visible('save-expense')).click();
+      await expect(page).toHaveURL(/saved=1/);
+      expect(body).toEqual({ date: '2026-03-29', amount: '123456789.123456789', description: 'Exact legacy', category: 'Clothing' });
+      return;
+    }
     await expect(page.locator(visible('time-input'))).toHaveValue('00:15');
     await expect(page.locator(visible('category-select'))).toHaveValue('Clothing');
-    await page.locator(visible('amount-input')).fill('65,55');
+    await page.locator(visible('amount-input')).fill('9007199254740993');
     await page.locator(visible('description-input')).fill('Veggies and fruit');
     await page.locator(visible('date-input')).fill('2026-03-29');
     await page.locator(visible('time-input')).fill('01:30');
@@ -41,7 +58,7 @@ for (const [name, viewport, date, offset] of [
     // Reload to capture the canonical happy layout, then fill the same payload.
     await page.reload();
     await expect(page.locator(visible('category-select'))).toHaveValue('Clothing');
-    await page.locator(visible('amount-input')).fill('65,55');
+    await page.locator(visible('amount-input')).fill('9007199254740993');
     await page.locator(visible('description-input')).fill('Veggies and fruit');
     await page.locator(visible('date-input')).fill(date);
     await page.locator(visible('time-input')).fill('09:30');
@@ -57,7 +74,7 @@ for (const [name, viewport, date, offset] of [
     const hold = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/Expense', async route => {
       posts++;
-      expect(route.request().postDataJSON()).toEqual({ date, occurredAt: `${date}T09:30:00${offset}`, currency: 'EUR', amount: 65.55, description: 'Veggies and fruit', category: 'Clothing' });
+      expect(route.request().postDataJSON()).toEqual({ date, occurredAt: `${date}T09:30:00${offset}`, currency: 'EUR', amount: '9007199254740993', description: 'Veggies and fruit', category: 'Clothing' });
       await hold;
       await route.fulfill({ json: { id: 'opaque/not-a-sheet-ordinal' } });
     });

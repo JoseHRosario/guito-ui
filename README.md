@@ -4,7 +4,7 @@ The web frontend of **Guito**, a personal expense tracker: control expenses and 
 
 > Live demo: https://guito.web.kerumirembora.com/ (deployed from `master`). Local tests stub the API; production consumes guito-api.
 
-> Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and opaque expense IDs. Full timestamp persistence requires the coordinated API deployment; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
+> Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and opaque expense IDs. Production remains date-only (Time hidden); dev/staging opt in to timestamps. Exact decimal strings preserve POST/prefill precision. Full timestamp persistence requires the coordinated API deployment; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
 
 ## Tech stack
 

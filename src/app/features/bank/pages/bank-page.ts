@@ -178,6 +178,7 @@ export class BankPage {
         bankPrefill: {
           description: transaction.description,
           amount: transaction.amount,
+          ...(transaction.amountExact ? { amountExact: transaction.amountExact } : {}),
           date: transaction.date,
           category: transaction.suggestedCategory?.name ?? '',
         },

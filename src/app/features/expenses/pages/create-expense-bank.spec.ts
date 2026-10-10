@@ -10,7 +10,7 @@ import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-s
 import { CreateExpensePage } from './create-expense-page';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
+const TEST_ENV = { expenseTimestampsEnabled: true, apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 const CATEGORIES = { categories: [{ name: 'Clothing' }, { name: 'Eating out' }] };
 /** The BankPage accept payload (issue #61) — structurally the ExtractedExpense contract. */
 const BANK_PREFILL = { description: 'CONTINENTE ONLINE 8831', amount: 58.93, date: '2026-10-02', category: 'Shopping' };
@@ -64,7 +64,7 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-10-25');
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toMatchObject({ occurredAt, date: '2026-10-25', currency: 'EUR', amount: 58.93 });
+    expect(req.request.body).toMatchObject({ occurredAt, date: '2026-10-25', currency: 'EUR', amount: '58.93' });
     req.flush('retry', { status: 500, statusText: 'Server Error' });
     await new Promise(r => setTimeout(r, 0));
     const time = page.querySelector<HTMLInputElement>('[data-testid=time-input]')!;
@@ -90,6 +90,24 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.body.occurredAt).toBe('2026-10-02T00:15:00+01:00');
     req.flush({ id: 'opaque-bank-or-voice-id' });
+    await new Promise(r => setTimeout(r, 0));
+  });
+
+  it.each(['voicePrefill', 'bankPrefill'])('retains exact decimal metadata and an arbitrary-offset instant from %s through POST', async channel => {
+    const occurredAt = '2026-07-02T05:45:27+05:30';
+    const amountExact = '123456789.123456789';
+    await router.navigate(['/expenses/create'], { state: { [channel]: { ...BANK_PREFILL, occurredAt, amount: 123456789.12345679, amountExact } } });
+    http.expectOne('https://api.test/Category').flush(CATEGORIES_WITH_SHOPPING);
+    await new Promise(r => setTimeout(r, 0));
+    harness.detectChanges();
+    const page = el();
+    expect(page.querySelector<HTMLInputElement>('[data-testid=amount-input]')?.value).toBe('123456789,123456789');
+    expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-07-02');
+    expect(page.querySelector<HTMLInputElement>('[data-testid=time-input]')?.value).toBe('01:15');
+    (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body).toMatchObject({ occurredAt, date: '2026-07-02', amount: amountExact });
+    req.flush({ id: 'exact-offset' });
     await new Promise(r => setTimeout(r, 0));
   });
 

@@ -4,13 +4,17 @@ const clock = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
 });
 
+function lisbonParts(instant: Date): Record<string, string> {
+  return Object.fromEntries(clock.formatToParts(instant).map(part => [part.type, part.value]));
+}
+
 export function lisbonFields(instant: Date): { date: string; time: string } {
-  const parts = Object.fromEntries(clock.formatToParts(instant).map(part => [part.type, part.value]));
+  const parts = lisbonParts(instant);
   return { date: `${parts['year']}-${parts['month']}-${parts['day']}`, time: `${parts['hour']}:${parts['minute']}` };
 }
 
 function offsetMinutes(instant: Date): number {
-  const parts = Object.fromEntries(clock.formatToParts(instant).map(part => [part.type, part.value]));
+  const parts = lisbonParts(instant);
   const wall = Date.parse(`${parts['year']}-${parts['month']}-${parts['day']}T${parts['hour']}:${parts['minute']}:${parts['second']}Z`);
   return Math.round((wall - instant.getTime()) / 60000);
 }

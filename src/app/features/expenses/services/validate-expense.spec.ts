@@ -1,16 +1,34 @@
-import { parseAmount, validateExpenseInput } from './validate-expense';
+import { amountDecimal, parseAmount, validateExpenseInput } from './validate-expense';
 
 describe('parseAmount (pt-PT comma decimal, issue #32)', () => {
   it('accepts comma decimals like 65,55', () => {
-    expect(parseAmount('65,55')).toBe(65.55);
+    expect(parseAmount('65,55')).toBe('65.55');
   });
 
   it('accepts dot decimals like 65.55', () => {
-    expect(parseAmount('65.55')).toBe(65.55);
+    expect(parseAmount('65.55')).toBe('65.55');
   });
 
   it('accepts whole amounts with surrounding spaces', () => {
-    expect(parseAmount(' 80 ')).toBe(80);
+    expect(parseAmount(' 80 ')).toBe('80');
+  });
+
+  it('normalizes represented numeric compatibility values without exponent transport', () => {
+    expect(amountDecimal(2.3)).toBe('2.3');
+    expect(amountDecimal(1e-7)).toBe('0.0000001');
+    expect(amountDecimal(1e21)).toBe('1000000000000000000000');
+    expect(amountDecimal(Infinity)).toBeNull();
+    expect(amountDecimal(NaN)).toBeNull();
+    expect(amountDecimal(1e-29)).toBeNull();
+  });
+
+  it('normalizes insignificant zeros while preserving all significant digits', () => {
+    expect(parseAmount(' 000123456789,1234567890 ')).toBe('123456789.123456789');
+    expect(parseAmount('9007199254740993')).toBe('9007199254740993');
+    expect(parseAmount('0.0000000000000000000000000001')).toBe('0.0000000000000000000000000001');
+    expect(parseAmount('79228162514264337593543950335')).toBe('79228162514264337593543950335');
+    expect(parseAmount('79228162514264337593543950336')).toBeNull();
+    expect(parseAmount('0.00000000000000000000000000001')).toBeNull();
   });
 
   it('rejects empty, non-numeric, and non-positive input', () => {

@@ -1,11 +1,32 @@
 /** Pure form validation for the Create Expense screen (issue #32, frame 3094:9937 rules). */
 
-/** Parses a pt-PT-friendly amount ('65,55', '65.55', '80'); null unless > 0. */
-export function parseAmount(input: string): number | null {
+/** Normalize a positive .NET decimal without binary floating point rounding. */
+export function parseAmount(input: string): string | null {
   const normalized = input.trim().replace(',', '.');
   if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
-  const value = Number(normalized);
-  return Number.isFinite(value) && value > 0 ? value : null;
+  const [whole, fraction = ''] = normalized.split('.');
+  const integer = whole.replace(/^0+(?=\d)/, '');
+  const decimals = fraction.replace(/0+$/, '');
+  const coefficient = (integer + decimals).replace(/^0+/, '') || '0';
+  if (coefficient === '0' || decimals.length > 28 || coefficient.length > 29 ||
+      (coefficient.length === 29 && coefficient > '79228162514264337593543950335')) return null;
+  return integer + (decimals ? `.${decimals}` : '');
+}
+
+/** Numeric compatibility preserves the represented value, not invented precision. */
+export function amountDecimal(amount: number | string): string | null {
+  if (typeof amount === 'string') return parseAmount(amount);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const text = String(amount);
+  if (!text.includes('e')) return parseAmount(text);
+  const [mantissa, exponent] = text.split('e');
+  const [whole, fraction = ''] = mantissa.split('.');
+  const digits = whole + fraction;
+  const point = whole.length + Number(exponent);
+  const expanded = point <= 0 ? `0.${'0'.repeat(-point)}${digits}` :
+    point >= digits.length ? digits + '0'.repeat(point - digits.length) :
+    `${digits.slice(0, point)}.${digits.slice(point)}`;
+  return parseAmount(expanded);
 }
 
 export interface ExpenseInput {

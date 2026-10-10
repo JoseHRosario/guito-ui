@@ -9,7 +9,7 @@ import { stubExpensesApi } from './helpers/stub-auth';
 
 const SESSION_KEY = 'guito.auth.session';
 
-const EXTRACT_OK = { date: '2026-10-02', occurredAt: '2026-10-02T09:30:17+01:00', amount: 2.3, description: 'Coco Verde', category: 'Eating out' };
+const EXTRACT_OK = { date: '2026-10-02', occurredAt: '2026-10-02T14:00:17+05:30', amount: 123456789.12345679, amountExact: '123456789.123456789', description: 'Coco Verde', category: 'Eating out' };
 
 async function seedSession(page: Page): Promise<void> {
   await page.addInitScript((key) => {
@@ -84,12 +84,14 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     await expect(page).toHaveURL(/\/expenses\/create$/, { timeout: 5_000 });
 
     // Prefilled for review (frame 3134:10053): pt-PT comma amount + markers.
-    await expect(page.locator('[data-testid="amount-input"]:visible')).toHaveValue('2,30');
+    await expect(page.locator('[data-testid="amount-input"]:visible')).toHaveValue('123456789,123456789');
     await expect(page.locator('[data-testid="description-input"]:visible')).toHaveValue('Coco Verde');
     await expect(page.locator('[data-testid="date-input"]:visible')).toHaveValue('2026-10-02');
-    await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('09:30');
+    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+    if (enabled) await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('09:30');
+    else await expect(page.getByTestId('time-input')).toHaveCount(0);
     await page.route('**/Expense', async route => {
-      expect(route.request().postDataJSON()).toMatchObject({ occurredAt: '2026-10-02T09:30:17+01:00', currency: 'EUR', amount: 2.3 });
+      expect(route.request().postDataJSON()).toEqual({ date: '2026-10-02', amount: '123456789.123456789', description: 'Coco Verde', category: 'Eating out', ...(enabled ? { occurredAt: EXTRACT_OK.occurredAt, currency: 'EUR' } : {}) });
       await route.fulfill({ json: { id: 'voice-opaque-id' } });
     });
     await expect(page.locator('[data-testid="category-select"]:visible')).toHaveValue('Eating out');

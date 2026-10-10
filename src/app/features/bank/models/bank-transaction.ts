@@ -16,6 +16,7 @@ export interface BankTransaction {
   date: string;
   /** Absolute amount in the account currency (outflows arrive positive). */
   amount: number;
+  amountExact?: string;
   currency: string;
   /** Remittance information — the bank's raw description string. */
   description: string;

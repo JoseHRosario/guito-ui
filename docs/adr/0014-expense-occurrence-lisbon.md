@@ -25,11 +25,31 @@ one. We do not silently choose either side of the fold.
 
 ## Wire contract and transition
 
-`POST /Expense` sends `{date: 'yyyy-MM-dd', occurredAt: ISO8601-with-offset,
-currency: 'EUR', amount, description, category}`. Positive amounts are posted
-without negation or prefill rounding. The legacy `date` remains for the old API
-until deployment; an old server may ignore occurrence/currency, so deploying the
-UI alone does **not** prove timestamp persistence.
+`APP_ENVIRONMENT.expenseTimestampsEnabled` is an explicit build-time capability:
+production is **false**, development/staging are **true**, and an absent flag is
+legacy-safe (false). Production auto-deploy must not activate timestamps before
+the API's Postgres cutover. Enable production only after verifying persistence.
+
+When enabled, `POST /Expense` sends `{date: 'yyyy-MM-dd', occurredAt:
+ISO8601-with-offset, currency: 'EUR', amount, description, category}` and the
+approved Time control/validation applies. When disabled, Time is not rendered or
+validated and POST sends **only** `{date, amount, description, category}`. The
+central ExpenseApi gate applies to every create path, including favorites.
+Sheets explicitly returns 409 for occurrence writes; it does not merely ignore
+unknown timestamp fields. Never discard an enabled timestamp to retry as legacy.
+
+Amounts use normalized invariant **decimal strings**, not JavaScript Number
+conversion, preserving `123456789.123456789` and `9007199254740993` through form
+validation and POST. Positivity and .NET decimal's 96-bit coefficient / scale <=28
+are checked textually before submission. The coordinated API accepts numeric or
+string amounts; old numeric clients remain compatible. Latest/AI DTOs keep their
+numeric `amount` for display compatibility and may supply `amountExact`; prefills
+prefer that sibling (including bank metadata when supplied). Without exact
+metadata, numeric prefills/favorites preserve the value already represented by
+the Number's string serialization, not precision previously lost upstream.
+Trailing insignificant zeros may be normalized; no two-decimal transport rounding
+is applied. Bank display formatting/suggestion logic is unchanged. UI deployment
+alone does **not** prove the API's decimal-string contract or persistence.
 
 Create returns `{id: string}`; the UI treats it as opaque. Numeric old-server
 responses are tolerated by converting them to strings, never ordinals extracted
@@ -76,3 +96,19 @@ known fold instants until edit, voice/bank date-only defaults, opaque list IDs,
 server row order, positive precision, save loading/retry, and mobile/desktop
 alignment in a non-Lisbon browser timezone. No live API, Postgres persistence,
 AWS, real speech recognition, Safari/Firefox or real bank consent was exercised.
+Local browser verification must use the corresponding built configuration:
+
+```sh
+npm run build
+npx playwright test --workers=2                         # production legacy
+npm run build -- --configuration staging
+GUITO_TIMESTAMPS_ENABLED=true npx playwright test --workers=2  # opt-in timestamps
+```
+
+The test-only environment variable selects expected behavior; it does not change
+the application's capability. Default CI build/expectations remain production.
+
+Review regressions cover explicit/absent capability at the HTTP seam, both built
+production legacy and staging timestamp browser modes (including favorites),
+manual exact decimals, exact AI/bank prefill round-trips, and an arbitrary +05:30
+known instant displayed in Lisbon and preserved unchanged.

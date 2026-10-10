@@ -9,7 +9,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
+const TEST_ENV = { expenseTimestampsEnabled: true, apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 const CATEGORIES_RESPONSE = { categories: [{ name: 'Clothing' }, { name: 'Food' }] };
 
 const API_RESPONSE = {
@@ -251,8 +251,8 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
 
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.method).toBe('POST');
-    const body = req.request.body as { amount: number; description: string; date: string; category: string };
-    expect(body.amount).toBe(2.3);
+    const body = req.request.body as { amount: string; description: string; date: string; category: string };
+    expect(body.amount).toBe('2.3');
     expect(body.description).toBe('Coco Verde');
     expect(body.category).toBe('Eating out');
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);

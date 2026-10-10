@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { amountDecimal } from './validate-expense';
 import { knownOccurrence, occurrenceDay } from './expense-time';
 
 /** What `POST /AI/extract` returns (camelCase wire DTO `ExpenseExtracted`). */
@@ -10,7 +11,8 @@ export interface ExtractedExpense {
   date: string;
   occurredAt?: string;
   /** Positive (ADR 0010) — the outflow is implied by the record being an Expense. */
-  amount: number;
+  amount: number | string;
+  amountExact?: string;
   description: string;
   category: string;
 }
@@ -19,6 +21,7 @@ interface ExtractedExpenseDto {
   date?: string | null;
   occurredAt?: string | null;
   amount?: number | null;
+  amountExact?: string | null;
   description?: string | null;
   category?: string | null;
 }
@@ -42,14 +45,16 @@ export class AiExtractApi {
       }),
     );
     const date = normalizeDate(response.date);
-    const amount = response.amount ?? null;
+    const amountExact = response.amountExact === undefined || response.amountExact === null ? undefined : amountDecimal(response.amountExact);
+    const amount = response.amount ?? amountExact ?? null;
+    const normalized = amountExact === undefined ? (amount === null ? null : amountDecimal(amount)) : amountExact;
     const description = (response.description ?? '').trim();
     const category = (response.category ?? '').trim();
-    if (date === null || amount === null || amount <= 0 || description === '') {
+    if (date === null || amount === null || normalized === null || description === '') {
       throw new Error('extract-unusable');
     }
     const occurredAt = knownOccurrence(response.occurredAt) ?? knownOccurrence(response.date);
-    return { date, amount, description, category, ...(occurredAt ? { occurredAt } : {}) };
+    return { date, amount, ...(amountExact ? { amountExact } : {}), description, category, ...(occurredAt ? { occurredAt } : {}) };
   }
 }
 

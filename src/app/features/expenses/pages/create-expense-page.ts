@@ -1,15 +1,19 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { CategoryApi } from '../services/category-api';
 import { ExpenseApi } from '../services/expense-api';
-import { parseAmount, validateExpenseInput, type ExpenseFieldErrors } from '../services/validate-expense';
+import { amountDecimal, parseAmount, validateExpenseInput, type ExpenseFieldErrors } from '../services/validate-expense';
 import type { ExtractedExpense } from '../services/ai-extract';
 import { knownOccurrence, lisbonFields, lisbonNow, resolveOccurrence } from '../services/expense-time';
 
 /** pt-PT decimal comma display for a prefilled amount (2.3 → '2,30'). */
-function amountText(amount: number): string {
-  return amount.toLocaleString('pt-PT', { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 100 });
+function amountText(amount: number | string): string {
+  const exact = amountDecimal(amount);
+  if (exact === null) return '';
+  const [whole, fraction = ''] = exact.split('.');
+  return `${whole},${fraction.padEnd(2, '0')}`;
 }
 
 /** Fields the voice path may mark as AI suggested; keeps template lookups type-checked. */
@@ -25,7 +29,8 @@ export interface BankPrefillState {
   bankPrefill: {
     description: string;
     /** Absolute positive amount from the bank row (guito-api#90 stores DBIT positive). */
-    amount: number;
+    amount: number | string;
+    amountExact?: string;
     /** ISO yyyy-MM-dd booking date. */
     date: string;
     occurredAt?: string;
@@ -47,6 +52,7 @@ export interface BankPrefillState {
   imports: [NgTemplateOutlet],
 })
 export class CreateExpensePage {
+  protected readonly timestampsEnabled = inject(APP_ENVIRONMENT).expenseTimestampsEnabled === true;
   private readonly categoryApi = inject(CategoryApi);
   private readonly expenseApi = inject(ExpenseApi);
   private readonly router = inject(Router);
@@ -97,7 +103,7 @@ export class CreateExpensePage {
       },
     );
     if (prefill) {
-      this.amount.set(amountText(prefill.amount));
+      this.amount.set(amountText(prefill.amountExact ?? prefill.amount));
       this.description.set(prefill.description);
       const known = knownOccurrence(prefill.occurredAt) ?? knownOccurrence(prefill.date);
       if (known) {
@@ -163,9 +169,9 @@ export class CreateExpensePage {
       date: this.isoDate(),
       category: this.category(),
     });
-    const occurrence = resolveOccurrence(this.isoDate(), this.time(), this.knownInstant);
+    const occurrence = this.timestampsEnabled ? resolveOccurrence(this.isoDate(), this.time(), this.knownInstant) : { occurredAt: null, error: '' };
     this.timeError.set(occurrence.error);
-    const failed = Object.values(validation).some((message) => message !== '') || occurrence.occurredAt === null;
+    const failed = Object.values(validation).some((message) => message !== '') || (this.timestampsEnabled && occurrence.occurredAt === null);
     this.errors.set(validation);
     this.saveError.set(null);
     if (failed) return;
@@ -175,8 +181,7 @@ export class CreateExpensePage {
     void this.expenseApi
       .create({
         date: this.isoDate(),
-        occurredAt: occurrence.occurredAt!,
-        currency: 'EUR',
+        ...(this.timestampsEnabled ? { occurredAt: occurrence.occurredAt!, currency: 'EUR' as const } : {}),
         // ADR 0010: amounts are stored positive — the outflow is implied by
         // the record being an Expense. Post the parsed amount as-is.
         amount: parsedAmount,

@@ -26,6 +26,7 @@ interface BankTransactionDto {
   id?: number | string | null;
   bookingDate?: string | null;
   amount?: number | null;
+  amountExact?: string | null;
   currency?: string | null;
   remittanceInformation?: string | null;
   /** FK id of the Jev-suggested category (guito-api#112). */
@@ -49,6 +50,7 @@ export class BankApi {
         id: dto.id === null || dto.id === undefined ? '' : String(dto.id),
         date: dto.bookingDate ?? '',
         amount: dto.amount ?? 0,
+        ...(dto.amountExact ? { amountExact: dto.amountExact } : {}),
         currency: dto.currency ?? 'EUR',
         description: dto.remittanceInformation ?? '',
         suggestedCategory:

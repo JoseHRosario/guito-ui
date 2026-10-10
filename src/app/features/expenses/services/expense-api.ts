@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import type { IconName } from '../../../shared/gicon';
+import { amountDecimal } from './validate-expense';
 import type { Expense } from '../models/expense';
 
 /**
@@ -17,6 +18,7 @@ interface ExpenseDto {
   storedOrder?: number | null;
   date?: string | null;
   amount?: number | null;
+  amountExact?: string | null;
   description?: string | null;
   category?: string | null;
   creatorEmail?: string | null;
@@ -51,6 +53,7 @@ export class ExpenseApi {
       id: dto.id ?? String(dto.storedOrder ?? ''),
       description: dto.description ?? '',
       amount: dto.amount ?? 0,
+      ...(dto.amountExact ? { amountExact: dto.amountExact } : {}),
       date: dto.occurredAt ?? dto.date ?? '',
       category: dto.category ?? '',
       icon: categoryIcon(dto.category ?? ''),
@@ -58,9 +61,14 @@ export class ExpenseApi {
   }
 
   /** Creates an expense (`POST /Expense`); resolves the opaque Expense Id (ADR-0009). */
-  async create(input: { date: string; occurredAt: string; currency: 'EUR'; amount: number; description: string; category: string }): Promise<string> {
+  async create(input: { date: string; occurredAt?: string; currency?: 'EUR'; amount: number | string; description: string; category: string }): Promise<string> {
+    // Central gate covers all callers, including favorites; Sheets rejects timestamps.
+    const amount = amountDecimal(input.amount);
+    if (amount === null) throw new Error('expense-amount-invalid');
+    const body = this.env.expenseTimestampsEnabled === true ? { ...input, amount } :
+      { date: input.date, amount, description: input.description, category: input.category };
     const response = await firstValueFrom(
-      this.http.post<{ id?: string | number | null }>(`${this.env.apiBaseUrl}/Expense`, input),
+      this.http.post<{ id?: string | number | null }>(`${this.env.apiBaseUrl}/Expense`, body),
     );
     return String(response.id ?? '');
   }
