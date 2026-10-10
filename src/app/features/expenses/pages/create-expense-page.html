@@ -2,7 +2,7 @@
   <!-- Mobile body -->
   <div class="flex w-full flex-col items-start gap-4 lg:hidden">
     <p class="text-2xl leading-normal font-semibold text-base-content" data-testid="create-title">Create Expense</p>
-    <ng-container *ngTemplateOutlet="createForm" />
+    <ng-container *ngTemplateOutlet="createForm; context: { prefix: 'mobile' }" />
   </div>
 
   <!-- Desktop: sidebar (matches the approved Workspace desktop chrome) -->
@@ -38,12 +38,12 @@
   <!-- Desktop: main panel — full-width form card (frame 3094:9704) -->
   <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
     <p class="text-2xl leading-normal font-semibold text-base-content" data-testid="create-title">Create Expense</p>
-    <ng-container *ngTemplateOutlet="createForm" />
+    <ng-container *ngTemplateOutlet="createForm; context: { prefix: 'desktop' }" />
   </div>
 
   <!-- Shared form card -->
-  <ng-template #createForm>
-    <form class="flex w-full flex-col items-start gap-4 rounded-2xl border border-base-content/10 bg-base-100 p-4 lg:p-6" (submit)="$event.preventDefault(); save()" novalidate>
+  <ng-template #createForm let-prefix="prefix">
+    <form class="flex w-full flex-col items-start gap-4 rounded-2xl border border-base-content/10 bg-base-100 p-4 lg:p-6" (submit)="$event.preventDefault(); save()" novalidate [attr.aria-busy]="saving()">
       <!-- Save-failure card (frame 3094:10011): above Save, red-bordered, values kept -->
       @if (saveError(); as error) {
         <div class="flex w-full flex-col items-start gap-1 rounded-xl border border-error bg-error/10 p-3" data-testid="save-error">
@@ -52,16 +52,16 @@
         </div>
       }
 
-      <div class="grid w-full grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        <div class="flex flex-col items-start gap-2">
+      <fieldset class="grid w-full min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-4" [disabled]="saving()">
+        <div class="order-1 flex flex-col items-start gap-2 lg:col-span-2">
           <div class="flex w-full items-center justify-between gap-2">
-          <label class="text-base leading-snug text-base-content" for="amount">Amount</label>
+          <label class="text-base leading-snug text-base-content" [attr.for]="prefix + '-amount'">Amount</label>
           @if (voiceSuggested().has('amount')) {
             <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-amount">AI suggested</span>
           }
         </div>
           <input
-            id="amount"
+            [id]="prefix + '-amount'"
             [class.input-error]="errors().amount !== ''"
             class="input h-10 w-full rounded-lg border-base-content/20 bg-base-100 px-4"
             type="text"
@@ -76,36 +76,15 @@
           }
         </div>
 
-        <div class="flex flex-col items-start gap-2">
+        <div class="order-2 flex flex-col items-start gap-2 lg:order-3 lg:col-span-4">
           <div class="flex w-full items-center justify-between gap-2">
-          <label class="text-base leading-snug text-base-content" for="date">Date</label>
-          @if (voiceSuggested().has('date')) {
-            <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-date">AI suggested</span>
-          }
-        </div>
-          <input
-            id="date"
-            [class.input-error]="errors().date !== ''"
-            class="input h-10 w-full rounded-lg border-base-content/20 bg-base-100 px-4"
-            type="date"
-            [value]="isoDate()"
-            (input)="onDate($event)"
-            data-testid="date-input"
-          />
-          @if (errors().date; as message) {
-            <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
-          }
-        </div>
-
-        <div class="flex flex-col items-start gap-2 lg:col-span-2">
-          <div class="flex w-full items-center justify-between gap-2">
-          <label class="text-base leading-snug text-base-content" for="description">Description</label>
+          <label class="text-base leading-snug text-base-content" [attr.for]="prefix + '-description'">Description</label>
           @if (voiceSuggested().has('description')) {
             <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-description">AI suggested</span>
           }
         </div>
           <input
-            id="description"
+            [id]="prefix + '-description'"
             [class.input-error]="errors().description !== ''"
             class="input h-10 w-full rounded-lg border-base-content/20 bg-base-100 px-4"
             type="text"
@@ -119,15 +98,49 @@
           }
         </div>
 
+        <div class="order-3 grid w-full min-w-0 grid-cols-2 items-start gap-4 lg:order-2 lg:col-span-2">
         <div class="flex flex-col items-start gap-2">
           <div class="flex w-full items-center justify-between gap-2">
-          <label class="text-base leading-snug text-base-content" for="category">Category</label>
+          <label class="text-base leading-snug text-base-content" [attr.for]="prefix + '-date'">Date</label>
+          @if (voiceSuggested().has('date')) {
+            <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-date">AI suggested</span>
+          }
+        </div>
+          <input
+            [id]="prefix + '-date'"
+            [class.input-error]="errors().date !== ''"
+            class="input h-10 w-full rounded-lg border-base-content/20 bg-base-100 px-4"
+            type="date"
+            [value]="isoDate()"
+            (input)="onDate($event)"
+            data-testid="date-input"
+          />
+          @if (errors().date; as message) {
+            <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
+          }
+        </div>
+
+        <div class="flex min-w-0 flex-col items-start gap-2">
+          <label class="text-base leading-snug text-base-content" [attr.for]="prefix + '-time'">Time</label>
+          <input [id]="prefix + '-time'" type="time" step="60"
+            class="input h-10 w-full min-w-0 rounded-lg border-base-content/20 bg-base-100 px-4"
+            [class.input-error]="timeError() !== ''" [attr.aria-invalid]="timeError() !== ''"
+            [attr.aria-describedby]="timeError() ? prefix + '-time-error' : null"
+            [value]="time()" (input)="onTime($any($event.target).value)" data-testid="time-input" />
+          @if (timeError(); as message) {
+            <p [id]="prefix + '-time-error'" class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
+          }
+        </div>
+        </div>
+        <div class="order-4 flex flex-col items-start gap-2 lg:col-span-2">
+          <div class="flex w-full items-center justify-between gap-2">
+          <label class="text-base leading-snug text-base-content" [attr.for]="prefix + '-category'">Category</label>
           @if (voiceSuggested().has('category')) {
             <span class="rounded-full bg-base-content/5 px-2 py-0.5 text-[10px] font-semibold text-base-content/55" data-testid="ai-suggested-category">AI suggested</span>
           }
         </div>
           <select
-            id="category"
+            [id]="prefix + '-category'"
             [class.select-error]="errors().category !== ''"
             class="select h-10 w-full rounded-lg border-base-content/20 bg-base-100 pl-4"
             (change)="onCategory($any($event.target).value)"
@@ -146,9 +159,9 @@
             <p class="text-xs leading-normal text-error" data-testid="field-error">{{ message }}</p>
           }
         </div>
-      </div>
+      </fieldset>
 
-      <button type="submit" class="btn btn-primary" [disabled]="saving()" data-testid="save-expense">
+      <button type="submit" class="btn btn-primary w-full lg:w-[240px]" [disabled]="saving()" data-testid="save-expense">
         @if (saving()) {
           <span class="loading loading-spinner loading-sm"></span>
         }

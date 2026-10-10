@@ -27,19 +27,19 @@ describe('AiExtractApi (POST /AI/extract, guito-ui#44)', () => {
     const req = http.expectOne('https://api.test/AI/extract');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ language: 'pt-PT', prompt: 'café 2,30 no Coco Verde' });
-    req.flush({ date: '2026-10-02T00:00:00Z', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
+    req.flush({ date: '2026-10-02', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
     await expect(pending).resolves.toEqual({ date: '2026-10-02', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
   });
 
   it('rejects when the amount is missing or not positive (ADR 0010)', async () => {
     const pending = api.extract('café');
-    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02T00:00:00Z', amount: 0, description: 'Coco Verde', category: 'Eating out' });
+    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount: 0, description: 'Coco Verde', category: 'Eating out' });
     await expect(pending).rejects.toThrow('extract-unusable');
   });
 
   it('rejects when the description is missing', async () => {
     const pending = api.extract('café');
-    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02T00:00:00Z', amount: 2.3, description: '   ', category: 'Eating out' });
+    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount: 2.3, description: '   ', category: 'Eating out' });
     await expect(pending).rejects.toThrow('extract-unusable');
   });
 

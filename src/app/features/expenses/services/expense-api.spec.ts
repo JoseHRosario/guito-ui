@@ -12,7 +12,7 @@ const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 
 const API_EXPENSES = {
   expenses: [
-    { storedOrder: 12, date: '2021-01-03T10:12:00', amount: -65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
+    { id: 'opaque/expense-id', storedOrder: 12, occurredAt: '2021-01-03T10:12:00+00:00', date: '2021-01-03T10:12:00', amount: -65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
     { storedOrder: 13, date: '2021-01-02T08:00:00', amount: 2500, description: 'Salary', category: null, creatorEmail: null },
   ],
 };
@@ -50,7 +50,7 @@ describe('ExpenseApi.latest', () => {
     req.flush(API_EXPENSES);
 
     await expect(promise).resolves.toEqual([
-      { id: '12', description: 'H&M', amount: -65.55, date: '2021-01-03T10:12:00', category: 'Clothing', icon: 'tag' },
+      { id: 'opaque/expense-id', description: 'H&M', amount: -65.55, date: '2021-01-03T10:12:00+00:00', category: 'Clothing', icon: 'tag' },
       { id: '13', description: 'Salary', amount: 2500, date: '2021-01-02T08:00:00', category: '', icon: 'tag' },
     ]);
   });

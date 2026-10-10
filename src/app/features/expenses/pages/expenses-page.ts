@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { formatEur } from '../services/money';
+import { lisbonNow, occurrenceDay } from '../services/expense-time';
 
 // --- list-model helpers (folded single-consumer helpers, guito-api#40/#9) ---
 
@@ -13,35 +14,33 @@ export interface ExpenseDayGroup {
   expenses: readonly Expense[];
 }
 
-const dayLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit' });
-const weekdayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+const dayLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', timeZone: 'UTC' });
+const weekdayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' });
 
 /** Groups expenses onto calendar days (newest first). */
 function groupExpensesByDay(expenses: readonly Expense[]): ExpenseDayGroup[] {
   const byDay = new Map<string, Expense[]>();
   for (const expense of expenses) {
-    const day = expense.date.slice(0, 10);
+    const day = occurrenceDay(expense.date);
     byDay.set(day, [...(byDay.get(day) ?? []), expense]);
   }
   return [...byDay.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([key, group]) => {
-      const date = new Date(key + 'T12:00:00');
+      const date = new Date(key + 'T12:00:00Z');
       return { key, label: `${dayLabel.format(date)}, ${weekdayLabel.format(date)}`, expenses: group };
     });
 }
 
-const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long' });
+const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'UTC' });
 
 /** The list's month label (e.g. "January, 2021"), from the newest expense; '' when empty. */
 function monthLabelOf(expenses: readonly Expense[]): string {
-  const newest = expenses.reduce<string | null>(
-    (latest, expense) => (latest === null || expense.date > latest ? expense.date : latest),
-    null,
-  );
-  if (newest === null) return '';
-  const date = new Date(newest);
-  return `${longMonth.format(date)}, ${date.getFullYear()}`;
+  // The server orders by occurrence instant; lexical offsets are not chronological.
+  const newest = expenses[0]?.date;
+  if (!newest) return '';
+  const date = new Date(`${occurrenceDay(newest)}T12:00:00Z`);
+  return `${longMonth.format(date)}, ${date.getUTCFullYear()}`;
 }
 import type { Expense } from '../models/expense';
 import { ExpenseApi } from '../services/expense-api';
@@ -188,10 +187,9 @@ export class ExpensesPage {
     if (this.dialBusy()) return;
     this.favoriteError.set(null);
     this.favoriteSaving.set(favorite.name);
-    const today = new Date();
-    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const { date, occurredAt } = lisbonNow();
     void this.expenseApi
-      .create({ date, amount: favorite.amount, description: favorite.description, category: favorite.category })
+      .create({ date, occurredAt, currency: 'EUR', amount: favorite.amount, description: favorite.description, category: favorite.category })
       .then(
         () => {
           this.favoriteSaving.set(null);

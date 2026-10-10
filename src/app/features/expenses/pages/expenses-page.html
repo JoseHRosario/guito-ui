@@ -175,7 +175,7 @@
           <hr class="w-full border-base-content/10" />
         </div>
         @for (expense of group.expenses; track expense.id) {
-          <div class="flex w-full items-center gap-3 border-b border-base-content/10 px-4 py-3" data-testid="expense-row">
+          <div class="flex w-full items-center gap-3 border-b border-base-content/10 px-4 py-3" data-testid="expense-row" [attr.data-expense-id]="expense.id">
             <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-success-content text-success">
               <g-icon [name]="expense.icon" class="size-5" />
             </span>

@@ -4,11 +4,11 @@ import type { IconName } from '../../../shared/gicon';
 export interface Expense {
   id: string;
   description: string;
-  /** Negative for outflows, positive for inflows, in EUR. */
+  /** Positive Expense outflow, in EUR; legacy signed values render unchanged. */
   amount: number;
-  /** ISO-8601 date(-time) as returned by the API. */
+  /** Offset occurrence timestamp, falling back to legacy date until API cutover. */
   date: string;
-  /** Stub-only: the API contract has no category yet. */
+  /** Category supplied by the API. */
   category: string;
   /** Stub-only: lucide icon name rendered by the category badge. */
   icon: IconName;

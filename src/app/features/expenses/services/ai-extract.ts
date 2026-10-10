@@ -2,11 +2,13 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { knownOccurrence, occurrenceDay } from './expense-time';
 
 /** What `POST /AI/extract` returns (camelCase wire DTO `ExpenseExtracted`). */
 export interface ExtractedExpense {
   /** ISO yyyy-MM-dd. */
   date: string;
+  occurredAt?: string;
   /** Positive (ADR 0010) — the outflow is implied by the record being an Expense. */
   amount: number;
   description: string;
@@ -15,6 +17,7 @@ export interface ExtractedExpense {
 
 interface ExtractedExpenseDto {
   date?: string | null;
+  occurredAt?: string | null;
   amount?: number | null;
   description?: string | null;
   category?: string | null;
@@ -45,7 +48,8 @@ export class AiExtractApi {
     if (date === null || amount === null || amount <= 0 || description === '') {
       throw new Error('extract-unusable');
     }
-    return { date, amount, description, category };
+    const occurredAt = knownOccurrence(response.occurredAt) ?? knownOccurrence(response.date);
+    return { date, amount, description, category, ...(occurredAt ? { occurredAt } : {}) };
   }
 }
 
@@ -54,5 +58,5 @@ function normalizeDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (isNaN(date.getTime())) return null;
-  return value.slice(0, 10);
+  return occurrenceDay(value);
 }

@@ -5,7 +5,7 @@ export function parseAmount(input: string): number | null {
   const normalized = input.trim().replace(',', '.');
   if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
   const value = Number(normalized);
-  return value > 0 ? value : null;
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 export interface ExpenseInput {

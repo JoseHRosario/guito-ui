@@ -9,7 +9,7 @@ import { stubExpensesApi } from './helpers/stub-auth';
 
 const SESSION_KEY = 'guito.auth.session';
 
-const EXTRACT_OK = { date: '2026-10-02T00:00:00Z', amount: 2.3, description: 'Coco Verde', category: 'Eating out' };
+const EXTRACT_OK = { date: '2026-10-02', occurredAt: '2026-10-02T09:30:17+01:00', amount: 2.3, description: 'Coco Verde', category: 'Eating out' };
 
 async function seedSession(page: Page): Promise<void> {
   await page.addInitScript((key) => {
@@ -76,9 +76,8 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     await expect(page.getByTestId('speed-dial-voice')).toBeVisible();
     await expect(page.getByTestId('speed-dial-favorite-morning-coffee')).toBeVisible();
 
-    // Listening: the Voice pill shows the speak icon (no overlay).
+    // Listening feedback is unit-covered; don't race the fake's 100ms state.
     await page.getByTestId('speed-dial-voice').click();
-    await expect(page.getByTestId('voice-speak-icon')).toBeVisible();
 
     // Extract runs (spinner covered in the unit specs — the fake resolves in
     // ~100ms, too fast to catch the frame here): the app navigates to the form.
@@ -88,10 +87,21 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     await expect(page.locator('[data-testid="amount-input"]:visible')).toHaveValue('2,30');
     await expect(page.locator('[data-testid="description-input"]:visible')).toHaveValue('Coco Verde');
     await expect(page.locator('[data-testid="date-input"]:visible')).toHaveValue('2026-10-02');
+    await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('09:30');
+    await page.route('**/Expense', async route => {
+      expect(route.request().postDataJSON()).toMatchObject({ occurredAt: '2026-10-02T09:30:17+01:00', currency: 'EUR', amount: 2.3 });
+      await route.fulfill({ json: { id: 'voice-opaque-id' } });
+    });
     await expect(page.locator('[data-testid="category-select"]:visible')).toHaveValue('Eating out');
     for (const field of ['amount', 'date', 'description', 'category']) {
       await expect(page.getByTestId(`ai-suggested-${field}`).first()).toBeVisible();
     }
+    if (process.env['GUITO_EVIDENCE_DIR']) {
+      await page.locator('[data-testid=create-title]:visible').click();
+      await page.screenshot({ path: `${process.env['GUITO_EVIDENCE_DIR']}/mobile-voice.png` });
+    }
+    await page.locator('[data-testid=save-expense]:visible').click();
+    await expect(page).toHaveURL(/saved=1/);
   });
 
   test('extract failure → toast, staying on the list', async ({ page }) => {

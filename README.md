@@ -2,9 +2,9 @@
 
 The web frontend of **Guito**, a personal expense tracker: control expenses and maximize savings. This SPA consumes the [guito-api](https://github.com/JoseHRosario/guito-api) HTTP API and is designed screen-by-screen in Figma before any code is written.
 
-> Live demo: https://guito.web.kerumirembora.com/ (deployed from `master`; data is currently stubbed in-app)
+> Live demo: https://guito.web.kerumirembora.com/ (deployed from `master`). Local tests stub the API; production consumes guito-api.
 
-> Status (2026): MVP under revival. The app shell, the latest-expenses screen, and the Google auth layer (env config, PKCE `AuthService`, `/auth/callback`) are implemented against approved Figma frames / settled decisions; next up: the Sign In screen (drafted in Figma, pending approval) and the route guard. Live API wiring follows (guito-api#9).
+> Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and opaque expense IDs. Full timestamp persistence requires the coordinated API deployment; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
 
 ## Tech stack
 
@@ -61,7 +61,7 @@ docs/adr/     UI decision records (0001–0010+)
 
 ## Docs
 
-- [CONTEXT.md](CONTEXT.md) — glossary (design file, design loop, token sync)
+- [GLOSSARY.md](GLOSSARY.md) — glossary (design file, design loop, token sync)
 - [docs/adr/](docs/adr/) — decisions (token source = Figma MCP sync, …)
 - [AGENTS.md](AGENTS.md) — rules for AI coding agents
 - [guito-api](https://github.com/JoseHRosario/guito-api) — the backend (issues for both repos live there)

@@ -14,7 +14,7 @@ const vis = (testId: string): string => `[data-testid="${testId}"]:visible`;
 
 const SEED_EXPENSES = {
   expenses: [
-    { storedOrder: 1, date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
+    { id: 'expense-1', occurredAt: '2021-01-03T10:12:00+00:00', currency: 'EUR', date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
   ],
 };
 
@@ -44,13 +44,13 @@ async function stubExpenseApis(page: Page): Promise<{ expenses: typeof SEED_EXPE
       await route.fulfill({ status: 405, body: 'method not allowed' });
       return;
     }
-    const body = route.request().postDataJSON() as { date: string; amount: number; description: string; category: string };
+    const body = route.request().postDataJSON() as { date: string; occurredAt: string; currency: string; amount: number; description: string; category: string };
     state.created.push(body);
     state.expenses = [
-      { storedOrder: 99, date: `${body.date}T12:00:00`, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
+      { id: 'created-opaque-id', occurredAt: body.occurredAt, currency: body.currency, date: body.date, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
       ...state.expenses,
     ];
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 99 }) });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'created-opaque-id' }) });
   });
   return state;
 }
@@ -122,6 +122,7 @@ test.describe('create expense flow (stubbed API, signed in)', () => {
 test.describe('favorites speed-dial (stubbed API, signed in)', () => {
   test('tapping the favorite creates the expense immediately with the preset payload', async ({ page }) => {
     const state = await stubExpenseApis(page);
+    await page.clock.setFixedTime(new Date('2026-07-01T23:15:42Z'));
     await seedSession(page);
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto('/');
@@ -138,11 +139,9 @@ test.describe('favorites speed-dial (stubbed API, signed in)', () => {
     await postCreated;
 
     // The preset posts as-is: positive amount, today's date, exact description/category.
-    const today = new Date();
-    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    expect(state.created).toEqual([
-      { date: iso, amount: 2.3, description: 'Coco Verde', category: 'Eating out' },
-    ]);
+    expect(state.created).toHaveLength(1);
+    expect(state.created[0]).toEqual({ date: '2026-07-02', occurredAt: '2026-07-02T00:15:42+01:00', currency: 'EUR', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
+    expect(state.created[0]['occurredAt']).toMatch(/T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
 
     await expect(page).toHaveURL(/\/\?saved=1$/);
     await expect(page.locator(vis('saved-toast'))).toContainText('Expense saved');
@@ -153,6 +152,7 @@ test.describe('favorites speed-dial (stubbed API, signed in)', () => {
 
   test('the scrim closes the speed-dial without creating anything', async ({ page }) => {
     const state = await stubExpenseApis(page);
+    await page.clock.setFixedTime(new Date('2026-07-01T23:15:42Z'));
     await seedSession(page);
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto('/');

@@ -11,6 +11,9 @@ import type { Expense } from '../models/expense';
  * System.Text.Json defaults; nullable fields mirror the sheet-backed DTO.
  */
 interface ExpenseDto {
+  id?: string | null;
+  occurredAt?: string | null;
+  currency?: string | null;
   storedOrder?: number | null;
   date?: string | null;
   amount?: number | null;
@@ -44,20 +47,21 @@ export class ExpenseApi {
     const url = `${this.env.apiBaseUrl}/Expense/latest/${count}`;
     const response = await firstValueFrom(this.http.get<{ expenses?: ExpenseDto[] | null }>(url));
     return (response.expenses ?? []).map((dto) => ({
-      id: String(dto.storedOrder ?? ''),
+      // Pre-cutover sheet ordinal: rendering-only compatibility, NOT durable identity.
+      id: dto.id ?? String(dto.storedOrder ?? ''),
       description: dto.description ?? '',
       amount: dto.amount ?? 0,
-      date: dto.date ?? '',
+      date: dto.occurredAt ?? dto.date ?? '',
       category: dto.category ?? '',
       icon: categoryIcon(dto.category ?? ''),
     }));
   }
 
   /** Creates an expense (`POST /Expense`); resolves the opaque Expense Id (ADR-0009). */
-  async create(input: { date: string; amount: number; description: string; category: string }): Promise<number> {
+  async create(input: { date: string; occurredAt: string; currency: 'EUR'; amount: number; description: string; category: string }): Promise<string> {
     const response = await firstValueFrom(
-      this.http.post<{ id?: number | null }>(`${this.env.apiBaseUrl}/Expense`, input),
+      this.http.post<{ id?: string | number | null }>(`${this.env.apiBaseUrl}/Expense`, input),
     );
-    return response.id ?? 0;
+    return String(response.id ?? '');
   }
 }

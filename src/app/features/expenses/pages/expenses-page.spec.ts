@@ -75,6 +75,22 @@ describe('ExpensesPage (live API, guito-api#9)', () => {
     expect(pageEl.querySelector('[data-testid="summary-expense"]')).toBeNull();
   });
 
+  it('groups offset timestamps by Lisbon occurrence day and retains server order and opaque IDs', async () => {
+    const page = render();
+    latestRequest().flush({ expenses: [
+      { id: 'id-A/not-an-ordinal', storedOrder: 9, date: '1900-01-01', occurredAt: '2026-07-01T23:30:00Z', amount: 20, description: 'Newest', category: 'Food' },
+      { id: 'id-B/not-an-ordinal', storedOrder: 8, date: '1900-01-01', occurredAt: '2026-07-02T00:10:00+01:00', amount: 10, description: 'Earlier', category: 'Food' },
+    ] });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(page.querySelector('[data-testid=group-header]')?.textContent).toContain('Jul 02, Thursday');
+    });
+    const rows = [...page.querySelectorAll('[data-testid=expense-row]')].slice(0, 2);
+    expect(rows.map(row => row.getAttribute('data-expense-id'))).toEqual(['id-A/not-an-ordinal', 'id-B/not-an-ordinal']);
+    expect(rows[0].textContent).toContain('Newest');
+    expect(rows[1].textContent).toContain('Earlier');
+  });
+
   it('shows the error card with a retry that re-requests the API', async () => {
     const pageEl = render();
     latestRequest().flush('boom', { status: 500, statusText: 'Server Error' });
@@ -240,7 +256,7 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     expect(body.description).toBe('Coco Verde');
     expect(body.category).toBe('Eating out');
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    req.flush({ id: 77 });
+    req.flush({ id: 'favorite-opaque-id' });
     fixture.detectChanges();
 
     // The success path refreshes the list in place (component reuse on
