@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FAVORITES } from './favorites';
+import { amountDecimal } from './validate-expense';
 
 describe('FAVORITES seed (issue #43, ADR 0012)', () => {
   it('carries a valid preset for every favorite', () => {
@@ -9,9 +10,7 @@ describe('FAVORITES seed (issue #43, ADR 0012)', () => {
       expect(favorite.name.trim()).not.toBe('');
       expect(favorite.description.trim()).not.toBe('');
       expect(favorite.category.trim()).not.toBe('');
-      // ADR 0010: amounts are stored positive — a non-positive favorite could
-      // never be saved (the API rejects non-positive amounts with 400).
-      expect(favorite.amount).toBeGreaterThan(0);
+      expect(amountDecimal(favorite.amount)).not.toBeNull();
     }
   });
 

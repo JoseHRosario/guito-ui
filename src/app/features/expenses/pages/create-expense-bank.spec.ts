@@ -8,9 +8,9 @@ import { TestBed } from '@angular/core/testing';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
 import { CreateExpensePage } from './create-expense-page';
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
-const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
+const TEST_ENV = { expenseTimestampsEnabled: true, apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 const CATEGORIES = { categories: [{ name: 'Clothing' }, { name: 'Eating out' }] };
 /** The BankPage accept payload (issue #61) — structurally the ExtractedExpense contract. */
 const BANK_PREFILL = { description: 'CONTINENTE ONLINE 8831', amount: 58.93, date: '2026-10-02', category: 'Shopping' };
@@ -47,11 +47,81 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     await harness.navigateByUrl('/');
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => { http.verify(); vi.useRealTimers(); localStorage.removeItem(SESSION_STORAGE_KEY); });
 
   function el(): HTMLElement {
     return document.querySelector('g-create-expense-page') as HTMLElement;
   }
+
+  it.each(['voicePrefill', 'bankPrefill'])('preserves a known fold instant from %s until Date or Time is edited', async (channel) => {
+    const occurredAt = '2026-10-25T01:30:27+00:00';
+    await router.navigate(['/expenses/create'], { state: { [channel]: { ...BANK_PREFILL, occurredAt } } });
+    http.expectOne('https://api.test/Category').flush(CATEGORIES_WITH_SHOPPING);
+    await new Promise(r => setTimeout(r, 0));
+    harness.detectChanges();
+    const page = el();
+    expect(page.querySelector<HTMLInputElement>('[data-testid=time-input]')?.value).toBe('01:30');
+    expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-10-25');
+    (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body).toMatchObject({ occurredAt, date: '2026-10-25', currency: 'EUR', amount: '58.93' });
+    req.flush('retry', { status: 500, statusText: 'Server Error' });
+    await new Promise(r => setTimeout(r, 0));
+    const time = page.querySelector<HTMLInputElement>('[data-testid=time-input]')!;
+    time.value = '01:30';
+    time.dispatchEvent(new Event('input'));
+    (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
+    harness.detectChanges();
+    expect(page.textContent).toContain('occurs twice');
+    http.expectNone('https://api.test/Expense');
+  });
+
+  it.each(['voicePrefill', 'bankPrefill'])('date-only %s keeps booking/proposal date but captures the current Lisbon time', async channel => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-07-01T23:15:42Z'));
+    await router.navigate(['/expenses/create'], { state: { [channel]: BANK_PREFILL } });
+    http.expectOne('https://api.test/Category').flush(CATEGORIES_WITH_SHOPPING);
+    await new Promise(r => setTimeout(r, 0));
+    harness.detectChanges();
+    const page = el();
+    expect(page.querySelector<HTMLInputElement>('[data-testid=time-input]')?.value).toBe('00:15');
+    expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-10-02');
+    (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body.occurredAt).toBe('2026-10-02T00:15:00+01:00');
+    req.flush({ id: 'opaque-bank-or-voice-id' });
+    await new Promise(r => setTimeout(r, 0));
+  });
+
+  it.each([
+    ['voicePrefill', '123456789.123456789'], ['bankPrefill', '123456789.123456789'],
+    ['voicePrefill', '-123456789.123456789'], ['bankPrefill', '-123456789.123456789'],
+    ['voicePrefill', '0'], ['bankPrefill', '0'],
+  ])('retains exact decimal %s %s and an arbitrary-offset instant through POST', async (channel, amountExact) => {
+    const occurredAt = '2026-07-02T05:45:27+05:30';
+
+    await router.navigate(['/expenses/create'], { state: { [channel]: { ...BANK_PREFILL, occurredAt, amount: 123456789.12345679, amountExact } } });
+    http.expectOne('https://api.test/Category').flush(CATEGORIES_WITH_SHOPPING);
+    await new Promise(r => setTimeout(r, 0));
+    harness.detectChanges();
+    const page = el();
+    expect(page.querySelector<HTMLInputElement>('[data-testid=amount-input]')?.value).toBe(amountExact === '0' ? '0,00' : amountExact.replace('.', ','));
+    expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-07-02');
+    expect(page.querySelector<HTMLInputElement>('[data-testid=time-input]')?.value).toBe('01:15');
+    (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body).toMatchObject({ occurredAt, date: '2026-07-02', amount: amountExact });
+    req.flush({ id: 'exact-offset' });
+    await new Promise(r => setTimeout(r, 0));
+  });
+
+  it('preserves a supplied positive amount without rounding during prefill', async () => {
+    await router.navigate(['/expenses/create'], { state: { bankPrefill: { ...BANK_PREFILL, amount: 58.937 } } });
+    http.expectOne('https://api.test/Category').flush(CATEGORIES_WITH_SHOPPING);
+    await new Promise(r => setTimeout(r, 0));
+    harness.detectChanges();
+    expect(el().querySelector<HTMLInputElement>('[data-testid=amount-input]')?.value).toBe('58,937');
+  });
 
   it('prefills the form from history.state.bankPrefill and preselects the suggested category', async () => {
     await router.navigate(['/expenses/create'], { state: { bankPrefill: BANK_PREFILL } });

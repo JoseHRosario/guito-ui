@@ -3,19 +3,19 @@
  * Mirrors the pending-GET contract of `GET /BankTransaction` (guito-api#91,
  * epic #82): pending = unmatched rows (`expense_id IS NULL`).
  *
- * CONTRACT NOTE: the endpoint is not implemented yet (guito-api#91 open) —
- * this DTO is the UI's provisional contract, coordinated with the sync
- * feature (#90: DBIT rows, amounts stored positive) and the Jev suggested
- * category (guito-api#112). Tolerant mapping keeps unknown/nullable fields
- * from breaking the page.
+ * Current sync imports debit outflows as positive amounts. The UI preserves
+ * whatever sign and exact-amount metadata the API supplies when prefilling an
+ * Expense; it does not normalize or negate values.
+ * Tolerant mapping keeps unknown/nullable fields from breaking the page.
  */
 export interface BankTransaction {
   /** Opaque row id (sync_key server-side). */
   id: string;
   /** Booking date as ISO yyyy-MM-dd. */
   date: string;
-  /** Absolute amount in the account currency (outflows arrive positive). */
+  /** Amount supplied by the API; current debit imports arrive positive. */
   amount: number;
+  amountExact?: string;
   currency: string;
   /** Remittance information — the bank's raw description string. */
   description: string;

@@ -1,20 +1,19 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { CategoryApi } from '../services/category-api';
 import { ExpenseApi } from '../services/expense-api';
-import { parseAmount, validateExpenseInput, type ExpenseFieldErrors } from '../services/validate-expense';
+import { amountDecimal, parseAmount, validateExpenseInput, type ExpenseFieldErrors } from '../services/validate-expense';
 import type { ExtractedExpense } from '../services/ai-extract';
-
-/** Local date as ISO yyyy-MM-dd (the date input's wire format). */
-function todayIso(): string {
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-}
+import { knownOccurrence, lisbonFields, lisbonNow, resolveOccurrence } from '../services/expense-time';
 
 /** pt-PT decimal comma display for a prefilled amount (2.3 → '2,30'). */
-function amountText(amount: number): string {
-  return amount.toFixed(2).replace('.', ',');
+function amountText(amount: number | string): string {
+  const exact = amountDecimal(amount);
+  if (exact === null) return '';
+  const [whole, fraction = ''] = exact.split('.');
+  return `${whole},${fraction.padEnd(2, '0')}`;
 }
 
 /** Fields the voice path may mark as AI suggested; keeps template lookups type-checked. */
@@ -29,10 +28,12 @@ export interface VoicePrefillState {
 export interface BankPrefillState {
   bankPrefill: {
     description: string;
-    /** Absolute positive amount from the bank row (guito-api#90 stores DBIT positive). */
-    amount: number;
+    /** Bank amount as supplied; preserve its sign without inferring outflow semantics. */
+    amount: number | string;
+    amountExact?: string;
     /** ISO yyyy-MM-dd booking date. */
     date: string;
+    occurredAt?: string;
     /** Jev-suggested category name; '' when the API had no suggestion. */
     category: string;
   };
@@ -51,6 +52,7 @@ export interface BankPrefillState {
   imports: [NgTemplateOutlet],
 })
 export class CreateExpensePage {
+  protected readonly timestampsEnabled = inject(APP_ENVIRONMENT).expenseTimestampsEnabled === true;
   private readonly categoryApi = inject(CategoryApi);
   private readonly expenseApi = inject(ExpenseApi);
   private readonly router = inject(Router);
@@ -60,7 +62,11 @@ export class CreateExpensePage {
   protected readonly amount = signal('');
   protected readonly description = signal('');
   /** ISO yyyy-MM-dd (daisyUI date input); defaults to today. */
-  protected readonly isoDate = signal(todayIso());
+  private readonly initialOccurrence = lisbonNow();
+  private knownInstant: string | null = this.initialOccurrence.occurredAt;
+  protected readonly isoDate = signal(this.initialOccurrence.date);
+  protected readonly time = signal(this.initialOccurrence.time);
+  protected readonly timeError = signal('');
   protected readonly errors = signal<ExpenseFieldErrors>({ amount: '', description: '', date: '', category: '' });
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
@@ -97,9 +103,18 @@ export class CreateExpensePage {
       },
     );
     if (prefill) {
-      this.amount.set(amountText(prefill.amount));
+      this.amount.set(amountText(prefill.amountExact ?? prefill.amount));
       this.description.set(prefill.description);
-      if (prefill.date) this.isoDate.set(prefill.date);
+      const known = knownOccurrence(prefill.occurredAt) ?? knownOccurrence(prefill.date);
+      if (known) {
+        const fields = lisbonFields(new Date(known));
+        this.isoDate.set(fields.date);
+        this.time.set(fields.time);
+        this.knownInstant = known;
+      } else if (prefill.date) {
+        this.isoDate.set(prefill.date);
+        this.knownInstant = null;
+      }
       // 'date' only when the proposal actually carried one (marker/value drift guard).
       // Bank-derived fields (issue #61) are bank data, not AI proposals — the markers
       // stay off; the Jev-suggested CATEGORY marker is set in the category branch above.
@@ -114,7 +129,13 @@ export class CreateExpensePage {
   /** daisyUI date input emits ISO yyyy-MM-dd directly ('' when cleared). */
   protected onDate(event: Event): void {
     this.isoDate.set((event.target as HTMLInputElement).value);
+    this.knownInstant = null;
     this.clearSuggested('date');
+  }
+
+  protected onTime(value: string): void {
+    this.time.set(value);
+    this.knownInstant = null;
   }
 
   protected onAmount(value: string): void {
@@ -148,7 +169,9 @@ export class CreateExpensePage {
       date: this.isoDate(),
       category: this.category(),
     });
-    const failed = Object.values(validation).some((message) => message !== '');
+    const occurrence = this.timestampsEnabled ? resolveOccurrence(this.isoDate(), this.time(), this.knownInstant) : { occurredAt: null, error: '' };
+    this.timeError.set(occurrence.error);
+    const failed = Object.values(validation).some((message) => message !== '') || (this.timestampsEnabled && occurrence.occurredAt === null);
     this.errors.set(validation);
     this.saveError.set(null);
     if (failed) return;
@@ -158,8 +181,8 @@ export class CreateExpensePage {
     void this.expenseApi
       .create({
         date: this.isoDate(),
-        // ADR 0010: amounts are stored positive — the outflow is implied by
-        // the record being an Expense. Post the parsed amount as-is.
+        ...(this.timestampsEnabled ? { occurredAt: occurrence.occurredAt!, currency: 'EUR' as const } : {}),
+        // Preserve the supplied signed/zero decimal exactly; never infer a sign.
         amount: parsedAmount,
         description: this.description().trim(),
         category: this.category(),

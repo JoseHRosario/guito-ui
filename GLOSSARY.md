@@ -1,5 +1,9 @@
 # Context & Glossary (guito-ui)
 
+- **Expense occurrence** — the purchase instant (`occurredAt`), distinct from creation/update audit dates. Editable Date/Time use Europe/Lisbon; new expenses default to now, not historical-import midnight. Known offset prefills retain their instant; DST gaps/folds are validated (ADR 0014).
+- **Expense ID** — opaque backend string, preserved unchanged. A pre-cutover `storedOrder` fallback is a temporary render key, never durable identity or a reconciliation reference.
+- **Create Expense canonical frames** — approved mobile `3094:35`, desktop `3094:9704`, validation `3094:9937`, save failure `3094:10011`, voice prefill `3134:10053`; native Time shares the Date row (ADR 0014).
+
 - **Guito design file** — José's duplicate of the "Simple Design System (Community)" Figma file, key `UoIK5MnIqDrgfHqMmBZoYk` (owner José). The Community original is read-only source and never edited. App designs live on its dedicated **Guito App** page. See ADR 0010.
 - **Design loop** — the UI workflow: Hermes drafts a screen on the Guito App page via the Figma MCP → José validates/edits in Figma → approval becomes the implement source. Design changes happen in Figma, never as code-side drift.
 - **Token sync (MCP)** — the process writing `design/tokens.json` from the design file's 'Color' variables (SDS Light mode), read via the Figma MCP (see ADR 0010). The REST/pull path is impossible on this plan: `file_variables:read` is Enterprise-only. The role→variable mapping lives in `tools/tokens/figma.json`.

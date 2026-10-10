@@ -8,6 +8,8 @@ import { serializeSession, SESSION_STORAGE_KEY } from './core/auth/auth-session'
 import { ExpenseApi } from './features/expenses/services/expense-api';
 import { STUB_EXPENSES } from './features/expenses/services/stub-expenses';
 
+afterEach(() => localStorage.removeItem(SESSION_STORAGE_KEY));
+
 function seedSession(): void {
   localStorage.setItem(
     SESSION_STORAGE_KEY,
@@ -20,7 +22,7 @@ const FAKE_EXPENSE_API = { provide: ExpenseApi, useValue: { latest: async () => 
 
 describe('App shell + expenses list (stubbed, authed session)', () => {
   beforeEach(async () => {
-    localStorage.clear();
+    localStorage.removeItem(SESSION_STORAGE_KEY);
     seedSession();
     await TestBed.configureTestingModule({
       imports: [App],
@@ -58,7 +60,7 @@ describe('App shell + expenses list (stubbed, authed session)', () => {
 
 describe('App behind the auth gate (ADR-0011, unauthenticated)', () => {
   beforeEach(async () => {
-    localStorage.clear();
+    localStorage.removeItem(SESSION_STORAGE_KEY);
     await TestBed.configureTestingModule({ imports: [App], providers: [provideRouter(routes)] }).compileComponents();
     const router = TestBed.inject(Router);
     await TestBed.inject(NgZone).run(() => router.navigateByUrl('/'));

@@ -14,14 +14,14 @@ export const SESSION_KEY = 'guito.auth.session';
 /** The latest-expenses list is LIVE (guito-api#9) — stub it at the transport. */
 const STUB_API_EXPENSES = {
   expenses: [
-    // ADR 0010: amounts are stored positive — every Expense is an outflow.
-    { storedOrder: 1, date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
-    { storedOrder: 2, date: '2021-01-03T11:30:00', amount: 80.0, description: 'T-Mobile', category: 'Broadband', creatorEmail: 'e2e@guito.app' },
-    { storedOrder: 3, date: '2021-01-03T14:45:00', amount: 120.0, description: 'Walmart', category: 'Shopping', creatorEmail: 'e2e@guito.app' },
-    { storedOrder: 4, date: '2021-01-03T18:20:00', amount: 150.6, description: 'Con Edison', category: 'Bills', creatorEmail: 'e2e@guito.app' },
-    { storedOrder: 5, date: '2021-01-02T08:00:00', amount: 30.15, description: 'Netflix', category: 'Entertainment', creatorEmail: 'e2e@guito.app' },
-    { storedOrder: 6, date: '2021-01-02T09:15:00', amount: 55.0, description: 'Starbucks', category: 'Snacks', creatorEmail: 'e2e@guito.app' },
-    { storedOrder: 7, date: '2021-01-02T17:40:00', amount: 78.4, description: 'CVS Pharmacy', category: 'Health', creatorEmail: 'e2e@guito.app' },
+    // Representative positive fixtures; signed and zero Expenses are also valid.
+    { id: 'expense-1', occurredAt: '2021-01-03T10:12:00+00:00', currency: 'EUR', date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
+    { id: 'expense-2', occurredAt: '2021-01-03T11:30:00+00:00', currency: 'EUR', date: '2021-01-03T11:30:00', amount: 80.0, description: 'T-Mobile', category: 'Broadband', creatorEmail: 'e2e@guito.app' },
+    { id: 'expense-3', occurredAt: '2021-01-03T14:45:00+00:00', currency: 'EUR', date: '2021-01-03T14:45:00', amount: 120.0, description: 'Walmart', category: 'Shopping', creatorEmail: 'e2e@guito.app' },
+    { id: 'expense-4', occurredAt: '2021-01-03T18:20:00+00:00', currency: 'EUR', date: '2021-01-03T18:20:00', amount: 150.6, description: 'Con Edison', category: 'Bills', creatorEmail: 'e2e@guito.app' },
+    { id: 'expense-5', occurredAt: '2021-01-02T08:00:00+00:00', currency: 'EUR', date: '2021-01-02T08:00:00', amount: 30.15, description: 'Netflix', category: 'Entertainment', creatorEmail: 'e2e@guito.app' },
+    { id: 'expense-6', occurredAt: '2021-01-02T09:15:00+00:00', currency: 'EUR', date: '2021-01-02T09:15:00', amount: 55.0, description: 'Starbucks', category: 'Snacks', creatorEmail: 'e2e@guito.app' },
+    { id: 'expense-7', occurredAt: '2021-01-02T17:40:00+00:00', currency: 'EUR', date: '2021-01-02T17:40:00', amount: 78.4, description: 'CVS Pharmacy', category: 'Health', creatorEmail: 'e2e@guito.app' },
   ],
 };
 

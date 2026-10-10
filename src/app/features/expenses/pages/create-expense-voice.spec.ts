@@ -11,7 +11,7 @@ import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-s
 import { CreateExpensePage } from './create-expense-page';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 
-const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
+const TEST_ENV = { expenseTimestampsEnabled: true, apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 const CATEGORIES = { categories: [{ name: 'Clothing' }, { name: 'Eating out' }] };
 const PREFILL = { date: '2026-10-02', amount: 2.3, description: 'Coco Verde', category: 'Eating out' };
 

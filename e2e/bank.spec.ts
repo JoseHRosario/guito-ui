@@ -7,7 +7,7 @@ import { stubExpensesApi, SESSION_KEY } from './helpers/stub-auth';
 // are not implemented yet (guito-api#91/#112); this spec freezes the UI contract.
 
 const STUB_PENDING = [
-  { id: 7, bookingDate: '2026-10-02', amount: 58.93, currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategoryId: 3, suggestedCategory: 'Shopping' },
+  { id: 7, bookingDate: '2026-10-02', amount: 123456789.12345679, amountExact: '123456789.123456789', currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategoryId: 3, suggestedCategory: 'Shopping' },
   { id: 9, bookingDate: '2026-10-01', amount: 200, currency: 'EUR', remittanceInformation: 'TRF MB WAY PARA MARIA S', suggestedCategory: null },
 ];
 
@@ -65,6 +65,17 @@ test.describe('Bank review page (issue #61, stubbed data, signed in)', () => {
     await expect(page).toHaveURL(/\/expenses\/create/);
     const description = page.locator('[data-testid="description-input"]:visible');
     await expect(description).toHaveValue('CONTINENTE ONLINE 8831');
+    await expect(page.locator('[data-testid="amount-input"]:visible')).toHaveValue('123456789,123456789');
+    await expect(page.locator('[data-testid="category-select"]:visible')).toHaveValue('Shopping');
+    let body: Record<string, unknown> | undefined;
+    await page.route('**/Expense', async route => {
+      body = route.request().postDataJSON();
+      await route.fulfill({ json: { id: 'bank-exact' } });
+    });
+    await page.locator('[data-testid="save-expense"]:visible').click();
+    await expect(page).toHaveURL(/saved=1/);
+    expect(body?.['amount']).toBe('123456789.123456789');
+    expect(Object.hasOwn(body!, 'occurredAt')).toBe(process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true');
   });
 
   test('mobile: sync button posts and surfaces the fetched/new result', async ({ page }) => {
