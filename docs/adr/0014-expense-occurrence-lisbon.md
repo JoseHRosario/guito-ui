@@ -40,8 +40,11 @@ unknown timestamp fields. Never discard an enabled timestamp to retry as legacy.
 
 Amounts use normalized invariant **decimal strings**, not JavaScript Number
 conversion, preserving `123456789.123456789` and `9007199254740993` through form
-validation and POST. Positivity and .NET decimal's 96-bit coefficient / scale <=28
-are checked textually before submission. The coordinated API accepts numeric or
+validation and POST. Signed and zero amounts are valid (approved guito-api#137
+schema review); no automatic sign reversal is applied to manual, voice, bank or
+favorite values. An optional leading plus is normalized away, and negative zero
+becomes `0`. .NET decimal's 96-bit coefficient / scale <=28 are checked textually
+against the absolute coefficient before submission. The coordinated API accepts numeric or
 string amounts; old numeric clients remain compatible. Latest/AI DTOs keep their
 numeric `amount` for display compatibility and may supply `amountExact`; prefills
 prefer that sibling (including bank metadata when supplied). Without exact
@@ -51,7 +54,9 @@ Trailing insignificant zeros may be normalized; no two-decimal transport roundin
 is applied. Bank display formatting/suggestion logic is unchanged. UI deployment
 alone does **not** prove the API's decimal-string contract or persistence.
 
-Create returns `{id: string}`; the UI treats it as opaque. Numeric old-server
+Create returns `{id: string}` including generated integer IDs serialized as
+strings; the UI treats it as opaque. Nullable `updateDate` is audit metadata,
+ignored by list mapping and never substituted for `occurredAt`. Numeric old-server
 responses are tolerated by converting them to strings, never ordinals extracted
 from new IDs. Latest remains wrapped in `{expenses: [...]}`. Real `id` wins over
 `storedOrder` unchanged; `occurredAt` wins over legacy `date`. Old-server
@@ -93,7 +98,7 @@ flows with transport stubs. Tracers were run red then green for Time/POST,
 voice timestamp preservation and prefill precision. Coverage includes Lisbon now
 near UTC midnight, summer/winter offsets, DST gap/fold rejection, preservation of
 known fold instants until edit, voice/bank date-only defaults, opaque list IDs,
-server row order, positive precision, save loading/retry, and mobile/desktop
+server row order, signed/zero precision and overflow rejection, save loading/retry, and mobile/desktop
 alignment in a non-Lisbon browser timezone. No live API, Postgres persistence,
 AWS, real speech recognition, Safari/Firefox or real bank consent was exercised.
 Local browser verification must use the corresponding built configuration:

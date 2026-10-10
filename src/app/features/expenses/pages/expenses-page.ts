@@ -182,7 +182,7 @@ export class ExpensesPage {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   }
 
-  /** Instant-creates an Expense from a favorite: date = today, amount as-is (ADR 0010 positive). */
+  /** Instant-creates an Expense from a favorite: date = today, signed/zero amount as supplied. */
   protected createFavorite(favorite: Favorite): void {
     if (this.dialBusy()) return;
     this.favoriteError.set(null);

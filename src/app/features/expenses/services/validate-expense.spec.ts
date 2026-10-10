@@ -31,11 +31,22 @@ describe('parseAmount (pt-PT comma decimal, issue #32)', () => {
     expect(parseAmount('0.00000000000000000000000000001')).toBeNull();
   });
 
-  it('rejects empty, non-numeric, and non-positive input', () => {
+  it('normalizes signed amounts and negative zero without losing precision', () => {
+    expect(parseAmount('-0001,2500')).toBe('-1.25');
+    expect(parseAmount('+1.25')).toBe('1.25');
+    expect(parseAmount('-0.000')).toBe('0');
+    expect(parseAmount('0')).toBe('0');
+    expect(parseAmount('-123456789.123456789')).toBe('-123456789.123456789');
+    expect(parseAmount('-79228162514264337593543950335')).toBe('-79228162514264337593543950335');
+    expect(parseAmount('-79228162514264337593543950336')).toBeNull();
+    expect(amountDecimal(-0)).toBe('0');
+  });
+
+  it('rejects empty, malformed and non-numeric input', () => {
     expect(parseAmount('')).toBeNull();
     expect(parseAmount('abc')).toBeNull();
-    expect(parseAmount('0')).toBeNull();
-    expect(parseAmount('-5')).toBeNull();
+    expect(parseAmount('--5')).toBeNull();
+    expect(parseAmount('+-5')).toBeNull();
     expect(parseAmount('65,55,55')).toBeNull();
   });
 });
@@ -49,9 +60,10 @@ describe('validateExpenseInput (frame 3094:9937 rules)', () => {
     expect(validateExpenseInput(valid)).toEqual(NONE);
   });
 
-  it('flags a missing/non-positive amount', () => {
+  it('flags a missing amount but accepts signed and zero amounts', () => {
     expect(validateExpenseInput({ ...valid, amount: '' }).amount).toBeTruthy();
-    expect(validateExpenseInput({ ...valid, amount: '0' }).amount).toBeTruthy();
+    expect(validateExpenseInput({ ...valid, amount: '0' })).toEqual(NONE);
+    expect(validateExpenseInput({ ...valid, amount: '-1.25' })).toEqual(NONE);
   });
 
   it('flags an empty description', () => {

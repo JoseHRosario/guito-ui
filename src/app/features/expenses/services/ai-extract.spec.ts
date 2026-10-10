@@ -43,9 +43,15 @@ describe('AiExtractApi (POST /AI/extract, guito-ui#44)', () => {
     await expect(pending).rejects.toThrow('extract-unusable');
   });
 
-  it('rejects when the amount is missing or not positive (ADR 0010)', async () => {
+  it.each([0, -1.25])('accepts signed/zero proposal amount %s', async amount => {
+    const pending = api.extract('signed');
+    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount, description: 'Signed', category: 'Food' });
+    expect((await pending).amount).toBe(amount);
+  });
+
+  it('rejects when the amount is missing', async () => {
     const pending = api.extract('café');
-    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount: 0, description: 'Coco Verde', category: 'Eating out' });
+    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount: null, description: 'Coco Verde', category: 'Eating out' });
     await expect(pending).rejects.toThrow('extract-unusable');
   });
 

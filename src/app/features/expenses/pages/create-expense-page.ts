@@ -28,7 +28,7 @@ export interface VoicePrefillState {
 export interface BankPrefillState {
   bankPrefill: {
     description: string;
-    /** Absolute positive amount from the bank row (guito-api#90 stores DBIT positive). */
+    /** Bank amount as supplied; preserve its sign without inferring outflow semantics. */
     amount: number | string;
     amountExact?: string;
     /** ISO yyyy-MM-dd booking date. */
@@ -182,8 +182,7 @@ export class CreateExpensePage {
       .create({
         date: this.isoDate(),
         ...(this.timestampsEnabled ? { occurredAt: occurrence.occurredAt!, currency: 'EUR' as const } : {}),
-        // ADR 0010: amounts are stored positive — the outflow is implied by
-        // the record being an Expense. Post the parsed amount as-is.
+        // Preserve the supplied signed/zero decimal exactly; never infer a sign.
         amount: parsedAmount,
         description: this.description().trim(),
         category: this.category(),

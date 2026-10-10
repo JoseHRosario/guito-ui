@@ -65,7 +65,7 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     await fixture.whenStable();
   });
 
-  it.each(['123456789.123456789', '9007199254740993'])('posts exact manual decimal %s without Number rounding', async amount => {
+  it.each(['123456789.123456789', '9007199254740993', '0', '-1.25', '-123456789.123456789'])('posts exact manual decimal %s without Number rounding', async amount => {
     const el = boot();
     await loadCategories();
     for (const [id, value] of [['amount-input', amount], ['description-input', 'Exact']]) {
@@ -78,6 +78,20 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     expect(req.request.body.amount).toBe(amount);
     req.flush({ id: 'exact' });
     await fixture.whenStable();
+  });
+
+  it.each(['-79228162514264337593543950336', '-0.00000000000000000000000000001'])('blocks decimal overflow %s before POST', async amount => {
+    const el = boot();
+    await loadCategories();
+    for (const [id, value] of [['amount-input', amount], ['description-input', 'Overflow']]) {
+      const input = el.querySelector<HTMLInputElement>(`[data-testid="${id}"]`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    }
+    (el.querySelector('[data-testid="save-expense"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="field-error"]')?.textContent).toContain('Enter a valid decimal amount');
+    http.expectNone('https://api.test/Expense');
   });
 
   it('posts the edited Lisbon date and native time with a summer offset and unchanged positive amount', async () => {
@@ -169,7 +183,7 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.method).toBe('POST');
     const body = req.request.body as { amount: string; description: string; date: string; category: string };
-    expect(body.amount).toBe('65.55'); // ADR 0010: amounts stored positive — no negation.
+    expect(body.amount).toBe('65.55'); // Preserve the supplied sign — no negation.
     expect(body.description).toBe('Veggies and fruit');
     expect(body.category).toBe('Clothing');
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);

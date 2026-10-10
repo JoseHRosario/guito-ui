@@ -93,15 +93,19 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     await new Promise(r => setTimeout(r, 0));
   });
 
-  it.each(['voicePrefill', 'bankPrefill'])('retains exact decimal metadata and an arbitrary-offset instant from %s through POST', async channel => {
+  it.each([
+    ['voicePrefill', '123456789.123456789'], ['bankPrefill', '123456789.123456789'],
+    ['voicePrefill', '-123456789.123456789'], ['bankPrefill', '-123456789.123456789'],
+    ['voicePrefill', '0'], ['bankPrefill', '0'],
+  ])('retains exact decimal %s %s and an arbitrary-offset instant through POST', async (channel, amountExact) => {
     const occurredAt = '2026-07-02T05:45:27+05:30';
-    const amountExact = '123456789.123456789';
+
     await router.navigate(['/expenses/create'], { state: { [channel]: { ...BANK_PREFILL, occurredAt, amount: 123456789.12345679, amountExact } } });
     http.expectOne('https://api.test/Category').flush(CATEGORIES_WITH_SHOPPING);
     await new Promise(r => setTimeout(r, 0));
     harness.detectChanges();
     const page = el();
-    expect(page.querySelector<HTMLInputElement>('[data-testid=amount-input]')?.value).toBe('123456789,123456789');
+    expect(page.querySelector<HTMLInputElement>('[data-testid=amount-input]')?.value).toBe(amountExact === '0' ? '0,00' : amountExact.replace('.', ','));
     expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-07-02');
     expect(page.querySelector<HTMLInputElement>('[data-testid=time-input]')?.value).toBe('01:15');
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();

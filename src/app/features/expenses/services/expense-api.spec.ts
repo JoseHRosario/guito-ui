@@ -67,6 +67,28 @@ describe('ExpenseApi.latest', () => {
     delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;
   });
 
+  it.each(['0', '-1.25', '-123456789.123456789', 0, -1.25, -1e-7, -1e21])('creates signed/zero amount %s as exact decimal text', async amount => {
+    const expected = typeof amount === 'string' ? amount : amount === -1e-7 ? '-0.0000001' : amount === -1e21 ? '-1000000000000000000000' : String(amount);
+    const pending = TestBed.inject(ExpenseApi).create({ date: '2026-07-01', amount, description: 'Signed', category: 'Food' });
+    // Attach rejection handling before inspecting the HTTP seam.
+    const result = pending.catch(error => error);
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body.amount).toBe(expected);
+    req.flush({ id: '2147483647', updateDate: null });
+    expect(await result).toBe('2147483647');
+  });
+
+  it.each(['-79228162514264337593543950336', '-0.00000000000000000000000000001'])('rejects overflow %s before HTTP', async amount => {
+    await expect(TestBed.inject(ExpenseApi).create({ date: '2026-07-01', amount, description: 'Overflow', category: 'Food' })).rejects.toThrow('expense-amount-invalid');
+    http.expectNone('https://api.test/Expense');
+  });
+
+  it('keeps generated integer IDs opaque and ignores nullable updateDate', async () => {
+    const pending = TestBed.inject(ExpenseApi).latest();
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [{ id: '2147483647', storedOrder: 9, updateDate: null, creationDate: '2026-07-01', occurredAt: '2026-07-01T10:00:00+01:00', amount: -1.25, amountExact: '-1.25', category: 'Food' }] });
+    expect(await pending).toEqual([{ id: '2147483647', description: '', amount: -1.25, amountExact: '-1.25', date: '2026-07-01T10:00:00+01:00', category: 'Food', icon: 'tag' }]);
+  });
+
   it('retains latest amountExact without converting it to a Number', async () => {
     const pending = TestBed.inject(ExpenseApi).latest();
     http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [{ id: 'exact', amount: 9007199254740992, amountExact: '9007199254740993' }] });

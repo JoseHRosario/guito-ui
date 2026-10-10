@@ -8,9 +8,9 @@ export interface Favorite {
 
 /**
  * Hardcoded v1 seed (ADR 0012: client-side constants until the Postgres-backed,
- * user-configurable favorites land). `category` must match the sheet's
- * Category tab exactly; `amount` is stored positive (ADR 0010 — the API
- * rejects non-positive amounts).
+ * user-configurable favorites land). `category` must match an API category
+ * name; signed and zero amounts are valid. Presets are posted as supplied,
+ * without inferring or reversing their sign.
  */
 export const FAVORITES: readonly Favorite[] = [
   { name: 'Morning Coffee', amount: 2.3, description: 'Coco Verde', category: 'Eating out' },

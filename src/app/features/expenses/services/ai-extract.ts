@@ -10,7 +10,7 @@ export interface ExtractedExpense {
   /** ISO yyyy-MM-dd. */
   date: string;
   occurredAt?: string;
-  /** Positive (ADR 0010) — the outflow is implied by the record being an Expense. */
+  /** Signed or zero decimal; preserve the supplied sign through review and creation. */
   amount: number | string;
   amountExact?: string;
   description: string;

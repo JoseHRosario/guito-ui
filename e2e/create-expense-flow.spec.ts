@@ -7,7 +7,7 @@ import { stubExpensesApi, SESSION_KEY } from './helpers/stub-auth';
 // save → back to the list with the new row on top + "Expense saved" toast; a
 // favorite tap creates the preset immediately. The API is stubbed at the
 // transport level; the create POST mutates the stubbed list so the reload
-// genuinely shows the new row. Amounts are posted POSITIVE (ADR 0010).
+// genuinely shows the new row. Signed/zero amounts are posted as supplied.
 
 // Both responsive branches exist in the DOM; scope everything to the visible one.
 const vis = (testId: string): string => `[data-testid="${testId}"]:visible`;
@@ -56,6 +56,38 @@ async function stubExpenseApis(page: Page): Promise<{ expenses: typeof SEED_EXPE
 }
 
 test.describe('create expense flow (stubbed API, signed in)', () => {
+  for (const amount of ['0', '-1.25', '-123456789.123456789']) {
+    test(`saves signed/zero decimal ${amount} without transport rounding`, async ({ page }) => {
+      const state = await stubExpenseApis(page);
+      await seedSession(page);
+      await page.goto('/expenses/create');
+      await expect(page.locator(vis('category-select'))).toHaveValue('Clothing');
+      await page.locator(vis('amount-input')).fill(amount);
+      await page.locator(vis('description-input')).fill('Signed exact');
+      await page.locator(vis('save-expense')).click();
+      await expect(page).toHaveURL(/\/\?saved=1$/);
+      expect(state.created).toHaveLength(1);
+      expect(state.created[0]['amount']).toBe(amount);
+      expect('occurredAt' in state.created[0]).toBe(process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true');
+      await expect(page.locator('[data-testid="expense-row"]:visible').first()).toContainText('Signed exact');
+    });
+  }
+
+  test('decimal overflow remains on the form without POST', async ({ page }) => {
+    const state = await stubExpenseApis(page);
+    await seedSession(page);
+    await page.goto('/expenses/create');
+    await expect(page.locator(vis('category-select'))).toHaveValue('Clothing');
+    await page.locator(vis('description-input')).fill('Overflow');
+    for (const amount of ['-79228162514264337593543950336', '-0.00000000000000000000000000001']) {
+      await page.locator(vis('amount-input')).fill(amount);
+      await page.locator(vis('save-expense')).click();
+      await expect(page.locator('[data-testid="field-error"]:visible').first()).toContainText('Enter a valid decimal amount');
+      await expect(page).toHaveURL(/\/expenses\/create$/);
+      expect(state.created).toHaveLength(0);
+    }
+  });
+
   test('validation errors keep the user on the form without calling POST', async ({ page }) => {
     await stubExpenseApis(page);
     await seedSession(page);
