@@ -5,7 +5,7 @@ import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { amountDecimal } from './validate-expense';
 import { knownOccurrence, occurrenceDay } from './expense-time';
 
-/** What `POST /AI/extract` returns (camelCase wire DTO `ExpenseExtracted`). */
+/** Internal review prefill: one date shared with the bank/form, not a wire DTO. */
 export interface ExtractedExpense {
   /** ISO day or known offset timestamp, preserved until the user edits Date/Time. */
   date: string;
@@ -16,6 +16,8 @@ export interface ExtractedExpense {
 }
 
 interface ExtractedExpenseDto {
+  bookingDate?: string | null;
+  /** Old production response, accepted only at this boundary until cutover. */
   date?: string | null;
   amount?: string | number | null;
   description?: string | null;
@@ -40,14 +42,15 @@ export class AiExtractApi {
         prompt,
       }),
     );
-    const date = normalizeDate(response.date);
+    const bookingDate = response.bookingDate !== undefined ? response.bookingDate : response.date;
+    const date = normalizeDate(bookingDate);
     const amount = response.amount == null ? null : amountDecimal(response.amount);
     const description = (response.description ?? '').trim();
     const category = (response.category ?? '').trim();
     if (date === null || amount === null || description === '') {
       throw new Error('extract-unusable');
     }
-    return { date: knownOccurrence(response.date) ?? date, amount, description, category };
+    return { date: knownOccurrence(bookingDate) ?? date, amount, description, category };
   }
 }
 

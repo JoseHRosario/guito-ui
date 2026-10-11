@@ -30,18 +30,31 @@ production is **false**, development/staging are **true**, and an absent flag is
 legacy-safe (false). Production auto-deploy must not activate timestamps before
 the API's Postgres cutover. Enable production only after verifying persistence.
 
-When enabled, `POST /Expense` sends `{date: ISO8601-with-offset,
+When enabled, `POST /Expense` sends `{bookingDate: ISO8601-with-offset,
 currency: 'EUR', amount, description, category}` and the
-approved Time control/validation applies. When disabled, Time is not rendered or
-validated and POST sends **only** `{date, amount, description, category}`. The
-central ExpenseApi gate applies to every create path, including favorites.
-The single create-request `date` maps to the API's booking date. The central
-transport receives one `date`: offset timestamp when enabled, otherwise its
-Lisbon day. It never forwards an `occurredAt` request property. Prefills also
-carry one date; only visual wall-clock resolution helpers retain purposeful parts.
-Latest uses only `bookingDate`.
-The API types create Date internally without changing its JSON wire name. Known
-offset timestamps retain fractional seconds (up to microseconds) verbatim.
+approved Time control/validation applies. The new API requires `bookingDate`
+(strongly typed DateTimeOffset internally) and rejects the old request `date`.
+When disabled or absent, Time is not rendered or validated and POST sends
+**only** `{date, amount, description, category}` to the old production API.
+The central ExpenseApi gate selects exactly one wire field for every create
+path, including bank, voice and favorites; it never sends both fields or
+forwards an `occurredAt` property.
+
+Production API and UI require a **coordinated cutover**: keep production's flag
+false while the old API/Sheets is serving; deploy the new Postgres API together
+with a production UI built with the flag true, then verify persistence. Deploying
+only the new API breaks old `date` writes; enabling only the UI breaks the old
+API. Staging is already opted in. No deployment is implied by local tests.
+
+AI responses now use `bookingDate`; the adapter prefers it over legacy `date`
+(and explicit null is unusable, never a fallback). Legacy `date` is accepted
+only at the HTTP boundary for old production until cutover. We deliberately
+retain the existing single internal review-prefill `date`, shared by voice,
+bank and the form, rather than duplicate it with `bookingDate`: this is form
+input data, not a wire DTO. Date/Time wall-clock helper names remain purposeful.
+Latest remains unchanged with canonical `bookingDate`. Known offset timestamps
+retain fractional seconds (up to microseconds) verbatim. API TimeService and DTO
+validation refactoring does not change these UI endpoint shapes or visuals.
 Sheets explicitly returns 409 for precise timestamp input; it does not support
 occurrence writes. Never discard an enabled timestamp to retry as legacy.
 

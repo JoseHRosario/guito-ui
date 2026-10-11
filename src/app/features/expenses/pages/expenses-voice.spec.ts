@@ -38,7 +38,7 @@ class FakeRecognition {
   }
 }
 
-const EXTRACT_OK = { date: '2026-10-02T00:00:00Z', amount: '2.3', description: 'Coco Verde', category: 'Eating out' };
+const EXTRACT_OK = { bookingDate: '2026-10-02T00:00:00Z', amount: '2.3', description: 'Coco Verde', category: 'Eating out' };
 
 describe('ExpensesPage voice capture (issue #44, frames 3141:2 / 3141:180)', () => {
   let http: HttpTestingController;

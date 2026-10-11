@@ -62,7 +62,8 @@ describe('ExpenseApi.latest', () => {
     const pending = TestBed.inject(ExpenseApi).create(input);
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.body).not.toHaveProperty('occurredAt');
-    expect(req.request.body).toEqual({ date: expenseTimestampsEnabled === true ? input.date : '2026-07-02', ...(expenseTimestampsEnabled === true ? { currency: input.currency } : {}), amount: input.amount, description: input.description, category: input.category });
+    expect(req.request.body).not.toHaveProperty(expenseTimestampsEnabled === true ? 'date' : 'bookingDate');
+    expect(req.request.body).toEqual({ [expenseTimestampsEnabled === true ? 'bookingDate' : 'date']: expenseTimestampsEnabled === true ? input.date : '2026-07-02', ...(expenseTimestampsEnabled === true ? { currency: input.currency } : {}), amount: input.amount, description: input.description, category: input.category });
     req.flush({ id: 123 });
     await expect(pending).resolves.toBe(123);
     delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;
@@ -74,7 +75,7 @@ describe('ExpenseApi.latest', () => {
     const input = { date: '2026-07-02', amount: '0', description: 'Fallback', category: 'Food', updateDate: null, unexpected: 'must not forward' };
     const pending = TestBed.inject(ExpenseApi).create(input);
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toEqual({ date: input.date, amount: '0', description: input.description, category: input.category });
+    expect(req.request.body).toEqual({ bookingDate: input.date, amount: '0', description: input.description, category: input.category });
     req.flush({ id: 123 });
     await expect(pending).resolves.toBe(123);
     delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;

@@ -72,7 +72,8 @@ export class ExpenseApi {
     if (amount === null) throw new Error('expense-amount-invalid');
     const timestampsEnabled = this.env.expenseTimestampsEnabled === true;
     const body = {
-      date: timestampsEnabled ? input.date : occurrenceDay(input.date),
+      // New API requires bookingDate; production Sheets keeps date until coordinated cutover.
+      [timestampsEnabled ? 'bookingDate' : 'date']: timestampsEnabled ? input.date : occurrenceDay(input.date),
       amount,
       description: input.description,
       category: input.category,

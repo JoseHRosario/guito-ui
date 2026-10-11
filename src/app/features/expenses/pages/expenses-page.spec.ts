@@ -252,12 +252,13 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
 
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.method).toBe('POST');
-    const body = req.request.body as { amount: string; description: string; date: string; category: string };
+    const body = req.request.body as { amount: string; description: string; bookingDate: string; category: string };
     expect(body.amount).toBe('2.3');
     expect(body.description).toBe('Coco Verde');
     expect(body.category).toBe('Eating out');
     expect(body).not.toHaveProperty('occurredAt');
-    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
+    expect(body).not.toHaveProperty('date');
+    expect(body.bookingDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
     req.flush({ id: 123 });
     fixture.detectChanges();
 

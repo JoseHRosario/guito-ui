@@ -64,7 +64,7 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-10-25');
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toMatchObject({ date: occurredAt, currency: 'EUR', amount: '58.93' });
+    expect(req.request.body).toMatchObject({ bookingDate: occurredAt, currency: 'EUR', amount: '58.93' });
     req.flush('retry', { status: 500, statusText: 'Server Error' });
     await new Promise(r => setTimeout(r, 0));
     const time = page.querySelector<HTMLInputElement>('[data-testid=time-input]')!;
@@ -88,7 +88,7 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-10-02');
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body.date).toBe('2026-10-02T00:15:00+01:00');
+    expect(req.request.body.bookingDate).toBe('2026-10-02T00:15:00+01:00');
     req.flush({ id: 123 });
     await new Promise(r => setTimeout(r, 0));
   });
@@ -112,7 +112,8 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.body).not.toHaveProperty('occurredAt');
-    expect(req.request.body).toMatchObject({ date: occurredAt, amount: exactAmount });
+    expect(req.request.body).not.toHaveProperty('date');
+    expect(req.request.body).toMatchObject({ bookingDate: occurredAt, amount: exactAmount });
     req.flush({ id: 123 });
     await new Promise(r => setTimeout(r, 0));
   });

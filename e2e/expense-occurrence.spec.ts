@@ -74,7 +74,7 @@ for (const [name, viewport, date, offset] of [
     const hold = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/Expense', async route => {
       posts++;
-      expect(route.request().postDataJSON()).toEqual({ date: `${date}T09:30:00${offset}`, currency: 'EUR', amount: '9007199254740993', description: 'Veggies and fruit', category: 'Clothing' });
+      expect(route.request().postDataJSON()).toEqual({ bookingDate: `${date}T09:30:00${offset}`, currency: 'EUR', amount: '9007199254740993', description: 'Veggies and fruit', category: 'Clothing' });
       await hold;
       await route.fulfill({ json: { id: 99 } });
     });
