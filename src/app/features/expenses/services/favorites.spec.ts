@@ -16,6 +16,6 @@ describe('FAVORITES seed (issue #43, ADR 0012)', () => {
 
   it('seeds Morning Coffee against the existing sheet category', () => {
     const coffee = FAVORITES.find((f) => f.name === 'Morning Coffee');
-    expect(coffee).toEqual({ name: 'Morning Coffee', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
+    expect(coffee).toEqual({ name: 'Morning Coffee', amount: '2.3', description: 'Coco Verde', category: 'Eating out' });
   });
 });

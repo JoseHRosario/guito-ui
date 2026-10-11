@@ -12,9 +12,9 @@ import { BankPage } from './bank-page';
 const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 
 const PENDING = [
-  { id: 7, bookingDate: '2026-10-02', amount: 58.93, currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategoryId: 3, suggestedCategory: 'Shopping' },
-  { id: 8, bookingDate: '2026-10-02', amount: 12.4, currency: 'EUR', remittanceInformation: 'MB WAY PURCHASE 4477 LISBOA', suggestedCategoryId: 2, suggestedCategory: 'Eating out' },
-  { id: 9, bookingDate: '2026-10-01', amount: 200, currency: 'EUR', remittanceInformation: 'TRF MB WAY PARA MARIA S', suggestedCategory: null },
+  { id: 7, bookingDate: '2026-10-02', amount: '58.93', currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategoryId: 3, suggestedCategory: 'Shopping' },
+  { id: 8, bookingDate: '2026-10-02', amount: '12.4', currency: 'EUR', remittanceInformation: 'MB WAY PURCHASE 4477 LISBOA', suggestedCategoryId: 2, suggestedCategory: 'Eating out' },
+  { id: 9, bookingDate: '2026-10-01', amount: '200', currency: 'EUR', remittanceInformation: 'TRF MB WAY PARA MARIA S', suggestedCategory: null },
 ];
 
 function setup(): HttpTestingController {
@@ -289,7 +289,7 @@ describe('BankPage (issue #61)', () => {
       state: {
         bankPrefill: {
           description: 'CONTINENTE ONLINE 8831',
-          amount: 58.93,
+          amount: '58.93',
           date: '2026-10-02',
           category: 'Shopping',
         },

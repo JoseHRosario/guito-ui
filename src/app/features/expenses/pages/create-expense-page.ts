@@ -29,11 +29,9 @@ export interface BankPrefillState {
   bankPrefill: {
     description: string;
     /** Bank amount as supplied; preserve its sign without inferring outflow semantics. */
-    amount: number | string;
-    amountExact?: string;
+    amount: string;
     /** ISO yyyy-MM-dd booking date. */
     date: string;
-    occurredAt?: string;
     /** Jev-suggested category name; '' when the API had no suggestion. */
     category: string;
   };
@@ -103,9 +101,9 @@ export class CreateExpensePage {
       },
     );
     if (prefill) {
-      this.amount.set(amountText(prefill.amountExact ?? prefill.amount));
+      this.amount.set(amountText(prefill.amount));
       this.description.set(prefill.description);
-      const known = knownOccurrence(prefill.occurredAt) ?? knownOccurrence(prefill.date);
+      const known = knownOccurrence(prefill.date);
       if (known) {
         const fields = lisbonFields(new Date(known));
         this.isoDate.set(fields.date);
@@ -180,8 +178,8 @@ export class CreateExpensePage {
     if (parsedAmount === null) return; // unreachable: validation gates above
     void this.expenseApi
       .create({
-        date: this.isoDate(),
-        ...(this.timestampsEnabled ? { occurredAt: occurrence.occurredAt!, currency: 'EUR' as const } : {}),
+        date: this.timestampsEnabled ? occurrence.occurredAt! : this.isoDate(),
+        ...(this.timestampsEnabled ? { currency: 'EUR' as const } : {}),
         // Preserve the supplied signed/zero decimal exactly; never infer a sign.
         amount: parsedAmount,
         description: this.description().trim(),

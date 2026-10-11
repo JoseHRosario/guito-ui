@@ -12,8 +12,8 @@ const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 
 const API_EXPENSES = {
   expenses: [
-    { id: 'opaque/expense-id', storedOrder: 12, occurredAt: '2021-01-03T10:12:00+00:00', date: '2021-01-03T10:12:00', amount: -65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
-    { storedOrder: 13, date: '2021-01-02T08:00:00', amount: 2500, description: 'Salary', category: null, creatorEmail: null },
+    { id: 12, bookingDate: '2021-01-03T10:12:00+00:00', amount: '-65.55', description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
+    { id: 13, bookingDate: '2021-01-02T08:00:00', amount: '2500', description: 'Salary', category: null, creatorEmail: null },
   ],
 };
 
@@ -50,21 +50,21 @@ describe('ExpenseApi.latest', () => {
     req.flush(API_EXPENSES);
 
     await expect(promise).resolves.toEqual([
-      { id: 'opaque/expense-id', description: 'H&M', amount: -65.55, date: '2021-01-03T10:12:00+00:00', category: 'Clothing', icon: 'tag' },
-      { id: '13', description: 'Salary', amount: 2500, date: '2021-01-02T08:00:00', category: '', icon: 'tag' },
+      { id: 12, description: 'H&M', amount: '-65.55', bookingDate: '2021-01-03T10:12:00+00:00', category: 'Clothing', icon: 'tag' },
+      { id: 13, description: 'Salary', amount: '2500', bookingDate: '2021-01-02T08:00:00', category: '', icon: 'tag' },
     ]);
   });
 
   it.each([undefined, false, true])('create centrally gates all callers with capability %s', async expenseTimestampsEnabled => {
     const env = TestBed.inject(APP_ENVIRONMENT);
     Object.assign(env, { expenseTimestampsEnabled });
-    const input = { date: '2026-07-02', occurredAt: '2026-07-02T05:45:27.123456+05:30', currency: 'EUR' as const, amount: '9007199254740993', description: 'Exact', category: 'Food' };
+    const input = { date: '2026-07-02T05:45:27.123456+05:30', currency: 'EUR' as const, amount: '9007199254740993', description: 'Exact', category: 'Food' };
     const pending = TestBed.inject(ExpenseApi).create(input);
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.body).not.toHaveProperty('occurredAt');
-    expect(req.request.body).toEqual({ date: expenseTimestampsEnabled === true ? input.occurredAt : input.date, ...(expenseTimestampsEnabled === true ? { currency: input.currency } : {}), amount: input.amount, description: input.description, category: input.category });
-    req.flush({ id: 'opaque' });
-    await expect(pending).resolves.toBe('opaque');
+    expect(req.request.body).toEqual({ date: expenseTimestampsEnabled === true ? input.date : '2026-07-02', ...(expenseTimestampsEnabled === true ? { currency: input.currency } : {}), amount: input.amount, description: input.description, category: input.category });
+    req.flush({ id: 123 });
+    await expect(pending).resolves.toBe(123);
     delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;
   });
 
@@ -75,8 +75,8 @@ describe('ExpenseApi.latest', () => {
     const pending = TestBed.inject(ExpenseApi).create(input);
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.body).toEqual({ date: input.date, amount: '0', description: input.description, category: input.category });
-    req.flush({ id: 'opaque' });
-    await expect(pending).resolves.toBe('opaque');
+    req.flush({ id: 123 });
+    await expect(pending).resolves.toBe(123);
     delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;
   });
 
@@ -88,7 +88,7 @@ describe('ExpenseApi.latest', () => {
     const req = http.expectOne('https://api.test/Expense');
     expect(req.request.body.amount).toBe(expected);
     req.flush({ id: '2147483647', updateDate: null });
-    expect(await result).toBe('2147483647');
+    expect(await result).toBe(2147483647);
   });
 
   it.each(['-79228162514264337593543950336', '-0.00000000000000000000000000001'])('rejects overflow %s before HTTP', async amount => {
@@ -96,16 +96,34 @@ describe('ExpenseApi.latest', () => {
     http.expectNone('https://api.test/Expense');
   });
 
-  it('keeps generated integer IDs opaque and ignores nullable updateDate', async () => {
+  it('keeps generated integer IDs numeric and ignores nullable updateDate', async () => {
     const pending = TestBed.inject(ExpenseApi).latest();
-    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [{ id: '2147483647', storedOrder: 9, updateDate: null, creationDate: '2026-07-01', occurredAt: '2026-07-01T10:00:00+01:00', amount: -1.25, amountExact: '-1.25', category: 'Food' }] });
-    expect(await pending).toEqual([{ id: '2147483647', description: '', amount: -1.25, amountExact: '-1.25', date: '2026-07-01T10:00:00+01:00', category: 'Food', icon: 'tag' }]);
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [{ id: 2147483647, updateDate: null, creationDate: '2026-07-01', bookingDate: '2026-07-01T10:00:00+01:00', amount: '-1.25', category: 'Food' }] });
+    expect(await pending).toEqual([{ id: 2147483647, description: '', amount: '-1.25', bookingDate: '2026-07-01T10:00:00+01:00', category: 'Food', icon: 'tag' }]);
   });
 
-  it('retains latest amountExact without converting it to a Number', async () => {
+  it('retains latest amount without converting it to a Number', async () => {
     const pending = TestBed.inject(ExpenseApi).latest();
-    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [{ id: 'exact', amount: 9007199254740992, amountExact: '9007199254740993' }] });
-    expect((await pending)[0].amountExact).toBe('9007199254740993');
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [{ id: 123, bookingDate: '2026-07-02T05:45:27.123456+05:30', amount: '9007199254740993' }] });
+    expect((await pending)[0].amount).toBe('9007199254740993');
+  });
+
+  it('tolerates legacy date/numeric amount without inventing ordinal identity', async () => {
+    const pending = TestBed.inject(ExpenseApi).latest();
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [
+      { storedOrder: 12, date: '2021-01-03T10:12:00', amount: -1e-7 },
+      { id: 23, bookingDate: null, date: '1900-01-01', amount: null },
+    ] });
+    expect(await pending).toEqual([
+      { id: null, bookingDate: '2021-01-03T10:12:00', amount: '-0.0000001', description: '', category: '', icon: 'tag' },
+      { id: 23, bookingDate: null, amount: null, description: '', category: '', icon: 'tag' },
+    ]);
+  });
+
+  it.each([123, '123', 'old-sheet-id'])('adapts create ID %s without retaining string IDs', async id => {
+    const pending = TestBed.inject(ExpenseApi).create({ date: '2026-07-02', amount: '0', description: 'Legacy', category: 'Food' });
+    http.expectOne('https://api.test/Expense').flush({ id });
+    expect(await pending).toBe(id === 'old-sheet-id' ? null : 123);
   });
 
   it('tolerates a missing expenses array' , async () => {

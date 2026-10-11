@@ -70,7 +70,7 @@ test.describe('Bank review page (issue #61, stubbed data, signed in)', () => {
     let body: Record<string, unknown> | undefined;
     await page.route('**/Expense', async route => {
       body = route.request().postDataJSON();
-      await route.fulfill({ json: { id: 'bank-exact' } });
+      await route.fulfill({ json: { id: 99 } });
     });
     await page.locator('[data-testid="save-expense"]:visible').click();
     await expect(page).toHaveURL(/saved=1/);

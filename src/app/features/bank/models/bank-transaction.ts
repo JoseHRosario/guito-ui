@@ -14,8 +14,7 @@ export interface BankTransaction {
   /** Booking date as ISO yyyy-MM-dd. */
   date: string;
   /** Amount supplied by the API; current debit imports arrive positive. */
-  amount: number;
-  amountExact?: string;
+  amount: string;
   currency: string;
   /** Remittance information — the bank's raw description string. */
   description: string;

@@ -178,7 +178,6 @@ export class BankPage {
         bankPrefill: {
           description: transaction.description,
           amount: transaction.amount,
-          ...(transaction.amountExact ? { amountExact: transaction.amountExact } : {}),
           date: transaction.date,
           category: transaction.suggestedCategory?.name ?? '',
         },
@@ -192,6 +191,6 @@ export class BankPage {
 
   /** pt-PT EUR for the common case; any other currency falls back to a plain 2-decimal render. */
   protected amountFor(transaction: BankTransaction): string {
-    return transaction.currency === 'EUR' ? formatEur(transaction.amount) : `${transaction.amount.toFixed(2)} ${transaction.currency}`;
+    return transaction.currency === 'EUR' ? formatEur(transaction.amount) : `${Number(transaction.amount).toFixed(2)} ${transaction.currency}`;
   }
 }

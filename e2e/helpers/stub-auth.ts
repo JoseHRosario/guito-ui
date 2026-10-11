@@ -15,13 +15,13 @@ export const SESSION_KEY = 'guito.auth.session';
 const STUB_API_EXPENSES = {
   expenses: [
     // Representative positive fixtures; signed and zero Expenses are also valid.
-    { id: 'expense-1', occurredAt: '2021-01-03T10:12:00+00:00', currency: 'EUR', date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
-    { id: 'expense-2', occurredAt: '2021-01-03T11:30:00+00:00', currency: 'EUR', date: '2021-01-03T11:30:00', amount: 80.0, description: 'T-Mobile', category: 'Broadband', creatorEmail: 'e2e@guito.app' },
-    { id: 'expense-3', occurredAt: '2021-01-03T14:45:00+00:00', currency: 'EUR', date: '2021-01-03T14:45:00', amount: 120.0, description: 'Walmart', category: 'Shopping', creatorEmail: 'e2e@guito.app' },
-    { id: 'expense-4', occurredAt: '2021-01-03T18:20:00+00:00', currency: 'EUR', date: '2021-01-03T18:20:00', amount: 150.6, description: 'Con Edison', category: 'Bills', creatorEmail: 'e2e@guito.app' },
-    { id: 'expense-5', occurredAt: '2021-01-02T08:00:00+00:00', currency: 'EUR', date: '2021-01-02T08:00:00', amount: 30.15, description: 'Netflix', category: 'Entertainment', creatorEmail: 'e2e@guito.app' },
-    { id: 'expense-6', occurredAt: '2021-01-02T09:15:00+00:00', currency: 'EUR', date: '2021-01-02T09:15:00', amount: 55.0, description: 'Starbucks', category: 'Snacks', creatorEmail: 'e2e@guito.app' },
-    { id: 'expense-7', occurredAt: '2021-01-02T17:40:00+00:00', currency: 'EUR', date: '2021-01-02T17:40:00', amount: 78.4, description: 'CVS Pharmacy', category: 'Health', creatorEmail: 'e2e@guito.app' },
+    { id: 1, bookingDate: '2021-01-03T10:12:00+00:00', currency: 'EUR', amount: '65.55', description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
+    { id: 2, bookingDate: '2021-01-03T11:30:00+00:00', currency: 'EUR', amount: '80.0', description: 'T-Mobile', category: 'Broadband', creatorEmail: 'e2e@guito.app' },
+    { id: 3, bookingDate: '2021-01-03T14:45:00+00:00', currency: 'EUR', amount: '120.0', description: 'Walmart', category: 'Shopping', creatorEmail: 'e2e@guito.app' },
+    { id: 4, bookingDate: '2021-01-03T18:20:00+00:00', currency: 'EUR', amount: '150.6', description: 'Con Edison', category: 'Bills', creatorEmail: 'e2e@guito.app' },
+    { id: 5, bookingDate: '2021-01-02T08:00:00+00:00', currency: 'EUR', amount: '30.15', description: 'Netflix', category: 'Entertainment', creatorEmail: 'e2e@guito.app' },
+    { id: 6, bookingDate: '2021-01-02T09:15:00+00:00', currency: 'EUR', amount: '55.0', description: 'Starbucks', category: 'Snacks', creatorEmail: 'e2e@guito.app' },
+    { id: 7, bookingDate: '2021-01-02T17:40:00+00:00', currency: 'EUR', amount: '78.4', description: 'CVS Pharmacy', category: 'Health', creatorEmail: 'e2e@guito.app' },
   ],
 };
 

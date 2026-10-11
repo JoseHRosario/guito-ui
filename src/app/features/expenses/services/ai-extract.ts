@@ -7,21 +7,17 @@ import { knownOccurrence, occurrenceDay } from './expense-time';
 
 /** What `POST /AI/extract` returns (camelCase wire DTO `ExpenseExtracted`). */
 export interface ExtractedExpense {
-  /** ISO yyyy-MM-dd. */
+  /** ISO day or known offset timestamp, preserved until the user edits Date/Time. */
   date: string;
-  occurredAt?: string;
   /** Signed or zero decimal; preserve the supplied sign through review and creation. */
-  amount: number | string;
-  amountExact?: string;
+  amount: string;
   description: string;
   category: string;
 }
 
 interface ExtractedExpenseDto {
   date?: string | null;
-  occurredAt?: string | null;
-  amount?: number | null;
-  amountExact?: string | null;
+  amount?: string | number | null;
   description?: string | null;
   category?: string | null;
 }
@@ -45,16 +41,13 @@ export class AiExtractApi {
       }),
     );
     const date = normalizeDate(response.date);
-    const amountExact = response.amountExact === undefined || response.amountExact === null ? undefined : amountDecimal(response.amountExact);
-    const amount = response.amount ?? amountExact ?? null;
-    const normalized = amountExact === undefined ? (amount === null ? null : amountDecimal(amount)) : amountExact;
+    const amount = response.amount == null ? null : amountDecimal(response.amount);
     const description = (response.description ?? '').trim();
     const category = (response.category ?? '').trim();
-    if (date === null || amount === null || normalized === null || description === '') {
+    if (date === null || amount === null || description === '') {
       throw new Error('extract-unusable');
     }
-    const occurredAt = knownOccurrence(response.occurredAt) ?? knownOccurrence(response.date);
-    return { date, amount, ...(amountExact ? { amountExact } : {}), description, category, ...(occurredAt ? { occurredAt } : {}) };
+    return { date: knownOccurrence(response.date) ?? date, amount, description, category };
   }
 }
 

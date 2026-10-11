@@ -1,7 +1,7 @@
 /** A Favorite: a saved Expense preset that creates an Expense in one tap (guito-ui#43, ADR 0012). */
 export interface Favorite {
   readonly name: string;
-  readonly amount: number;
+  readonly amount: string;
   readonly description: string;
   readonly category: string;
 }
@@ -13,5 +13,5 @@ export interface Favorite {
  * without inferring or reversing their sign.
  */
 export const FAVORITES: readonly Favorite[] = [
-  { name: 'Morning Coffee', amount: 2.3, description: 'Coco Verde', category: 'Eating out' },
+  { name: 'Morning Coffee', amount: '2.3', description: 'Coco Verde', category: 'Eating out' },
 ];

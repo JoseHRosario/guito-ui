@@ -1,4 +1,4 @@
-# Expense occurrence: Lisbon wall clock and opaque identity
+# Expense booking date: Lisbon wall clock and numeric identity
 
 ## Decision (guito-api#128)
 
@@ -36,9 +36,11 @@ approved Time control/validation applies. When disabled, Time is not rendered or
 validated and POST sends **only** `{date, amount, description, category}`. The
 central ExpenseApi gate applies to every create path, including favorites.
 The single create-request `date` maps to the API's booking date. The central
-transport selects internal `occurredAt ?? date` when enabled, otherwise the legacy
-date-only `date`; it never forwards an `occurredAt` request property. Internal
-form/prefill and latest-response `date`/`occurredAt` contracts are unchanged. Known
+transport receives one `date`: offset timestamp when enabled, otherwise its
+Lisbon day. It never forwards an `occurredAt` request property. Prefills also
+carry one date; only visual wall-clock resolution helpers retain purposeful parts.
+Latest uses only `bookingDate`.
+The API types create Date internally without changing its JSON wire name. Known
 offset timestamps retain fractional seconds (up to microseconds) verbatim.
 Sheets explicitly returns 409 for precise timestamp input; it does not support
 occurrence writes. Never discard an enabled timestamp to retry as legacy.
@@ -50,23 +52,29 @@ schema review); no automatic sign reversal is applied to manual, voice, bank or
 favorite values. An optional leading plus is normalized away, and negative zero
 becomes `0`. .NET decimal's 96-bit coefficient / scale <=28 are checked textually
 against the absolute coefficient before submission. The coordinated API accepts numeric or
-string amounts; old numeric clients remain compatible. Latest/AI DTOs keep their
-numeric `amount` for display compatibility and may supply `amountExact`; prefills
-prefer that sibling (including bank metadata when supplied). Without exact
+string amounts; old numeric clients remain compatible. Latest/AI publish a single exact decimal-string `amount`, not `amountExact`.
+Expense/AI/bank prefills and favorites retain only canonical decimal text.
+The bank endpoint's unrelated numeric amount/optional amountExact contract stays
+unchanged: normalize at the bank HTTP mapping boundary, prefer exact metadata
+when supplied, then discard the sibling. Number conversion is rendering-only. Without exact
 metadata, numeric prefills/favorites preserve the value already represented by
 the Number's string serialization, not precision previously lost upstream.
 Trailing insignificant zeros may be normalized; no two-decimal transport rounding
 is applied. Bank display formatting/suggestion logic is unchanged. UI deployment
 alone does **not** prove the API's decimal-string contract or persistence.
 
-Create returns `{id: string}` including generated integer IDs serialized as
-strings; the UI treats it as opaque. Nullable `updateDate` is audit metadata,
-ignored by list mapping and never substituted for `occurredAt`. Numeric old-server
-responses are tolerated by converting them to strings, never ordinals extracted
-from new IDs. Latest remains wrapped in `{expenses: [...]}`. Real `id` wins over
-`storedOrder` unchanged; `occurredAt` wins over legacy `date`. Old-server
-`storedOrder` fallback is rendering-only compatibility, **not durable identity**,
-and must not be used for reconciliation or persisted references. The list groups
+Create returns `{id: number}`; all usable expense IDs are positive safe integers.
+The HTTP adapter accepts digit-only legacy ID strings as numbers. Legacy opaque
+create IDs still acknowledge a successful write but return null identity; callers
+do not currently consume that identity. Legacy latest rows without a numeric ID
+retain null identity and track by row object, never by storedOrder or array index.
+Bank and category IDs remain strings. Latest remains wrapped in `{expenses: [...]}`
+and maps only `bookingDate` (nullable) plus a single exact-string amount (nullable).
+Legacy production `date`/numeric amount are accepted at the HTTP boundary only;
+explicit bookingDate null never falls back to a date or audit field. Numeric
+compatibility cannot recover digits already lost by the server. Nullable audit
+creationDate/updateDate are not occurrence fallbacks. Missing dates group as
+Unknown date; missing amounts display an em dash, not an invented zero. The list groups
 by Lisbon occurrence day and preserves the server's descending timestamp order
 within each day; it does not re-sort by ID, audit timestamps or offset strings.
 Creation/update audit timestamps are not expense dates.
@@ -102,7 +110,7 @@ Agreed seams: rendered Angular components/router navigation and Chromium browser
 flows with transport stubs. Tracers were run red then green for Time/POST,
 voice timestamp preservation and prefill precision. Coverage includes Lisbon now
 near UTC midnight, summer/winter offsets, DST gap/fold rejection, preservation of
-known fold instants until edit, voice/bank date-only defaults, opaque list IDs,
+known fold instants until edit, voice/bank date-only defaults, numeric list IDs,
 server row order, signed/zero precision and overflow rejection, save loading/retry, and mobile/desktop
 alignment in a non-Lisbon browser timezone. No live API, Postgres persistence,
 AWS, real speech recognition, Safari/Firefox or real bank consent was exercised.

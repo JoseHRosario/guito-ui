@@ -20,7 +20,7 @@ const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 
 const API_RESPONSE = {
   expenses: [
-    { storedOrder: 12, date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
+    { id: 12, bookingDate: '2021-01-03T10:12:00', amount: '65.55', description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
   ],
 };
 

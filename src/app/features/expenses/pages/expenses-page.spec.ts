@@ -14,8 +14,8 @@ const CATEGORIES_RESPONSE = { categories: [{ name: 'Clothing' }, { name: 'Food' 
 
 const API_RESPONSE = {
   expenses: [
-    { storedOrder: 12, date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
-    { storedOrder: 13, date: '2021-01-02T08:00:00', amount: 30, description: 'Bus pass', category: 'Transportation', creatorEmail: null },
+    { id: 12, bookingDate: '2021-01-03T10:12:00', amount: '65.55', description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' },
+    { id: 13, bookingDate: '2021-01-02T08:00:00', amount: '30', description: 'Bus pass', category: 'Transportation', creatorEmail: null },
   ],
 };
 
@@ -75,18 +75,18 @@ describe('ExpensesPage (live API, guito-api#9)', () => {
     expect(pageEl.querySelector('[data-testid="summary-expense"]')).toBeNull();
   });
 
-  it('groups offset timestamps by Lisbon occurrence day and retains server order and opaque IDs', async () => {
+  it('groups offset timestamps by Lisbon occurrence day and retains server order and numeric IDs', async () => {
     const page = render();
     latestRequest().flush({ expenses: [
-      { id: 'id-A/not-an-ordinal', storedOrder: 9, date: '1900-01-01', occurredAt: '2026-07-01T23:30:00Z', amount: 20, description: 'Newest', category: 'Food' },
-      { id: 'id-B/not-an-ordinal', storedOrder: 8, date: '1900-01-01', occurredAt: '2026-07-02T00:10:00+01:00', amount: 10, description: 'Earlier', category: 'Food' },
+      { id: 9, bookingDate: '2026-07-01T23:30:00Z', amount: '20', description: 'Newest', category: 'Food' },
+      { id: 8, bookingDate: '2026-07-02T00:10:00+01:00', amount: '10', description: 'Earlier', category: 'Food' },
     ] });
     await vi.waitFor(() => {
       fixture.detectChanges();
       expect(page.querySelector('[data-testid=group-header]')?.textContent).toContain('Jul 02, Thursday');
     });
     const rows = [...page.querySelectorAll('[data-testid=expense-row]')].slice(0, 2);
-    expect(rows.map(row => row.getAttribute('data-expense-id'))).toEqual(['id-A/not-an-ordinal', 'id-B/not-an-ordinal']);
+    expect(rows.map(row => row.getAttribute('data-expense-id'))).toEqual(['9', '8']);
     expect(rows[0].textContent).toContain('Newest');
     expect(rows[1].textContent).toContain('Earlier');
   });
@@ -226,8 +226,9 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     }
   });
 
-  function renderWithList(): HTMLElement {
+  function renderWithList(exactAmount?: string): HTMLElement {
     fixture = TestBed.createComponent(ExpensesPage);
+    if (exactAmount !== undefined) Object.defineProperty(fixture.componentInstance, 'favorites', { value: [{ name: 'Exact preset', amount: exactAmount, description: 'Exact', category: 'Food' }] });
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
@@ -257,7 +258,7 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     expect(body.category).toBe('Eating out');
     expect(body).not.toHaveProperty('occurredAt');
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
-    req.flush({ id: 'favorite-opaque-id' });
+    req.flush({ id: 123 });
     fixture.detectChanges();
 
     // The success path refreshes the list in place (component reuse on
@@ -272,6 +273,18 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     fixture.detectChanges();
     expect(el.querySelector('[data-testid="favorite-spinner"]')).toBeNull();
+  });
+
+  it.each(['0', '-1.25', '9007199254740993', '-123456789.123456789'])('favorite button persists single exact amount %s', async amount => {
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const el = renderWithList(amount);
+    (el.querySelector('[data-testid=speed-dial-favorite-exact-preset]') as HTMLButtonElement).click();
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body.amount).toBe(amount);
+    expect(req.request.body).not.toHaveProperty('amountExact');
+    req.flush({ id: 123 });
+    await new Promise(r => setTimeout(r, 0));
+    http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [] });
   });
 
   it('the scrim closes the speed-dial without navigating', () => {

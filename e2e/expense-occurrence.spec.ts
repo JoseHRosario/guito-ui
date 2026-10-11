@@ -76,7 +76,7 @@ for (const [name, viewport, date, offset] of [
       posts++;
       expect(route.request().postDataJSON()).toEqual({ date: `${date}T09:30:00${offset}`, currency: 'EUR', amount: '9007199254740993', description: 'Veggies and fruit', category: 'Clothing' });
       await hold;
-      await route.fulfill({ json: { id: 'opaque/not-a-sheet-ordinal' } });
+      await route.fulfill({ json: { id: 99 } });
     });
     await page.locator(visible('save-expense')).click();
     await expect.poll(() => posts).toBe(1);

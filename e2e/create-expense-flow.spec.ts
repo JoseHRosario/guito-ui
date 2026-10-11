@@ -14,7 +14,7 @@ const vis = (testId: string): string => `[data-testid="${testId}"]:visible`;
 
 const SEED_EXPENSES = {
   expenses: [
-    { id: 'expense-1', occurredAt: '2021-01-03T10:12:00+00:00', currency: 'EUR', date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
+    { id: 1, bookingDate: '2021-01-03T10:12:00+00:00', currency: 'EUR', amount: '65.55', description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
   ],
 };
 
@@ -47,10 +47,10 @@ async function stubExpenseApis(page: Page): Promise<{ expenses: typeof SEED_EXPE
     const body = route.request().postDataJSON() as { date: string; currency: string; amount: string; description: string; category: string };
     state.created.push(body);
     state.expenses = [
-      { id: 'created-opaque-id', occurredAt: body.date, currency: body.currency, date: body.date, amount: Number(body.amount), description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
+      { id: 99, bookingDate: body.date, currency: body.currency, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
       ...state.expenses,
     ];
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'created-opaque-id' }) });
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 99 }) });
   });
   return state;
 }

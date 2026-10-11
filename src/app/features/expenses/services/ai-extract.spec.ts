@@ -27,26 +27,33 @@ describe('AiExtractApi (POST /AI/extract, guito-ui#44)', () => {
     const req = http.expectOne('https://api.test/AI/extract');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ language: 'pt-PT', prompt: 'café 2,30 no Coco Verde' });
-    req.flush({ date: '2026-10-02', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
-    await expect(pending).resolves.toEqual({ date: '2026-10-02', amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
+    req.flush({ date: '2026-10-02', amount: '2.3', description: 'Coco Verde', category: 'Eating out' });
+    await expect(pending).resolves.toEqual({ date: '2026-10-02', amount: '2.3', description: 'Coco Verde', category: 'Eating out' });
   });
 
-  it('retains supplied exact decimal metadata instead of the rounded numeric sibling', async () => {
+  it('retains the single exact decimal amount', async () => {
     const pending = api.extract('exact');
-    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-07-02', amount: 123456789.12345679, amountExact: '123456789.123456789', description: 'Exact', category: 'Food' });
-    expect((await pending).amountExact).toBe('123456789.123456789');
+    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-07-02', amount: '123456789.123456789', description: 'Exact', category: 'Food' });
+    expect((await pending).amount).toBe('123456789.123456789');
   });
 
-  it('rejects invalid supplied exact metadata rather than falling back to rounded amount', async () => {
+  it('rejects invalid decimal text', async () => {
     const pending = api.extract('exact');
-    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-07-02', amount: 2.3, amountExact: 'bad', description: 'Exact', category: 'Food' });
+    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-07-02', amount: 'bad', description: 'Exact', category: 'Food' });
     await expect(pending).rejects.toThrow('extract-unusable');
   });
 
   it.each([0, -1.25])('accepts signed/zero proposal amount %s', async amount => {
     const pending = api.extract('signed');
     http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount, description: 'Signed', category: 'Food' });
-    expect((await pending).amount).toBe(amount);
+    expect((await pending).amount).toBe(String(amount));
+  });
+
+  it('retains microseconds and >2^53 decimal text in one proposal date/amount', async () => {
+    const pending = api.extract('exact');
+    const date = '2026-07-02T05:45:27.123456+05:30';
+    http.expectOne('https://api.test/AI/extract').flush({ date, amount: '9007199254740993', description: 'Exact', category: 'Food' });
+    expect(await pending).toEqual({ date, amount: '9007199254740993', description: 'Exact', category: 'Food' });
   });
 
   it('rejects when the amount is missing', async () => {
@@ -57,13 +64,13 @@ describe('AiExtractApi (POST /AI/extract, guito-ui#44)', () => {
 
   it('rejects when the description is missing', async () => {
     const pending = api.extract('café');
-    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount: 2.3, description: '   ', category: 'Eating out' });
+    http.expectOne('https://api.test/AI/extract').flush({ date: '2026-10-02', amount: '2.3', description: '   ', category: 'Eating out' });
     await expect(pending).rejects.toThrow('extract-unusable');
   });
 
   it('rejects when the date is missing or unparseable', async () => {
     const pending = api.extract('café');
-    http.expectOne('https://api.test/AI/extract').flush({ date: null, amount: 2.3, description: 'Coco Verde', category: 'Eating out' });
+    http.expectOne('https://api.test/AI/extract').flush({ date: null, amount: '2.3', description: 'Coco Verde', category: 'Eating out' });
     await expect(pending).rejects.toThrow('extract-unusable');
   });
 

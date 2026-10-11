@@ -21,12 +21,13 @@ const weekdayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZon
 function groupExpensesByDay(expenses: readonly Expense[]): ExpenseDayGroup[] {
   const byDay = new Map<string, Expense[]>();
   for (const expense of expenses) {
-    const day = occurrenceDay(expense.date);
+    const day = occurrenceDay(expense.bookingDate ?? '');
     byDay.set(day, [...(byDay.get(day) ?? []), expense]);
   }
   return [...byDay.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([key, group]) => {
+      if (!key) return { key, label: 'Unknown date', expenses: group };
       const date = new Date(key + 'T12:00:00Z');
       return { key, label: `${dayLabel.format(date)}, ${weekdayLabel.format(date)}`, expenses: group };
     });
@@ -37,7 +38,7 @@ const longMonth = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'U
 /** The list's month label (e.g. "January, 2021"), from the newest expense; '' when empty. */
 function monthLabelOf(expenses: readonly Expense[]): string {
   // The server orders by occurrence instant; lexical offsets are not chronological.
-  const newest = expenses[0]?.date;
+  const newest = expenses[0]?.bookingDate;
   if (!newest) return '';
   const date = new Date(`${occurrenceDay(newest)}T12:00:00Z`);
   return `${longMonth.format(date)}, ${date.getUTCFullYear()}`;
@@ -187,9 +188,9 @@ export class ExpensesPage {
     if (this.dialBusy()) return;
     this.favoriteError.set(null);
     this.favoriteSaving.set(favorite.name);
-    const { date, occurredAt } = lisbonNow();
+    const { occurredAt } = lisbonNow();
     void this.expenseApi
-      .create({ date, occurredAt, currency: 'EUR', amount: favorite.amount, description: favorite.description, category: favorite.category })
+      .create({ date: occurredAt, currency: 'EUR', amount: favorite.amount, description: favorite.description, category: favorite.category })
       .then(
         () => {
           this.favoriteSaving.set(null);
