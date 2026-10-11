@@ -106,6 +106,36 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     await expect(page).toHaveURL(/saved=1/);
   });
 
+  test.describe('calendar-day extraction', () => {
+    test.use({ timezoneId: 'America/Los_Angeles' });
+
+    test('offset-free AI midnight retains its calendar day through POST', async ({ page }) => {
+      const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+      await page.clock.install({ time: new Date('2026-10-02T12:00:00Z') });
+      await stubExpensesApi(page);
+      await stubCategoryApi(page);
+      await stubExtract(page, 200, { bookingDate: '2026-10-02T00:00:00', amount: '2.30', description: 'Calendar coffee', category: 'Eating out' });
+      await seedSession(page);
+      await installSpeechFake(page, 'calendar coffee');
+      await page.setViewportSize({ width: 402, height: 874 });
+      await page.goto('/');
+      await page.getByTestId('add-expense-fab').click();
+      await page.getByTestId('speed-dial-voice').click();
+      await expect(page).toHaveURL(/\/expenses\/create$/);
+      await expect(page.locator('[data-testid="date-input"]:visible')).toHaveValue('2026-10-02');
+      if (enabled) await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('13:00');
+      await page.route('**/Expense', async route => {
+        const body = route.request().postDataJSON();
+        expect(body[enabled ? 'bookingDate' : 'date']).toBe(enabled ? '2026-10-02T13:00:00+01:00' : '2026-10-02');
+        expect(body).not.toHaveProperty(enabled ? 'date' : 'bookingDate');
+        expect(body.amount).toBe('2.3');
+        await route.fulfill({ json: { id: 99 } });
+      });
+      await page.locator('[data-testid=save-expense]:visible').click();
+      await expect(page).toHaveURL(/saved=1/);
+    });
+  });
+
   test('extract failure → toast, staying on the list', async ({ page }) => {
     await stubExpensesApi(page);
     await stubCategoryApi(page);
