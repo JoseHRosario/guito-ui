@@ -5,6 +5,7 @@
  */
 export const environment = {
   production: true,
+  expenseTimestampsEnabled: false,
   googleClientId: '665373918058-15r7orcfdr1tsi1uef1ev7f66fs17rtc.apps.googleusercontent.com',
   apiBaseUrl: 'https://guito.api.kerumirembora.com',
   version: '0.0.0-dev',

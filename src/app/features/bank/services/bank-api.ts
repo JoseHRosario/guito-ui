@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { amountDecimal } from '../../expenses/services/validate-expense';
 import type { BankConnection } from '../models/bank-connection';
 import type { BankSyncResult, BankTransaction } from '../models/bank-transaction';
 
@@ -26,6 +27,7 @@ interface BankTransactionDto {
   id?: number | string | null;
   bookingDate?: string | null;
   amount?: number | null;
+  amountExact?: string | null;
   currency?: string | null;
   remittanceInformation?: string | null;
   /** FK id of the Jev-suggested category (guito-api#112). */
@@ -48,7 +50,7 @@ export class BankApi {
       .map((dto) => ({
         id: dto.id === null || dto.id === undefined ? '' : String(dto.id),
         date: dto.bookingDate ?? '',
-        amount: dto.amount ?? 0,
+        amount: amountDecimal(dto.amountExact ?? dto.amount ?? 0) ?? '',
         currency: dto.currency ?? 'EUR',
         description: dto.remittanceInformation ?? '',
         suggestedCategory:

@@ -7,14 +7,14 @@ import { stubExpensesApi, SESSION_KEY } from './helpers/stub-auth';
 // save → back to the list with the new row on top + "Expense saved" toast; a
 // favorite tap creates the preset immediately. The API is stubbed at the
 // transport level; the create POST mutates the stubbed list so the reload
-// genuinely shows the new row. Amounts are posted POSITIVE (ADR 0010).
+// genuinely shows the new row. Signed/zero amounts are posted as supplied.
 
 // Both responsive branches exist in the DOM; scope everything to the visible one.
 const vis = (testId: string): string => `[data-testid="${testId}"]:visible`;
 
 const SEED_EXPENSES = {
   expenses: [
-    { storedOrder: 1, date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
+    { id: 1, bookingDate: '2021-01-03T10:12:00+00:00', currency: 'EUR', amount: '65.55', description: 'H&M', category: 'Clothing', creatorEmail: 'e2e@guito.app' },
   ],
 };
 
@@ -44,10 +44,10 @@ async function stubExpenseApis(page: Page): Promise<{ expenses: typeof SEED_EXPE
       await route.fulfill({ status: 405, body: 'method not allowed' });
       return;
     }
-    const body = route.request().postDataJSON() as { date: string; amount: number; description: string; category: string };
+    const body = route.request().postDataJSON() as { date?: string; bookingDate?: string; currency: string; amount: string; description: string; category: string };
     state.created.push(body);
     state.expenses = [
-      { storedOrder: 99, date: `${body.date}T12:00:00`, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
+      { id: 99, bookingDate: (process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true' ? body.bookingDate : body.date)!, currency: body.currency, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
       ...state.expenses,
     ];
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 99 }) });
@@ -56,6 +56,41 @@ async function stubExpenseApis(page: Page): Promise<{ expenses: typeof SEED_EXPE
 }
 
 test.describe('create expense flow (stubbed API, signed in)', () => {
+  for (const amount of ['0', '-1.25', '-123456789.123456789']) {
+    test(`saves signed/zero decimal ${amount} without transport rounding`, async ({ page }) => {
+      const state = await stubExpenseApis(page);
+      await seedSession(page);
+      await page.goto('/expenses/create');
+      await expect(page.locator(vis('category-select'))).toHaveValue('Clothing');
+      await page.locator(vis('amount-input')).fill(amount);
+      await page.locator(vis('description-input')).fill('Signed exact');
+      await page.locator(vis('save-expense')).click();
+      await expect(page).toHaveURL(/\/\?saved=1$/);
+      expect(state.created).toHaveLength(1);
+      expect(state.created[0]['amount']).toBe(amount);
+      expect(state.created[0]).not.toHaveProperty('occurredAt');
+      const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+      expect(state.created[0]).not.toHaveProperty(enabled ? 'date' : 'bookingDate');
+      expect(String(state.created[0][enabled ? 'bookingDate' : 'date']).includes('T')).toBe(enabled);
+      await expect(page.locator('[data-testid="expense-row"]:visible').first()).toContainText('Signed exact');
+    });
+  }
+
+  test('decimal overflow remains on the form without POST', async ({ page }) => {
+    const state = await stubExpenseApis(page);
+    await seedSession(page);
+    await page.goto('/expenses/create');
+    await expect(page.locator(vis('category-select'))).toHaveValue('Clothing');
+    await page.locator(vis('description-input')).fill('Overflow');
+    for (const amount of ['-79228162514264337593543950336', '-0.00000000000000000000000000001']) {
+      await page.locator(vis('amount-input')).fill(amount);
+      await page.locator(vis('save-expense')).click();
+      await expect(page.locator('[data-testid="field-error"]:visible').first()).toContainText('Enter a valid decimal amount');
+      await expect(page).toHaveURL(/\/expenses\/create$/);
+      expect(state.created).toHaveLength(0);
+    }
+  });
+
   test('validation errors keep the user on the form without calling POST', async ({ page }) => {
     await stubExpenseApis(page);
     await seedSession(page);
@@ -122,6 +157,7 @@ test.describe('create expense flow (stubbed API, signed in)', () => {
 test.describe('favorites speed-dial (stubbed API, signed in)', () => {
   test('tapping the favorite creates the expense immediately with the preset payload', async ({ page }) => {
     const state = await stubExpenseApis(page);
+    await page.clock.setFixedTime(new Date('2026-07-01T23:15:42Z'));
     await seedSession(page);
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto('/');
@@ -138,11 +174,9 @@ test.describe('favorites speed-dial (stubbed API, signed in)', () => {
     await postCreated;
 
     // The preset posts as-is: positive amount, today's date, exact description/category.
-    const today = new Date();
-    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    expect(state.created).toEqual([
-      { date: iso, amount: 2.3, description: 'Coco Verde', category: 'Eating out' },
-    ]);
+    expect(state.created).toHaveLength(1);
+    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+    expect(state.created[0]).toEqual({ [enabled ? 'bookingDate' : 'date']: enabled ? '2026-07-02T00:15:42+01:00' : '2026-07-02', ...(enabled ? { currency: 'EUR' } : {}), amount: '2.3', description: 'Coco Verde', category: 'Eating out' });
 
     await expect(page).toHaveURL(/\/\?saved=1$/);
     await expect(page.locator(vis('saved-toast'))).toContainText('Expense saved');
@@ -153,6 +187,7 @@ test.describe('favorites speed-dial (stubbed API, signed in)', () => {
 
   test('the scrim closes the speed-dial without creating anything', async ({ page }) => {
     const state = await stubExpenseApis(page);
+    await page.clock.setFixedTime(new Date('2026-07-01T23:15:42Z'));
     await seedSession(page);
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto('/');

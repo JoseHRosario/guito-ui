@@ -2,20 +2,24 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { amountDecimal } from './validate-expense';
+import { knownOccurrence, occurrenceDay } from './expense-time';
 
-/** What `POST /AI/extract` returns (camelCase wire DTO `ExpenseExtracted`). */
+/** Internal review prefill: one date shared with the bank/form, not a wire DTO. */
 export interface ExtractedExpense {
-  /** ISO yyyy-MM-dd. */
+  /** ISO day or known offset timestamp, preserved until the user edits Date/Time. */
   date: string;
-  /** Positive (ADR 0010) — the outflow is implied by the record being an Expense. */
-  amount: number;
+  /** Signed or zero decimal; preserve the supplied sign through review and creation. */
+  amount: string;
   description: string;
   category: string;
 }
 
 interface ExtractedExpenseDto {
+  bookingDate?: string | null;
+  /** Old production response, accepted only at this boundary until cutover. */
   date?: string | null;
-  amount?: number | null;
+  amount?: string | number | null;
   description?: string | null;
   category?: string | null;
 }
@@ -38,14 +42,15 @@ export class AiExtractApi {
         prompt,
       }),
     );
-    const date = normalizeDate(response.date);
-    const amount = response.amount ?? null;
+    const bookingDate = response.bookingDate !== undefined ? response.bookingDate : response.date;
+    const date = normalizeDate(bookingDate);
+    const amount = response.amount == null ? null : amountDecimal(response.amount);
     const description = (response.description ?? '').trim();
     const category = (response.category ?? '').trim();
-    if (date === null || amount === null || amount <= 0 || description === '') {
+    if (date === null || amount === null || description === '') {
       throw new Error('extract-unusable');
     }
-    return { date, amount, description, category };
+    return { date: knownOccurrence(bookingDate) ?? date, amount, description, category };
   }
 }
 
@@ -54,5 +59,5 @@ function normalizeDate(value: string | null | undefined): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (isNaN(date.getTime())) return null;
-  return value.slice(0, 10);
+  return occurrenceDay(value);
 }

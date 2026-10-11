@@ -68,7 +68,7 @@ describe('BankApi', () => {
       {
         id: '7',
         date: '2026-10-02',
-        amount: 58.93,
+        amount: '58.93',
         currency: 'EUR',
         description: 'CONTINENTE ONLINE 8831',
         suggestedCategory: { id: '3', name: 'Shopping' },
@@ -76,7 +76,7 @@ describe('BankApi', () => {
       {
         id: '8',
         date: '2026-10-01',
-        amount: 200,
+        amount: '200',
         currency: 'EUR',
         description: 'TRF MB WAY PARA MARIA S',
         suggestedCategory: null,
@@ -94,9 +94,18 @@ describe('BankApi', () => {
     ]);
     const rows = await promise;
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toEqual({ id: '', date: '2026-10-03', amount: 5, currency: 'EUR', description: 'X', suggestedCategory: null });
+    expect(rows[0]).toEqual({ id: '', date: '2026-10-03', amount: '5', currency: 'EUR', description: 'X', suggestedCategory: null });
     expect(rows[1].description).toBe('');
     expect(rows[1].suggestedCategory).toEqual({ id: '5', name: 'Bills' });
+  });
+
+  it.each(['9007199254740993', '-123456789.123456789', '0'])('normalizes bank exact metadata %s into a single amount', async amount => {
+    const pending = TestBed.inject(BankApi).pending();
+    http.expectOne('https://api.test/BankTransaction').flush([{ id: 'bank-id', amount: 9007199254740992, amountExact: amount }]);
+    const [row] = await pending;
+    expect(row.amount).toBe(amount);
+    expect(row.id).toBe('bank-id');
+    expect(row).not.toHaveProperty('amountExact');
   });
 
   it('POST /BankTransaction/sync returns the fetched/new counts', async () => {

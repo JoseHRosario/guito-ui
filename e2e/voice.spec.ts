@@ -9,7 +9,7 @@ import { stubExpensesApi } from './helpers/stub-auth';
 
 const SESSION_KEY = 'guito.auth.session';
 
-const EXTRACT_OK = { date: '2026-10-02T00:00:00Z', amount: 2.3, description: 'Coco Verde', category: 'Eating out' };
+const EXTRACT_OK = { bookingDate: '2026-10-02T14:00:17.123456+05:30', amount: '123456789.123456789', description: 'Coco Verde', category: 'Eating out' };
 
 async function seedSession(page: Page): Promise<void> {
   await page.addInitScript((key) => {
@@ -49,7 +49,7 @@ async function installSpeechFake(page: Page, transcript: string): Promise<void> 
 
 async function stubExtract(page: Page, status = 200, body: unknown = EXTRACT_OK): Promise<void> {
   await page.route('**/AI/extract', (route: Route) => {
-    void route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    void route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body === EXTRACT_OK && process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'true' ? { date: EXTRACT_OK.bookingDate, amount: EXTRACT_OK.amount, description: EXTRACT_OK.description, category: EXTRACT_OK.category } : body) });
   });
 }
 
@@ -76,22 +76,64 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     await expect(page.getByTestId('speed-dial-voice')).toBeVisible();
     await expect(page.getByTestId('speed-dial-favorite-morning-coffee')).toBeVisible();
 
-    // Listening: the Voice pill shows the speak icon (no overlay).
+    // Listening feedback is unit-covered; don't race the fake's 100ms state.
     await page.getByTestId('speed-dial-voice').click();
-    await expect(page.getByTestId('voice-speak-icon')).toBeVisible();
 
     // Extract runs (spinner covered in the unit specs — the fake resolves in
     // ~100ms, too fast to catch the frame here): the app navigates to the form.
     await expect(page).toHaveURL(/\/expenses\/create$/, { timeout: 5_000 });
 
     // Prefilled for review (frame 3134:10053): pt-PT comma amount + markers.
-    await expect(page.locator('[data-testid="amount-input"]:visible')).toHaveValue('2,30');
+    await expect(page.locator('[data-testid="amount-input"]:visible')).toHaveValue('123456789,123456789');
     await expect(page.locator('[data-testid="description-input"]:visible')).toHaveValue('Coco Verde');
     await expect(page.locator('[data-testid="date-input"]:visible')).toHaveValue('2026-10-02');
+    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+    if (enabled) await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('09:30');
+    else await expect(page.getByTestId('time-input')).toHaveCount(0);
+    await page.route('**/Expense', async route => {
+      expect(route.request().postDataJSON()).toEqual({ [enabled ? 'bookingDate' : 'date']: enabled ? EXTRACT_OK.bookingDate : '2026-10-02', amount: '123456789.123456789', description: 'Coco Verde', category: 'Eating out', ...(enabled ? { currency: 'EUR' } : {}) });
+      await route.fulfill({ json: { id: 99 } });
+    });
     await expect(page.locator('[data-testid="category-select"]:visible')).toHaveValue('Eating out');
     for (const field of ['amount', 'date', 'description', 'category']) {
       await expect(page.getByTestId(`ai-suggested-${field}`).first()).toBeVisible();
     }
+    if (process.env['GUITO_EVIDENCE_DIR']) {
+      await page.locator('[data-testid=create-title]:visible').click();
+      await page.screenshot({ path: `${process.env['GUITO_EVIDENCE_DIR']}/mobile-voice.png` });
+    }
+    await page.locator('[data-testid=save-expense]:visible').click();
+    await expect(page).toHaveURL(/saved=1/);
+  });
+
+  test.describe('calendar-day extraction', () => {
+    test.use({ timezoneId: 'America/Los_Angeles' });
+
+    test('offset-free AI midnight retains its calendar day through POST', async ({ page }) => {
+      const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+      await page.clock.install({ time: new Date('2026-10-02T12:00:00Z') });
+      await stubExpensesApi(page);
+      await stubCategoryApi(page);
+      await stubExtract(page, 200, { bookingDate: '2026-10-02T00:00:00', amount: '2.30', description: 'Calendar coffee', category: 'Eating out' });
+      await seedSession(page);
+      await installSpeechFake(page, 'calendar coffee');
+      await page.setViewportSize({ width: 402, height: 874 });
+      await page.goto('/');
+      await page.getByTestId('add-expense-fab').click();
+      await page.getByTestId('speed-dial-voice').click();
+      await expect(page).toHaveURL(/\/expenses\/create$/);
+      await expect(page.locator('[data-testid="date-input"]:visible')).toHaveValue('2026-10-02');
+      if (enabled) await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('13:00');
+      await page.route('**/Expense', async route => {
+        const body = route.request().postDataJSON();
+        expect(body[enabled ? 'bookingDate' : 'date']).toBe(enabled ? '2026-10-02T13:00:00+01:00' : '2026-10-02');
+        expect(body).not.toHaveProperty(enabled ? 'date' : 'bookingDate');
+        expect(body.amount).toBe('2.3');
+        await route.fulfill({ json: { id: 99 } });
+      });
+      await page.locator('[data-testid=save-expense]:visible').click();
+      await expect(page).toHaveURL(/saved=1/);
+    });
   });
 
   test('extract failure → toast, staying on the list', async ({ page }) => {

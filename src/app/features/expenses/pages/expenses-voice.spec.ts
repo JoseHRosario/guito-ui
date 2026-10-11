@@ -38,7 +38,7 @@ class FakeRecognition {
   }
 }
 
-const EXTRACT_OK = { date: '2026-10-02T00:00:00Z', amount: 2.3, description: 'Coco Verde', category: 'Eating out' };
+const EXTRACT_OK = { bookingDate: '2026-10-02T00:00:00Z', amount: '2.3', description: 'Coco Verde', category: 'Eating out' };
 
 describe('ExpensesPage voice capture (issue #44, frames 3141:2 / 3141:180)', () => {
   let http: HttpTestingController;
@@ -79,7 +79,7 @@ describe('ExpensesPage voice capture (issue #44, frames 3141:2 / 3141:180)', () 
   /** Flushes the latest-expenses load so the dial is interactive. */
   async function loadList(): Promise<void> {
     http.expectOne('https://api.test/Expense/latest/20').flush({
-      expenses: [{ storedOrder: 12, date: '2021-01-03T10:12:00', amount: 65.55, description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' }],
+      expenses: [{ id: 12, bookingDate: '2021-01-03T10:12:00', amount: '65.55', description: 'H&M', category: 'Clothing', creatorEmail: 'a@b.c' }],
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     fixture.detectChanges();

@@ -3,20 +3,32 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import type { IconName } from '../../../shared/gicon';
+import { occurrenceDay } from './expense-time';
+import { amountDecimal } from './validate-expense';
 import type { Expense } from '../models/expense';
 
 /**
  * The Expense wire contract of `GET /Expense/latest/{count}` (ADR-0003 human
  * auth; the interceptor attaches the Bearer ID token). camelCase per the API's
- * System.Text.Json defaults; nullable fields mirror the sheet-backed DTO.
+ * System.Text.Json defaults; exact decimal strings preserve API precision.
  */
 interface ExpenseDto {
-  storedOrder?: number | null;
+  id?: number | string | null;
+  bookingDate?: string | null;
+  currency?: string | null;
+  /** Pre-cutover date/numeric amount are accepted only at this HTTP boundary. */
   date?: string | null;
-  amount?: number | null;
+  amount?: string | number | null;
   description?: string | null;
   category?: string | null;
   creatorEmail?: string | null;
+}
+
+/** Integer expense IDs only; never derive identity from a sheet ordinal. */
+function expenseId(value: number | string | null | undefined): number | null {
+  if (typeof value === 'string' && !/^\d+$/.test(value)) return null;
+  const id = typeof value === 'string' ? Number(value) : value;
+  return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 /** Maps the API's category to its list-row lucide glyph; 'tag' fallback for unknown categories. */
@@ -39,25 +51,38 @@ export class ExpenseApi {
   private readonly http = inject(HttpClient);
   private readonly env = inject(APP_ENVIRONMENT);
 
-  /** Latest expenses, newest first. `id` is the opaque Expense Id (ADR-0009). */
+  /** Latest expenses, newest first. `id` is the numeric Expense Id; pre-cutover missing identity stays null. */
   async latest(count = 20): Promise<Expense[]> {
     const url = `${this.env.apiBaseUrl}/Expense/latest/${count}`;
     const response = await firstValueFrom(this.http.get<{ expenses?: ExpenseDto[] | null }>(url));
     return (response.expenses ?? []).map((dto) => ({
-      id: String(dto.storedOrder ?? ''),
+      id: expenseId(dto.id),
       description: dto.description ?? '',
-      amount: dto.amount ?? 0,
-      date: dto.date ?? '',
+      amount: dto.amount == null ? null : amountDecimal(dto.amount),
+      bookingDate: dto.bookingDate !== undefined ? dto.bookingDate : dto.date ?? null,
       category: dto.category ?? '',
       icon: categoryIcon(dto.category ?? ''),
     }));
   }
 
-  /** Creates an expense (`POST /Expense`); resolves the opaque Expense Id (ADR-0009). */
-  async create(input: { date: string; amount: number; description: string; category: string }): Promise<number> {
+  /** Creates an expense (`POST /Expense`); resolves the numeric Expense Id, or null for a legacy nonnumeric ID. */
+  async create(input: { date: string; currency?: 'EUR'; amount: number | string; description: string; category: string }): Promise<number | null> {
+    // Central gate covers all callers, including favorites; Sheets rejects timestamps.
+    const amount = amountDecimal(input.amount);
+    if (amount === null) throw new Error('expense-amount-invalid');
+    const timestampsEnabled = this.env.expenseTimestampsEnabled === true;
+    const body = {
+      // New API requires bookingDate; production Sheets keeps date until coordinated cutover.
+      [timestampsEnabled ? 'bookingDate' : 'date']: timestampsEnabled ? input.date : occurrenceDay(input.date),
+      amount,
+      description: input.description,
+      category: input.category,
+      ...(timestampsEnabled && input.currency ? { currency: input.currency } : {}),
+    };
     const response = await firstValueFrom(
-      this.http.post<{ id?: number | null }>(`${this.env.apiBaseUrl}/Expense`, input),
+      this.http.post<{ id?: string | number | null }>(`${this.env.apiBaseUrl}/Expense`, body),
     );
-    return response.id ?? 0;
+    // Legacy nonnumeric create IDs indicate success but cannot become numeric identity.
+    return expenseId(response.id);
   }
 }

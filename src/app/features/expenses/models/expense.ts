@@ -1,15 +1,12 @@
 import type { IconName } from '../../../shared/gicon';
 
-/** Mirrors the API Expense contract (description, amount, date); extra fields are UI stubs. */
+/** Latest expense adapted for list rendering, with one exact amount and booking timestamp. */
 export interface Expense {
-  id: string;
+  /** null only for pre-cutover rows without a durable numeric expense ID. */
+  id: number | null;
   description: string;
-  /** Negative for outflows, positive for inflows, in EUR. */
-  amount: number;
-  /** ISO-8601 date(-time) as returned by the API. */
-  date: string;
-  /** Stub-only: the API contract has no category yet. */
+  amount: string | null;
+  bookingDate: string | null;
   category: string;
-  /** Stub-only: lucide icon name rendered by the category badge. */
   icon: IconName;
 }
