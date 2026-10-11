@@ -105,7 +105,7 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     }
     (el.querySelector('[data-testid="save-expense"]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toEqual({ date: '2026-07-01', occurredAt: '2026-07-01T09:30:00+01:00', currency: 'EUR', amount: '65.55', description: 'Lunch', category: 'Clothing' });
+    expect(req.request.body).toEqual({ date: '2026-07-01T09:30:00+01:00', currency: 'EUR', amount: '65.55', description: 'Lunch', category: 'Clothing' });
     req.flush({ id: 'opaque-expense-id' });
     await fixture.whenStable();
   });
@@ -186,7 +186,7 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
     expect(body.amount).toBe('65.55'); // Preserve the supplied sign — no negation.
     expect(body.description).toBe('Veggies and fruit');
     expect(body.category).toBe('Clothing');
-    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
     req.flush({ id: 'created-opaque-id' });
     await vi.waitFor(() => expect(navSpy).toHaveBeenCalledWith(['/'], { queryParams: { saved: '1' } }));
   });

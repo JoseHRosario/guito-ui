@@ -9,7 +9,7 @@ import { stubExpensesApi } from './helpers/stub-auth';
 
 const SESSION_KEY = 'guito.auth.session';
 
-const EXTRACT_OK = { date: '2026-10-02', occurredAt: '2026-10-02T14:00:17+05:30', amount: 123456789.12345679, amountExact: '123456789.123456789', description: 'Coco Verde', category: 'Eating out' };
+const EXTRACT_OK = { date: '2026-10-02', occurredAt: '2026-10-02T14:00:17.123456+05:30', amount: 123456789.12345679, amountExact: '123456789.123456789', description: 'Coco Verde', category: 'Eating out' };
 
 async function seedSession(page: Page): Promise<void> {
   await page.addInitScript((key) => {
@@ -91,7 +91,7 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     if (enabled) await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('09:30');
     else await expect(page.getByTestId('time-input')).toHaveCount(0);
     await page.route('**/Expense', async route => {
-      expect(route.request().postDataJSON()).toEqual({ date: '2026-10-02', amount: '123456789.123456789', description: 'Coco Verde', category: 'Eating out', ...(enabled ? { occurredAt: EXTRACT_OK.occurredAt, currency: 'EUR' } : {}) });
+      expect(route.request().postDataJSON()).toEqual({ date: enabled ? EXTRACT_OK.occurredAt : '2026-10-02', amount: '123456789.123456789', description: 'Coco Verde', category: 'Eating out', ...(enabled ? { currency: 'EUR' } : {}) });
       await route.fulfill({ json: { id: 'voice-opaque-id' } });
     });
     await expect(page.locator('[data-testid="category-select"]:visible')).toHaveValue('Eating out');

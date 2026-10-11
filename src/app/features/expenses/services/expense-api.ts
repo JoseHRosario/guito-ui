@@ -65,8 +65,14 @@ export class ExpenseApi {
     // Central gate covers all callers, including favorites; Sheets rejects timestamps.
     const amount = amountDecimal(input.amount);
     if (amount === null) throw new Error('expense-amount-invalid');
-    const body = this.env.expenseTimestampsEnabled === true ? { ...input, amount } :
-      { date: input.date, amount, description: input.description, category: input.category };
+    const timestampsEnabled = this.env.expenseTimestampsEnabled === true;
+    const body = {
+      date: timestampsEnabled ? input.occurredAt ?? input.date : input.date,
+      amount,
+      description: input.description,
+      category: input.category,
+      ...(timestampsEnabled && input.currency ? { currency: input.currency } : {}),
+    };
     const response = await firstValueFrom(
       this.http.post<{ id?: string | number | null }>(`${this.env.apiBaseUrl}/Expense`, body),
     );

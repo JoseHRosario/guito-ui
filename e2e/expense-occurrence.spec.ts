@@ -27,7 +27,7 @@ for (const [name, viewport, date, offset] of [
       await page.route('**/Expense', async route => {
         body = route.request().postDataJSON();
         // Simulates Sheets' real timestamp conflict: legacy mode must avoid it.
-        await route.fulfill({ status: Object.hasOwn(body as object, 'occurredAt') ? 409 : 200, json: { id: 12 } });
+        await route.fulfill({ status: String((body as { date: string }).date).includes('T') ? 409 : 200, json: { id: 12 } });
       });
       await page.locator(visible('save-expense')).click();
       await expect(page).toHaveURL(/saved=1/);
@@ -74,7 +74,7 @@ for (const [name, viewport, date, offset] of [
     const hold = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/Expense', async route => {
       posts++;
-      expect(route.request().postDataJSON()).toEqual({ date, occurredAt: `${date}T09:30:00${offset}`, currency: 'EUR', amount: '9007199254740993', description: 'Veggies and fruit', category: 'Clothing' });
+      expect(route.request().postDataJSON()).toEqual({ date: `${date}T09:30:00${offset}`, currency: 'EUR', amount: '9007199254740993', description: 'Veggies and fruit', category: 'Clothing' });
       await hold;
       await route.fulfill({ json: { id: 'opaque/not-a-sheet-ordinal' } });
     });

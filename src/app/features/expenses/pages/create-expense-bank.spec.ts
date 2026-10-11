@@ -64,7 +64,7 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-10-25');
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toMatchObject({ occurredAt, date: '2026-10-25', currency: 'EUR', amount: '58.93' });
+    expect(req.request.body).toMatchObject({ date: occurredAt, currency: 'EUR', amount: '58.93' });
     req.flush('retry', { status: 500, statusText: 'Server Error' });
     await new Promise(r => setTimeout(r, 0));
     const time = page.querySelector<HTMLInputElement>('[data-testid=time-input]')!;
@@ -88,7 +88,7 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     expect(page.querySelector<HTMLInputElement>('[data-testid=date-input]')?.value).toBe('2026-10-02');
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body.occurredAt).toBe('2026-10-02T00:15:00+01:00');
+    expect(req.request.body.date).toBe('2026-10-02T00:15:00+01:00');
     req.flush({ id: 'opaque-bank-or-voice-id' });
     await new Promise(r => setTimeout(r, 0));
   });
@@ -98,7 +98,7 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     ['voicePrefill', '-123456789.123456789'], ['bankPrefill', '-123456789.123456789'],
     ['voicePrefill', '0'], ['bankPrefill', '0'],
   ])('retains exact decimal %s %s and an arbitrary-offset instant through POST', async (channel, amountExact) => {
-    const occurredAt = '2026-07-02T05:45:27+05:30';
+    const occurredAt = '2026-07-02T05:45:27.123456+05:30';
 
     await router.navigate(['/expenses/create'], { state: { [channel]: { ...BANK_PREFILL, occurredAt, amount: 123456789.12345679, amountExact } } });
     http.expectOne('https://api.test/Category').flush(CATEGORIES_WITH_SHOPPING);
@@ -110,7 +110,8 @@ describe('CreateExpensePage — bank prefill (issue #61)', () => {
     expect(page.querySelector<HTMLInputElement>('[data-testid=time-input]')?.value).toBe('01:15');
     (page.querySelector('[data-testid=save-expense]') as HTMLButtonElement).click();
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toMatchObject({ occurredAt, date: '2026-07-02', amount: amountExact });
+    expect(req.request.body).not.toHaveProperty('occurredAt');
+    expect(req.request.body).toMatchObject({ date: occurredAt, amount: amountExact });
     req.flush({ id: 'exact-offset' });
     await new Promise(r => setTimeout(r, 0));
   });

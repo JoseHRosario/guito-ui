@@ -58,10 +58,23 @@ describe('ExpenseApi.latest', () => {
   it.each([undefined, false, true])('create centrally gates all callers with capability %s', async expenseTimestampsEnabled => {
     const env = TestBed.inject(APP_ENVIRONMENT);
     Object.assign(env, { expenseTimestampsEnabled });
-    const input = { date: '2026-07-02', occurredAt: '2026-07-02T05:45:27+05:30', currency: 'EUR' as const, amount: '9007199254740993', description: 'Exact', category: 'Food' };
+    const input = { date: '2026-07-02', occurredAt: '2026-07-02T05:45:27.123456+05:30', currency: 'EUR' as const, amount: '9007199254740993', description: 'Exact', category: 'Food' };
     const pending = TestBed.inject(ExpenseApi).create(input);
     const req = http.expectOne('https://api.test/Expense');
-    expect(req.request.body).toEqual(expenseTimestampsEnabled === true ? input : { date: input.date, amount: input.amount, description: input.description, category: input.category });
+    expect(req.request.body).not.toHaveProperty('occurredAt');
+    expect(req.request.body).toEqual({ date: expenseTimestampsEnabled === true ? input.occurredAt : input.date, ...(expenseTimestampsEnabled === true ? { currency: input.currency } : {}), amount: input.amount, description: input.description, category: input.category });
+    req.flush({ id: 'opaque' });
+    await expect(pending).resolves.toBe('opaque');
+    delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;
+  });
+
+  it('enabled create falls back to date and forwards only explicit body fields', async () => {
+    const env = TestBed.inject(APP_ENVIRONMENT);
+    Object.assign(env, { expenseTimestampsEnabled: true });
+    const input = { date: '2026-07-02', amount: '0', description: 'Fallback', category: 'Food', updateDate: null, unexpected: 'must not forward' };
+    const pending = TestBed.inject(ExpenseApi).create(input);
+    const req = http.expectOne('https://api.test/Expense');
+    expect(req.request.body).toEqual({ date: input.date, amount: '0', description: input.description, category: input.category });
     req.flush({ id: 'opaque' });
     await expect(pending).resolves.toBe('opaque');
     delete (env as { expenseTimestampsEnabled?: boolean }).expenseTimestampsEnabled;

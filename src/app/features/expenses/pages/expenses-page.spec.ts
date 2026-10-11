@@ -255,7 +255,8 @@ describe('ExpensesPage — favorites speed-dial (issue #43, ADR 0012)', () => {
     expect(body.amount).toBe('2.3');
     expect(body.description).toBe('Coco Verde');
     expect(body.category).toBe('Eating out');
-    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body).not.toHaveProperty('occurredAt');
+    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
     req.flush({ id: 'favorite-opaque-id' });
     fixture.detectChanges();
 

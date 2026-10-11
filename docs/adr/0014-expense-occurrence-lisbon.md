@@ -30,13 +30,18 @@ production is **false**, development/staging are **true**, and an absent flag is
 legacy-safe (false). Production auto-deploy must not activate timestamps before
 the API's Postgres cutover. Enable production only after verifying persistence.
 
-When enabled, `POST /Expense` sends `{date: 'yyyy-MM-dd', occurredAt:
-ISO8601-with-offset, currency: 'EUR', amount, description, category}` and the
+When enabled, `POST /Expense` sends `{date: ISO8601-with-offset,
+currency: 'EUR', amount, description, category}` and the
 approved Time control/validation applies. When disabled, Time is not rendered or
 validated and POST sends **only** `{date, amount, description, category}`. The
 central ExpenseApi gate applies to every create path, including favorites.
-Sheets explicitly returns 409 for occurrence writes; it does not merely ignore
-unknown timestamp fields. Never discard an enabled timestamp to retry as legacy.
+The single create-request `date` maps to the API's booking date. The central
+transport selects internal `occurredAt ?? date` when enabled, otherwise the legacy
+date-only `date`; it never forwards an `occurredAt` request property. Internal
+form/prefill and latest-response `date`/`occurredAt` contracts are unchanged. Known
+offset timestamps retain fractional seconds (up to microseconds) verbatim.
+Sheets explicitly returns 409 for precise timestamp input; it does not support
+occurrence writes. Never discard an enabled timestamp to retry as legacy.
 
 Amounts use normalized invariant **decimal strings**, not JavaScript Number
 conversion, preserving `123456789.123456789` and `9007199254740993` through form

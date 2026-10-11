@@ -75,7 +75,8 @@ test.describe('Bank review page (issue #61, stubbed data, signed in)', () => {
     await page.locator('[data-testid="save-expense"]:visible').click();
     await expect(page).toHaveURL(/saved=1/);
     expect(body?.['amount']).toBe('123456789.123456789');
-    expect(Object.hasOwn(body!, 'occurredAt')).toBe(process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true');
+    expect(body).not.toHaveProperty('occurredAt');
+    expect(String(body?.['date']).includes('T')).toBe(process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true');
   });
 
   test('mobile: sync button posts and surfaces the fetched/new result', async ({ page }) => {
