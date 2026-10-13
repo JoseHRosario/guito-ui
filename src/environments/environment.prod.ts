@@ -5,7 +5,8 @@
  */
 export const environment = {
   production: true,
-  expenseTimestampsEnabled: false,
+  // Postgres authority is active after guito-api#132; creates require bookingDate (#145).
+  expenseTimestampsEnabled: true,
   googleClientId: '665373918058-15r7orcfdr1tsi1uef1ev7f66fs17rtc.apps.googleusercontent.com',
   apiBaseUrl: 'https://guito.api.kerumirembora.com',
   version: '0.0.0-dev',

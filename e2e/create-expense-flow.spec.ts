@@ -47,7 +47,7 @@ async function stubExpenseApis(page: Page): Promise<{ expenses: typeof SEED_EXPE
     const body = route.request().postDataJSON() as { date?: string; bookingDate?: string; currency: string; amount: string; description: string; category: string };
     state.created.push(body);
     state.expenses = [
-      { id: 99, bookingDate: (process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true' ? body.bookingDate : body.date)!, currency: body.currency, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
+      { id: 99, bookingDate: (process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false' ? body.bookingDate : body.date)!, currency: body.currency, amount: body.amount, description: body.description, category: body.category, creatorEmail: 'e2e@guito.app' },
       ...state.expenses,
     ];
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 99 }) });
@@ -69,7 +69,7 @@ test.describe('create expense flow (stubbed API, signed in)', () => {
       expect(state.created).toHaveLength(1);
       expect(state.created[0]['amount']).toBe(amount);
       expect(state.created[0]).not.toHaveProperty('occurredAt');
-      const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+      const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false';
       expect(state.created[0]).not.toHaveProperty(enabled ? 'date' : 'bookingDate');
       expect(String(state.created[0][enabled ? 'bookingDate' : 'date']).includes('T')).toBe(enabled);
       await expect(page.locator('[data-testid="expense-row"]:visible').first()).toContainText('Signed exact');
@@ -175,7 +175,7 @@ test.describe('favorites speed-dial (stubbed API, signed in)', () => {
 
     // The preset posts as-is: positive amount, today's date, exact description/category.
     expect(state.created).toHaveLength(1);
-    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false';
     expect(state.created[0]).toEqual({ [enabled ? 'bookingDate' : 'date']: enabled ? '2026-07-02T00:15:42+01:00' : '2026-07-02', ...(enabled ? { currency: 'EUR' } : {}), amount: '2.3', description: 'Coco Verde', category: 'Eating out' });
 
     await expect(page).toHaveURL(/\/\?saved=1$/);

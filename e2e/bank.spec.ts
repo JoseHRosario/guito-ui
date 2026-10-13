@@ -76,7 +76,7 @@ test.describe('Bank review page (issue #61, stubbed data, signed in)', () => {
     await expect(page).toHaveURL(/saved=1/);
     expect(body?.['amount']).toBe('123456789.123456789');
     expect(body).not.toHaveProperty('occurredAt');
-    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false';
     expect(body).not.toHaveProperty(enabled ? 'date' : 'bookingDate');
     expect(String(body?.[enabled ? 'bookingDate' : 'date']).includes('T')).toBe(enabled);
   });

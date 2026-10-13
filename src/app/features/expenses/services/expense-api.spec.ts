@@ -5,6 +5,7 @@ import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { authInterceptor } from '../../../core/auth/auth-interceptor';
 import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
 import { ExpenseApi } from './expense-api';
+import { environment as productionEnvironment } from '../../../../environments/environment.prod';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -30,7 +31,7 @@ describe('ExpenseApi.latest', () => {
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
-        { provide: APP_ENVIRONMENT, useValue: TEST_ENV },
+        { provide: APP_ENVIRONMENT, useValue: { ...TEST_ENV } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -53,6 +54,30 @@ describe('ExpenseApi.latest', () => {
       { id: 12, description: 'H&M', amount: '-65.55', bookingDate: '2021-01-03T10:12:00+00:00', category: 'Clothing', icon: 'tag' },
       { id: 13, description: 'Salary', amount: '2500', bookingDate: '2021-01-02T08:00:00', category: '', icon: 'tag' },
     ]);
+  });
+
+  it('production creates use the Postgres bookingDate contract and preserve exact amounts', async () => {
+    const env = TestBed.inject(APP_ENVIRONMENT);
+    Object.assign(env, productionEnvironment);
+    const pending = TestBed.inject(ExpenseApi).create({
+      date: '2026-07-02T00:15:42+01:00',
+      currency: 'EUR',
+      amount: '9007199254740993',
+      description: 'Production contract regression',
+      category: 'Food',
+    });
+    const req = http.expectOne(`${productionEnvironment.apiBaseUrl}/Expense`);
+    req.flush({ id: 123 });
+    await expect(pending).resolves.toBe(123);
+    expect(req.request.body).toEqual({
+      bookingDate: '2026-07-02T00:15:42+01:00',
+      currency: 'EUR',
+      amount: '9007199254740993',
+      description: 'Production contract regression',
+      category: 'Food',
+    });
+    expect(req.request.body).not.toHaveProperty('date');
+    expect(req.request.body).not.toHaveProperty('occurredAt');
   });
 
   it.each([undefined, false, true])('create centrally gates all callers with capability %s', async expenseTimestampsEnabled => {

@@ -9,7 +9,7 @@ for (const [name, viewport, date, offset] of [
   ['mobile', { width: 402, height: 874 }, '2026-10-02', '+01:00'],
   ['desktop', { width: 1440, height: 1033 }, '2026-01-02', '+00:00'],
 ] as const) {
-  test(`${name}: ${process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true' ? 'timestamp capability, Lisbon/DST and exact save' : 'production legacy date-only exact save'}`, async ({ page }) => {
+  test(`${name}: ${process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false' ? 'timestamp capability, Lisbon/DST and exact save' : 'legacy capability date-only exact save'}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.clock.setFixedTime(new Date('2026-07-01T23:15:42Z'));
     await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub-id', accessToken: 'stub-access', expiresAt: Date.now() + 3600000 })), SESSION_KEY);
@@ -17,7 +17,7 @@ for (const [name, viewport, date, offset] of [
     await page.route('**/Category', route => route.fulfill({ json: { categories: [{ name: 'Clothing' }] } }));
     await page.goto('/expenses/create');
     await expect(page.locator(visible('date-input'))).toHaveValue('2026-07-02');
-    if (process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'true') {
+    if (process.env['GUITO_TIMESTAMPS_ENABLED'] === 'false') {
       await expect(page.getByTestId('time-input')).toHaveCount(0);
       await expect(page.locator(visible('category-select'))).toHaveValue('Clothing');
       await page.locator(visible('amount-input')).fill('123456789,123456789');
