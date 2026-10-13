@@ -12,9 +12,9 @@ import { BankPage } from './bank-page';
 const TEST_ENV = { apiBaseUrl: 'https://api.test', googleClientId: 'cid' };
 
 const PENDING = [
-  { id: 7, bookingDate: '2026-10-02', amount: '58.93', currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', suggestedCategoryId: 3, suggestedCategory: 'Shopping' },
-  { id: 8, bookingDate: '2026-10-02', amount: '12.4', currency: 'EUR', remittanceInformation: 'MB WAY PURCHASE 4477 LISBOA', suggestedCategoryId: 2, suggestedCategory: 'Eating out' },
-  { id: 9, bookingDate: '2026-10-01', amount: '200', currency: 'EUR', remittanceInformation: 'TRF MB WAY PARA MARIA S', suggestedCategory: null },
+  { id: 7, bookingDate: '2026-10-02', amount: '58.93', currency: 'EUR', remittanceInformation: 'CONTINENTE ONLINE 8831', status: 'BOOK', reviewStatus: 'needsReview', suggestedCategory: { id: 3, name: 'Shopping' } },
+  { id: 8, bookingDate: '2026-10-02', amount: '12.4', currency: 'EUR', remittanceInformation: 'MB WAY PURCHASE 4477 LISBOA', status: 'BOOK', reviewStatus: 'ignored', suggestedCategory: { id: 2, name: 'Eating out' } },
+  { id: 9, bookingDate: '2026-10-01', amount: '200', currency: 'EUR', remittanceInformation: 'TRF MB WAY PARA MARIA S', status: 'BOOK', reviewStatus: 'matched', suggestedCategory: null, linkedExpense: { id: 12, bookingDate: '2026-10-01T23:30:00+00:00', amount: '200', currency: 'EUR', description: 'Expense paid', category: 'Bills' } },
 ];
 
 function setup(): HttpTestingController {
@@ -66,7 +66,51 @@ describe('BankPage (issue #61)', () => {
     vi.restoreAllMocks();
   });
 
-  it('loads pending transactions and renders date-grouped rows newest first', async () => {
+  it('starts collapsed and expands exactly one row on click, then collapses on a second click', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http);
+    await tick();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const toggles = el.querySelectorAll<HTMLButtonElement>('[data-testid=bank-row-toggle]');
+    expect(toggles).toHaveLength(6);
+    expect([...toggles].every(button => button.getAttribute('aria-expanded') === 'false')).toBe(true);
+    toggles[0].click(); fixture.detectChanges();
+    expect(toggles[0].getAttribute('aria-expanded')).toBe('true');
+    toggles[1].click(); fixture.detectChanges();
+    expect(toggles[0].getAttribute('aria-expanded')).toBe('false');
+    expect(toggles[1].getAttribute('aria-expanded')).toBe('true');
+    toggles[1].click(); fixture.detectChanges();
+    expect(el.querySelector('[data-testid=bank-details]')).toBeNull();
+  });
+
+  it('shows the approved bank status and currency details without duplicate description or suggestion copy', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http);
+    await tick();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click();
+    fixture.detectChanges();
+
+    const panel = el.querySelector('[data-testid=bank-details]')!;
+    expect(panel.textContent).toContain('Bank booking status: BOOK');
+    expect(panel.textContent).toContain('Currency: EUR');
+    expect(panel.textContent).not.toContain('CONTINENTE ONLINE 8831');
+    expect(panel.textContent).not.toContain('Suggested category');
+  });
+
+  it('renders the bank schema maximum amount without losing its cents', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http, [{ ...PENDING[0], amount: '9999999999999999.99' }]);
+    await tick();
+    fixture.detectChanges();
+
+    const amount = (fixture.nativeElement as HTMLElement).querySelector('[data-testid=bank-amount]')!;
+    expect(amount.textContent?.replace(/[\u00a0\u202f]/g, ' ').trim()).toBe('9 999 999 999 999 999,99 €');
+  });
+
+  it('loads the inbox in a single card with booking day and review status', async () => {
     const fixture = TestBed.createComponent(BankPage);
     const load = http.expectOne('https://api.test/BankTransaction');
     load.flush(PENDING);
@@ -75,12 +119,6 @@ describe('BankPage (issue #61)', () => {
 
     const el = fixture.nativeElement as HTMLElement;
     // jsdom renders BOTH responsive branches — every testid appears twice.
-    const groups = Array.from(el.querySelectorAll('[data-testid=bank-group]'));
-    expect(groups.length).toBe(4);
-    expect(groups[0].textContent).toContain('02/10/2026');
-    expect(groups[1].textContent).toContain('01/10/2026');
-    expect(groups[2].textContent).toContain('02/10/2026');
-    expect(groups[3].textContent).toContain('01/10/2026');
     const rows = Array.from(el.querySelectorAll('[data-testid=bank-row]'));
     expect(rows.length).toBe(6);
     expect((rows[0].textContent ?? '')).toContain('CONTINENTE ONLINE 8831');
@@ -190,6 +228,17 @@ describe('BankPage (issue #61)', () => {
     expect(el.querySelector('[data-testid=open-settings]')).not.toBeNull();
   });
 
+  it('expired consent during Sync keeps existing transactions and offers Open Settings', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http); await tick(); fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
+    http.expectOne('https://api.test/BankTransaction/sync').flush({}, { status: 409, statusText: 'Conflict' });
+    await tick(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(6);
+    expect(el.querySelector('[data-testid=open-settings]')).not.toBeNull();
+  });
+
   it('a non-409 sync failure keeps the generic message', async () => {
     const fixture = TestBed.createComponent(BankPage);
     await flushUnlinked(http);
@@ -237,16 +286,6 @@ describe('BankPage (issue #61)', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=sync-spinner]')).toBeNull();
   });
 
-  it('shows the No suggestion meta for rows without a Jev category', async () => {
-    const fixture = TestBed.createComponent(BankPage);
-    const load = http.expectOne('https://api.test/BankTransaction');
-    load.flush([PENDING[2]]);
-    await fixture.whenStable();
-    fixture.detectChanges();
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('No suggestion');
-  });
-
   it('sync button POSTs /BankTransaction/sync then reloads the pending list', async () => {
     const fixture = TestBed.createComponent(BankPage);
     await flushUnlinked(http);
@@ -273,38 +312,144 @@ describe('BankPage (issue #61)', () => {
     expect(text).toContain('+3 new');
   });
 
-  it('accept navigates to the create form prefilled from the transaction (suggested category included)', async () => {
+  it('filters All, Needs review, Matched and Ignored locally, with matched expense metadata and no Accept', async () => {
     const fixture = TestBed.createComponent(BankPage);
-    flushPending(http, [PENDING[0]]);
-    await fixture.whenStable();
-    fixture.detectChanges();
+    flushPending(http); await tick(); fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid=accept-transaction]')).toBeNull();
+    const filters = el.querySelectorAll<HTMLButtonElement>('[data-testid=bank-filter]');
+    expect(filters).toHaveLength(8);
+    expect(filters[0].getAttribute('aria-pressed')).toBe('true');
+    expect(el.textContent).toContain('Expense paid');
+    filters[1].click(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(2);
+    expect(el.textContent).toContain('Needs review');
+    filters[2].click(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(2);
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    expect(el.querySelector('[data-testid=bank-details]')?.textContent).toContain('02/10/2026');
+    expect(el.querySelector('[data-testid=bank-details]')?.textContent).toContain('Bills');
+    expect(el.querySelector('[data-testid=bank-action]')).toBeNull();
+    filters[3].click(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(2);
+    expect(el.querySelector('[data-testid=bank-details]')).toBeNull();
+    http.expectNone('https://api.test/BankTransaction');
+  });
 
-    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-    const accept = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid=accept-transaction]');
-    expect(accept).not.toBeNull();
-    accept!.click();
-    await new Promise((r) => setTimeout(r, 0));
+  it('ignores a needs-review row once, shows a row spinner, then returns it to review using authoritative DTOs', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http); await tick(); fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    const button = el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!;
+    expect(button?.textContent).toContain('Ignore');
+    button.click(); button.click(); fixture.detectChanges();
+    const ignore = http.expectOne('https://api.test/BankTransaction/7/ignore');
+    expect(ignore.request.method).toBe('POST');
+    expect(ignore.request.body).toEqual({});
+    expect(button.disabled).toBe(true);
+    expect(el.querySelector('[data-testid=sync-spinner]')).toBeNull();
+    expect(el.querySelector('[data-testid=bank-action-spinner]')).not.toBeNull();
+    ignore.flush({ ...PENDING[0], reviewStatus: 'ignored', suggestedCategory: null });
+    await tick(); fixture.detectChanges();
+    expect(el.querySelector('[data-testid=bank-action-spinner]')).toBeNull();
+    expect(el.querySelector('[data-testid=bank-details]')?.textContent).toContain('Currency: EUR');
+    const reviewButton = el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!;
+    expect(reviewButton.textContent).toContain('Return to review');
+    reviewButton.click();
+    const review = http.expectOne('https://api.test/BankTransaction/7/review');
+    expect(review.request.method).toBe('POST');
+    expect(review.request.body).toEqual({});
+    review.flush(PENDING[0]); await tick(); fixture.detectChanges();
+    expect(el.querySelector('[data-testid=bank-action]')?.textContent).toContain('Ignore');
+  });
 
-    expect(navigate).toHaveBeenCalledWith(['/expenses/create'], {
-      state: {
-        bankPrefill: {
-          description: 'CONTINENTE ONLINE 8831',
-          amount: '58.93',
-          date: '2026-10-02',
-          category: 'Shopping',
-        },
-      },
-    });
+  it.each([400, 404, 500])('preserves the row and error after a failed transition (%s) and lets the user retry', async status => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http); await tick(); fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click();
+    http.expectOne('https://api.test/BankTransaction/7/ignore').flush({}, { status, statusText: 'Failure' });
+    await tick(); fixture.detectChanges();
+    expect(el.querySelector('[data-testid=bank-row-error]')?.textContent).toContain('Could not update');
+    expect(el.querySelector('[data-testid=bank-row]')?.textContent).toContain('Needs review');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')?.disabled).toBe(false);
+    expect(el.querySelector('[data-testid=bank-action-spinner]')).toBeNull();
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click();
+    http.expectOne('https://api.test/BankTransaction/7/ignore').flush({ ...PENDING[0], reviewStatus: 'ignored' });
+    await tick(); fixture.detectChanges();
+    expect(el.querySelector('[data-testid=bank-row-error]')).toBeNull();
+  });
+
+  it.each([false, true])('refreshes authoritative state after 409, preserves rows on refresh failure=%s, and never retries the action', async failRefresh => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http); await tick(); fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click();
+    http.expectOne('https://api.test/BankTransaction/7/ignore').flush({}, { status: 409, statusText: 'Conflict' });
+    await tick(); fixture.detectChanges();
+    const refresh = http.expectOne('https://api.test/BankTransaction');
+    expect(el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')?.disabled).toBe(true);
+    if (failRefresh) refresh.flush({}, { status: 500, statusText: 'Failure' });
+    else refresh.flush([{ ...PENDING[0], reviewStatus: 'matched', linkedExpense: PENDING[2].linkedExpense }, PENDING[1], PENDING[2]]);
+    await tick(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(6);
+    expect(el.querySelector('[data-testid=bank-row-error]')).not.toBeNull();
+    if (failRefresh) {
+      expect(el.querySelector('[data-testid=bank-error]')).not.toBeNull();
+      el.querySelector<HTMLButtonElement>('[data-testid=bank-retry]')!.click();
+      http.expectOne('https://api.test/BankTransaction').flush(PENDING);
+      await tick(); fixture.detectChanges();
+      expect(el.querySelector('[data-testid=bank-error]')).toBeNull();
+    } else {
+      expect(el.querySelector('[data-testid=bank-details]')?.textContent).toContain('Expense paid');
+      expect(el.querySelector('[data-testid=bank-action]')).toBeNull();
+    }
+    http.expectNone('https://api.test/BankTransaction/7/ignore');
+  });
+
+  it('serializes refresh and transition, allowing filters to change without overwriting the chosen view', async () => {
+    const fixture = TestBed.createComponent(BankPage);
+    flushPending(http); await tick(); fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click(); fixture.detectChanges();
+    expect(el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]')?.disabled).toBe(true);
+    el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
+    http.expectNone('https://api.test/BankTransaction/sync');
+    el.querySelectorAll<HTMLButtonElement>('[data-testid=bank-filter]')[3].click(); fixture.detectChanges();
+    http.expectOne('https://api.test/BankTransaction/7/ignore').flush({ ...PENDING[0], reviewStatus: 'ignored' });
+    await tick(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(4);
+    expect(el.querySelector('[data-testid=bank-details]')).toBeNull();
+    expect(el.querySelectorAll('[data-testid=bank-filter]')[3].getAttribute('aria-pressed')).toBe('true');
+    el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
+    http.expectOne('https://api.test/BankTransaction/sync').flush({ fetched: 3, new: 0 });
+    await tick(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    expect(el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')?.disabled).toBe(true);
+    http.expectOne('https://api.test/BankTransaction').flush({}, { status: 500, statusText: 'Failure' });
+    await tick(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(4);
+    expect(el.querySelector('[data-testid=bank-error]')).not.toBeNull();
   });
 
   it('load failure keeps the page usable with an error line and the sync button', async () => {
     const fixture = TestBed.createComponent(BankPage);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=bank-loading]')).not.toBeNull();
     const load = http.expectOne('https://api.test/BankTransaction');
     load.flush({ message: 'boom' }, { status: 500, statusText: 'Server Error' });
-    await fixture.whenStable();
+    await tick();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid=bank-error]')).not.toBeNull();
     expect(el.querySelector('[data-testid=sync-bank]')).not.toBeNull();
+    el.querySelector<HTMLButtonElement>('[data-testid=bank-retry]')!.click();
+    flushPending(http); await tick(); fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(6);
+    expect(el.querySelector('[data-testid=bank-error]')).toBeNull();
   });
 });

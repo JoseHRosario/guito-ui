@@ -7,8 +7,9 @@ New manual expenses capture one current instant when the form opens. Date and
 native Time (`HH:mm` wire value) are editable; favorites capture now on tap.
 A date-only voice proposal or bank booking retains its day and defaults its time
 to the form's captured current Lisbon time. Midnight is only a historical import
-rule, not the default for new expenses. Bank acceptance still only prefills the
-form: this issue does not implement atomic create-and-match or automatic matching.
+rule, not the default for new expenses. The former Bank Accept action only
+prefilled the form; #133 removes it from the inbox (ADR 0015). Atomic create-and-link
+is #135; no automatic matching is implied.
 
 Known offset timestamps supplied through voice/bank prefill are displayed in
 Lisbon and preserved verbatim (including offset and seconds) on an unchanged
@@ -69,11 +70,11 @@ becomes `0`. .NET decimal's 96-bit coefficient / scale <=28 are checked textuall
 against the absolute coefficient before submission. The coordinated API accepts numeric or
 string amounts; old numeric clients remain compatible. Latest/AI publish a single exact decimal-string `amount`, not `amountExact`.
 Expense/AI/bank prefills and favorites retain only canonical decimal text.
-The bank endpoint's unrelated numeric amount/optional amountExact contract stays
-unchanged: normalize at the bank HTTP mapping boundary, prefer exact metadata
-when supplied, then discard the sibling. Number conversion is rendering-only. Without exact
-metadata, numeric prefills/favorites preserve the value already represented by
-the Number's string serialization, not precision previously lost upstream.
+The bank endpoint now publishes one exact decimal-string amount for #133
+(ADR 0015); numeric legacy amounts normalize only at the bank HTTP boundary.
+Number conversion is rendering-only. Numeric prefills/favorites preserve the value
+already represented by the Number's string serialization, not precision previously
+lost upstream.
 Trailing insignificant zeros may be normalized; no two-decimal transport rounding
 is applied. Bank display formatting/suggestion logic is unchanged. UI deployment
 alone does **not** prove the API's decimal-string contract or persistence.

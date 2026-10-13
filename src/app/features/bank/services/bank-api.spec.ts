@@ -17,7 +17,7 @@ const API_PENDING = [
     amount: 58.93,
     currency: 'EUR',
     remittanceInformation: 'CONTINENTE ONLINE 8831',
-    suggestedCategoryId: 3, suggestedCategory: 'Shopping',
+    suggestedCategory: { id: 3, name: 'Shopping' },
     direction: 'DBIT',
     status: 'BOOK',
   },
@@ -55,8 +55,27 @@ describe('BankApi', () => {
     localStorage.removeItem(SESSION_STORAGE_KEY);
   });
 
+  it('lists all review states with optional selected query and preserves exact linked-expense data', async () => {
+    const api = TestBed.inject(BankApi);
+    const promise = api.list('matched');
+    const req = http.expectOne('https://api.test/BankTransaction?reviewStatus=matched');
+    expect(req.request.headers.get('x-google-idtoken')).toBe('id-token');
+    req.flush([{ id: '9223372036854775807', accountUid: 'account-test', bookingDate: '2026-10-02', amount: '123456789.123456789', currency: 'EUR', status: 'BOOK', reviewStatus: 'matched', remittanceInformation: 'Bank description', suggestedCategory: { id: 3, name: 'Shopping' }, linkedExpense: { id: 12, bookingDate: '2026-10-02T23:30:00+01:00', amount: '123456789.123456789', currency: 'EUR', description: 'Expense description', category: 'Shopping' } }]);
+    expect(await promise).toEqual([{ id: '9223372036854775807', accountUid: 'account-test', date: '2026-10-02', amount: '123456789.123456789', currency: 'EUR', status: 'BOOK', reviewStatus: 'matched', description: 'Bank description', suggestedCategory: { id: '3', name: 'Shopping' }, linkedExpense: { id: 12, bookingDate: '2026-10-02T23:30:00+01:00', amount: '123456789.123456789', currency: 'EUR', description: 'Expense description', category: 'Shopping' } }]);
+  });
+
+  it('preserves distinct numeric Int64 IDs from the actual JSON list without rounding', async () => {
+    const promise = TestBed.inject(BankApi).list();
+    const req = http.expectOne('https://api.test/BankTransaction');
+    req.flush('[{"id":9007199254740992,"remittanceInformation":"first"},{"id":9007199254740993,"remittanceInformation":"second"},{"id":9223372036854775807,"linkedExpense":{"id":12,"bookingDate":"2026-10-02T12:00:00+01:00","amount":"8.99","currency":"EUR","description":"Expense","category":"Entertainment"}}]');
+
+    const rows = await promise;
+    expect(rows.map(row => row.id)).toEqual(['9007199254740992', '9007199254740993', '9223372036854775807']);
+    expect(rows[2].linkedExpense?.id).toBe(12);
+  });
+
   it('GET /BankTransaction sends the human-auth headers and maps pending rows tolerantly', async () => {
-    const promise = TestBed.inject(BankApi).pending();
+    const promise = TestBed.inject(BankApi).list();
 
     const req = http.expectOne('https://api.test/BankTransaction');
     expect(req.request.method).toBe('GET');
@@ -66,7 +85,7 @@ describe('BankApi', () => {
     const rows = await promise;
     expect(rows).toEqual([
       {
-        id: '7',
+        id: '7', accountUid: '', status: 'BOOK', reviewStatus: 'needsReview', linkedExpense: null,
         date: '2026-10-02',
         amount: '58.93',
         currency: 'EUR',
@@ -74,7 +93,7 @@ describe('BankApi', () => {
         suggestedCategory: { id: '3', name: 'Shopping' },
       },
       {
-        id: '8',
+        id: '8', accountUid: '', status: '', reviewStatus: 'needsReview', linkedExpense: null,
         date: '2026-10-01',
         amount: '200',
         currency: 'EUR',
@@ -85,27 +104,63 @@ describe('BankApi', () => {
   });
 
   it('pending() drops rows without usable identity and tolerates null fields', async () => {
-    const promise = TestBed.inject(BankApi).pending();
+    const promise = TestBed.inject(BankApi).list();
     const req = http.expectOne('https://api.test/BankTransaction');
     req.flush([
       null,
       { bookingDate: '2026-10-03', amount: 5, currency: 'EUR', remittanceInformation: 'X' },
-      { id: 9, amount: null, currency: null, remittanceInformation: null, suggestedCategoryId: 5, suggestedCategory: 'Bills' },
+      { id: 9, amount: null, currency: null, remittanceInformation: null, suggestedCategory: { id: 5, name: 'Bills' } },
     ]);
     const rows = await promise;
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toEqual({ id: '', date: '2026-10-03', amount: '5', currency: 'EUR', description: 'X', suggestedCategory: null });
-    expect(rows[1].description).toBe('');
-    expect(rows[1].suggestedCategory).toEqual({ id: '5', name: 'Bills' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].description).toBe('');
+    expect(rows[0].suggestedCategory).toEqual({ id: '5', name: 'Bills' });
   });
 
   it.each(['9007199254740993', '-123456789.123456789', '0'])('normalizes bank exact metadata %s into a single amount', async amount => {
-    const pending = TestBed.inject(BankApi).pending();
-    http.expectOne('https://api.test/BankTransaction').flush([{ id: 'bank-id', amount: 9007199254740992, amountExact: amount }]);
+    const pending = TestBed.inject(BankApi).list();
+    http.expectOne('https://api.test/BankTransaction').flush([{ id: '9', amount }]);
     const [row] = await pending;
     expect(row.amount).toBe(amount);
-    expect(row.id).toBe('bank-id');
+    expect(row.id).toBe('9');
     expect(row).not.toHaveProperty('amountExact');
+  });
+
+  it.each(['all', 'needsReview', 'matched', 'ignored'] as const)('sends the selected %s filter unchanged', async status => {
+    const promise = TestBed.inject(BankApi).list(status);
+    const req = http.expectOne(`https://api.test/BankTransaction?reviewStatus=${status}`);
+    expect(req.request.method).toBe('GET');
+    req.flush([]); expect(await promise).toEqual([]);
+  });
+
+  it.each(['ignore', 'review'] as const)('POST %s preserves the Int64 path and returns the complete DTO on repeated idempotent requests', async action => {
+    const api = TestBed.inject(BankApi);
+    for (let repeat = 0; repeat < 2; repeat++) {
+      const promise = api[action]('9223372036854775807');
+      const req = http.expectOne(`https://api.test/BankTransaction/9223372036854775807/${action}`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({});
+      expect(req.request.headers.get('x-google-idtoken')).toBe('id-token');
+      req.flush({ ...API_PENDING[0], id: '9223372036854775807', amount: '9007199254740993', reviewStatus: action === 'ignore' ? 'ignored' : 'needsReview', linkedExpense: null });
+      const row = await promise;
+      expect(row.id).toBe('9223372036854775807');
+      expect(row.amount).toBe('9007199254740993');
+      expect(row.reviewStatus).toBe(action === 'ignore' ? 'ignored' : 'needsReview');
+      expect(row.linkedExpense).toBeNull();
+    }
+  });
+
+  it('uses the original numeric list identity for an action and preserves its numeric response', async () => {
+    const api = TestBed.inject(BankApi);
+    const listing = api.list();
+    http.expectOne('https://api.test/BankTransaction').flush('[{"id":9223372036854775807,"reviewStatus":"needsReview"}]');
+    const [loaded] = await listing;
+
+    const action = api.ignore(loaded.id);
+    const req = http.expectOne('https://api.test/BankTransaction/9223372036854775807/ignore');
+    req.flush('{"id":9223372036854775807,"reviewStatus":"ignored","linkedExpense":null}');
+
+    expect((await action).id).toBe('9223372036854775807');
   });
 
   it('POST /BankTransaction/sync returns the fetched/new counts', async () => {

@@ -1,196 +1,138 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { NgTemplateOutlet } from '@angular/common';
-import { GIcon, type IconName } from '../../../shared/gicon';
+import { GIcon } from '../../../shared/gicon';
 import { SyncButton } from '../components/sync-button';
-import { formatEur } from '../../expenses/services/money';
 import { BankApi } from '../services/bank-api';
 import type { BankTransaction } from '../models/bank-transaction';
+import type { BankReviewStatus } from '../models/bank-review-status';
 
-/** Suggested category → list-row lucide glyph; 'briefcase' fallback for unknown categories. */
-function categoryIcon(category: { name: string } | null): IconName {
-  if (category === null) return 'briefcase';
-  const ICONS: Readonly<Record<string, IconName>> = {
-    clothing: 'tag',
-    broadband: 'wifi',
-    shopping: 'shopping-bag',
-    bills: 'zap',
-    entertainment: 'film',
-    snacks: 'utensils',
-    health: 'heart',
-    'eating out': 'utensils',
-  };
-  return ICONS[category.name.toLowerCase()] ?? 'briefcase';
-}
-
-/** Date-group header: 'Today · 02/10/2026' / 'Yesterday · …' / plain date. */
-export function groupLabel(isoDate: string, todayIso: string): string {
-  const diff = daysBetween(todayIso, isoDate);
-  const date = isoDate.slice(8, 10) + '/' + isoDate.slice(5, 7) + '/' + isoDate.slice(0, 4);
-  if (diff === 0) return `Today · ${date}`;
-  if (diff === 1) return `Yesterday · ${date}`;
-  return date;
-}
-
-/** Whole days `from` − `to` (both ISO yyyy-MM-dd), ignoring DST edges. */
-function daysBetween(from: string, to: string): number {
-  const a = Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10));
-  const b = Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10));
-  return Math.round((a - b) / 86_400_000);
-}
-
-interface TransactionGroup {
-  date: string;
-  label: string;
-  transactions: BankTransaction[];
-}
-
-/** Type-narrowing helper: `error` is an HttpErrorResponse with that status. */
 function isHttp(error: unknown, status: number): boolean {
   return error instanceof HttpErrorResponse && error.status === status;
 }
+function day(value: string): string {
+  return value ? `${value.slice(8, 10)}/${value.slice(5, 7)}/${value.slice(0, 4)}` : 'Unknown date';
+}
+function money(amount: string, currency: string): string {
+  if (!amount) return '—';
+  try {
+    // ECMA-402 accepts exact decimal strings; TypeScript's signature still only names number/bigint.
+    const format = new Intl.NumberFormat('pt-PT', { style: 'currency', currency }).format as unknown as (value: string) => string;
+    return format(amount);
+  }
+  catch { return `${amount} ${currency}`; }
+}
+const LABELS = { needsReview: 'Needs review', matched: 'Matched', ignored: 'Ignored' };
 
-/**
- * Bank review page (issue #61): pending (unmatched) bank transactions with
- * sync and accept-to-expense, per the approved Figma frames (mobile 3201:270,
- * desktop 3201:10189). Accept opens the Create Expense form prefilled; there
- * is no reject action in this MVP (unmatched rows stay visible until matched —
- * match flow is guito-api#83).
- */
+/** Approved #133 inbox: all rows collapsed on entry, one inline detail on click. */
 @Component({
   selector: 'g-bank-page',
   templateUrl: './bank-page.html',
   styleUrl: './bank.css',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [GIcon, NgTemplateOutlet, SyncButton],
 })
 export class BankPage {
   private readonly bankApi = inject(BankApi);
   private readonly router = inject(Router);
-
   protected readonly transactions = signal<readonly BankTransaction[]>([]);
+  protected readonly expandedId = signal<string | null>(null);
+  protected readonly filter = signal<BankReviewStatus | 'all'>('all');
+  protected readonly filters = [
+    { value: 'all', label: 'All' }, { value: 'needsReview', label: 'Needs review' },
+    { value: 'matched', label: 'Matched' }, { value: 'ignored', label: 'Ignored' },
+  ] as const;
   protected readonly loading = signal(true);
+  protected readonly refreshing = signal(false);
   protected readonly loadError = signal(false);
   protected readonly syncing = signal(false);
-  /** Result of the last sync, e.g. '+3 new · 12 fetched'; null hides the line. */
-  protected readonly syncResult = signal<string | null>(null);
-  /**
-   * No linked bank account (issue #64): probed via GET /BankConnection only
-   * when the pending list is empty, and forced on a sync-409. Drives the
-   * empty-state 'Bank connection' section + Open Settings action.
-   */
-  protected readonly notLinked = signal(false);
-
-  /** `?linked=N` from the consent callback 302 (guito-api#117): N = accounts linked. */
-  readonly linked = input<string>();
-
-  /** Accounts linked by the consent flow, null when this is not a callback landing. */
-  protected readonly linkedCount = computed(() => {
-    const value = this.linked();
-    return value === undefined ? null : Math.max(0, Math.trunc(Number(value)) || 0);
-  });
-
-  /** Accounts to confirm (null = no confirmation): a 0-account callback landing must NOT show success. */
-  protected readonly linkedConfirmed = computed(() => {
-    const count = this.linkedCount();
-    return count !== null && count > 0 ? count : null;
-  });
-
-  /** Groups newest-first so the review starts at the most recent booking day. */
-  protected readonly groups = computed<TransactionGroup[]>(() => {
-    const today = new Date();
-    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const byDate = new Map<string, BankTransaction[]>();
-    for (const tx of this.transactions()) {
-      const list = byDate.get(tx.date) ?? [];
-      list.push(tx);
-      byDate.set(tx.date, list);
-    }
-    return [...byDate.keys()]
-      .sort()
-      .reverse()
-      .map((date) => ({ date, label: groupLabel(date, todayIso), transactions: byDate.get(date) ?? [] }));
-  });
-
-  constructor() {
-    void this.load();
-  }
-
-  protected async load(): Promise<void> {
+  // Serialize transitions and refreshes so an older list cannot overwrite an updated row.
+  protected readonly pendingId = signal<string | null>(null);
+  protected readonly rowError = signal<{ id: string; message: string } | null>(null);
+  protected readonly busy = computed(() => this.refreshing() || this.syncing() || this.pendingId() !== null);
+  protected async transition(tx: BankTransaction): Promise<void> {
+    if (this.busy() || tx.reviewStatus === 'matched') return;
+    this.pendingId.set(tx.id);
+    this.rowError.set(null);
     try {
-      const rows = await this.bankApi.pending();
-      this.transactions.set(rows);
-      this.loadError.set(false);
-      // Empty pending list may mean no linked account (issue #64) — probe the
-      // connection (not on every load; a 409 on the GET also implies it).
-      if (rows.length === 0) await this.probeLink();
+      const updated = await (tx.reviewStatus === 'ignored' ? this.bankApi.review(tx.id) : this.bankApi.ignore(tx.id));
+      this.transactions.update(rows => rows.map(row => row.id === tx.id ? updated : row));
     } catch (error) {
       if (isHttp(error, 409)) {
-        this.notLinked.set(true);
-      } else {
-        this.loadError.set(true);
-      }
+        this.rowError.set({ id: tx.id, message: 'Transaction changed — refreshing its review state.' });
+        await this.load();
+        this.rowError.set({ id: tx.id, message: this.loadError()
+          ? 'Could not refresh transaction — previous list unchanged. Use Retry.'
+          : 'Transaction changed — review the refreshed state.' });
+      } else this.rowError.set({ id: tx.id, message: 'Could not update transaction — try again.' });
+    } finally { this.pendingId.set(null); }
+  }
+  protected retry(): void {
+    if (!this.busy()) void this.load();
+  }
+  protected readonly syncResult = signal<string | null>(null);
+  protected readonly notLinked = signal(false);
+  readonly linked = input<string>();
+  protected readonly linkedConfirmed = computed(() => {
+    const count = Math.trunc(Number(this.linked()));
+    return Number.isFinite(count) && count > 0 ? count : null;
+  });
+  protected readonly rows = computed(() => this.transactions()
+    .filter(tx => this.filter() === 'all' || tx.reviewStatus === this.filter())
+    .map(tx => ({
+      ...tx,
+      meta: `${day(tx.date)} · ${LABELS[tx.reviewStatus]}`,
+      displayAmount: money(tx.amount, tx.currency),
+      expenseDate: tx.linkedExpense ? new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).format(new Date(tx.linkedExpense.bookingDate)) : '',
+      expenseAmount: tx.linkedExpense ? money(tx.linkedExpense.amount, tx.linkedExpense.currency) : '',
+    })));
+
+  constructor() { void this.load(); }
+  protected toggle(id: string): void {
+    this.expandedId.update(current => current === id ? null : id);
+  }
+  protected selectFilter(value: BankReviewStatus | 'all'): void {
+    this.filter.set(value);
+    this.expandedId.set(null);
+  }
+  protected async load(): Promise<void> {
+    if (this.refreshing()) return;
+    this.refreshing.set(true);
+    try {
+      const rows = await this.bankApi.list();
+      this.transactions.set(rows);
+      this.loadError.set(false);
+      if (!rows.some(tx => tx.id === this.expandedId())) this.expandedId.set(null);
+      if (rows.length === 0) await this.probeLink();
+      else this.notLinked.set(false);
+    } catch (error) {
+      if (isHttp(error, 409)) this.notLinked.set(true);
+      else this.loadError.set(true);
     } finally {
       this.loading.set(false);
+      this.refreshing.set(false);
     }
   }
-
-  /** GET /BankConnection: any linked account means the bank IS connected. */
   private async probeLink(): Promise<void> {
-    try {
-      this.notLinked.set((await this.bankApi.connections()).length === 0);
-    } catch {
-      // Probe failure must not break the empty state — keep the last state.
-    }
+    try { this.notLinked.set((await this.bankApi.connections()).length === 0); }
+    catch { /* A failed connection probe preserves the last known state. */ }
   }
-
   protected async sync(): Promise<void> {
-    if (this.syncing()) return;
+    if (this.busy()) return;
     this.syncing.set(true);
     try {
       const result = await this.bankApi.sync();
       this.syncResult.set(`+${result.new} new · ${result.fetched} fetched`);
       await this.load();
     } catch (error) {
-      // 409 = no link / expired consent (issue #64): route back to Settings,
-      // never surface the generic 'Sync failed' for this state.
       if (isHttp(error, 409)) {
         this.notLinked.set(true);
         this.syncResult.set('No bank connected — open Settings to link your bank.');
-      } else {
-        this.syncResult.set('Sync failed — try again');
-      }
-    } finally {
-      this.syncing.set(false);
-    }
+      } else this.syncResult.set('Sync failed — try again');
+    } finally { this.syncing.set(false); }
   }
-
-  /** Empty-state action: linking lives on Settings (issue #64). */
-  protected openSettings(): void {
-    void this.router.navigate(['/settings']);
-  }
-
-  /** Accept → the existing Create Expense form, prefilled from the bank row. */
-  protected accept(transaction: BankTransaction): void {
-    void this.router.navigate(['/expenses/create'], {
-      state: {
-        bankPrefill: {
-          description: transaction.description,
-          amount: transaction.amount,
-          date: transaction.date,
-          category: transaction.suggestedCategory?.name ?? '',
-        },
-      },
-    });
-  }
-
-  protected iconFor(transaction: BankTransaction): IconName {
-    return categoryIcon(transaction.suggestedCategory);
-  }
-
-  /** pt-PT EUR for the common case; any other currency falls back to a plain 2-decimal render. */
-  protected amountFor(transaction: BankTransaction): string {
-    return transaction.currency === 'EUR' ? formatEur(transaction.amount) : `${Number(transaction.amount).toFixed(2)} ${transaction.currency}`;
-  }
+  protected openSettings(): void { void this.router.navigate(['/settings']); }
 }
