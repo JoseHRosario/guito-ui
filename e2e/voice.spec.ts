@@ -49,7 +49,7 @@ async function installSpeechFake(page: Page, transcript: string): Promise<void> 
 
 async function stubExtract(page: Page, status = 200, body: unknown = EXTRACT_OK): Promise<void> {
   await page.route('**/AI/extract', (route: Route) => {
-    void route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body === EXTRACT_OK && process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'true' ? { date: EXTRACT_OK.bookingDate, amount: EXTRACT_OK.amount, description: EXTRACT_OK.description, category: EXTRACT_OK.category } : body) });
+    void route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body === EXTRACT_OK && process.env['GUITO_TIMESTAMPS_ENABLED'] === 'false' ? { date: EXTRACT_OK.bookingDate, amount: EXTRACT_OK.amount, description: EXTRACT_OK.description, category: EXTRACT_OK.category } : body) });
   });
 }
 
@@ -87,7 +87,7 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     await expect(page.locator('[data-testid="amount-input"]:visible')).toHaveValue('123456789,123456789');
     await expect(page.locator('[data-testid="description-input"]:visible')).toHaveValue('Coco Verde');
     await expect(page.locator('[data-testid="date-input"]:visible')).toHaveValue('2026-10-02');
-    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+    const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false';
     if (enabled) await expect(page.locator('[data-testid="time-input"]:visible')).toHaveValue('09:30');
     else await expect(page.getByTestId('time-input')).toHaveCount(0);
     await page.route('**/Expense', async route => {
@@ -110,7 +110,7 @@ test.describe('voice capture (issue #44, stubbed speech + extract)', () => {
     test.use({ timezoneId: 'America/Los_Angeles' });
 
     test('offset-free AI midnight retains its calendar day through POST', async ({ page }) => {
-      const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] === 'true';
+      const enabled = process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false';
       await page.clock.install({ time: new Date('2026-10-02T12:00:00Z') });
       await stubExpensesApi(page);
       await stubCategoryApi(page);

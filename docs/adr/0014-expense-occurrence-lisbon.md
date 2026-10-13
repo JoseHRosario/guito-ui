@@ -26,9 +26,11 @@ one. We do not silently choose either side of the fold.
 ## Wire contract and transition
 
 `APP_ENVIRONMENT.expenseTimestampsEnabled` is an explicit build-time capability:
-production is **false**, development/staging are **true**, and an absent flag is
-legacy-safe (false). Production auto-deploy must not activate timestamps before
-the API's Postgres cutover. Enable production only after verifying persistence.
+production, development and staging are now **true**; an absent flag remains
+legacy-safe (false). Production was kept false before the API's Postgres cutover.
+After the approved guito-api#132 authority switch, guito-api#145 enables the
+existing production capability to match the API's required `bookingDate` contract.
+Development/staging configuration and the API are unchanged by this UI fix.
 
 When enabled, `POST /Expense` sends `{bookingDate: ISO8601-with-offset,
 currency: 'EUR', amount, description, category}` and the
@@ -131,15 +133,19 @@ Local browser verification must use the corresponding built configuration:
 
 ```sh
 npm run build
-npx playwright test --workers=2                         # production legacy
+npx playwright test --workers=2                         # production timestamps
 npm run build -- --configuration staging
-GUITO_TIMESTAMPS_ENABLED=true npx playwright test --workers=2  # opt-in timestamps
+npx playwright test --workers=2                         # staging timestamps
 ```
 
 The test-only environment variable selects expected behavior; it does not change
-the application's capability. Default CI build/expectations remain production.
+the application's capability. Default CI build/expectations are production with
+timestamps enabled; staging has the same expectations. Explicit
+`GUITO_TIMESTAMPS_ENABLED=false` is only for a separately built legacy-capability
+fixture, never the current production or staging build.
 
-Review regressions cover explicit/absent capability at the HTTP seam, both built
-production legacy and staging timestamp browser modes (including favorites),
+Review regressions cover explicit/absent capability at the HTTP seam, the actual
+production environment's required `bookingDate` create contract, and both built
+production and staging timestamp browser modes (including favorites),
 manual exact decimals, exact AI/bank prefill round-trips, and an arbitrary +05:30
 known instant displayed in Lisbon and preserved unchanged.
