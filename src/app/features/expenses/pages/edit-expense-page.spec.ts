@@ -21,9 +21,9 @@ beforeEach(async () => {
   harness = await RouterTestingHarness.create();
 });
 afterEach(() => { http.verify(); localStorage.removeItem(SESSION_STORAGE_KEY); });
-async function open() {
+async function open(resource = detail) {
   await harness.navigateByUrl('/expenses/7/edit');
-  http.expectOne('https://api.test/Expense/7').flush(detail, { headers: { ETag: '"1"' } });
+  http.expectOne('https://api.test/Expense/7').flush(resource, { headers: { ETag: '"1"' } });
   http.expectOne('https://api.test/Category').flush({ categories: [{ name: 'Groceries' }] });
   await harness.fixture.whenStable();
   harness.fixture.debugElement.query(By.css('g-edit-expense-page')).injector.get(ChangeDetectorRef).markForCheck();
@@ -81,7 +81,7 @@ it.each([
   summaries.forEach(expectCurrent);
   expect(input('description').value).toBe('My retained intent');
   expect(input('category').value).toBe('Groceries');
-  expect(input('time').value).toBe('01:15:27.123456');
+  expect(input('time').value).toBe('01:15:27');
   expect(button('Save changes').disabled).toBe(true);
   http.expectNone('https://api.test/Expense/7');
 });
@@ -200,14 +200,43 @@ it('validates Lisbon gaps and folds and retains edited occurrence seconds on a v
   http.expectNone('https://api.test/Expense/7');
   set('date', '2026-10-25'); set('time', '01:30'); button('Save changes').click(); harness.detectChanges();
   expect(harness.fixture.nativeElement.textContent).toContain('occurs twice in Lisbon');
-  set('date', '2026-07-03'); set('time', '14:23:45.123'); button('Save changes').click();
+  set('date', '2026-07-03'); set('time', '14:23:45'); button('Save changes').click();
   const req = http.expectOne('https://api.test/Expense/7');
-  expect(req.request.body.bookingDate).toBe('2026-07-03T14:23:45.123+01:00');
+  expect(req.request.body.bookingDate).toBe('2026-07-03T14:23:45+01:00');
   req.flush({}, { status: 409, statusText: 'Conflict' });
 });
-it('displays original microseconds in the Time control without losing them on open', async () => {
+it('opens native daisyUI Time with whole seconds and saves the original microsecond offset unchanged', async () => {
   await open();
-  expect(input('time').value).toBe('01:15:27.123456');
+  expect(input('time').type).toBe('time');
+  expect(input('time').step).toBe('1');
+  expect(input('time').classList.contains('input')).toBe(true);
+  expect(input('time').value).toBe('01:15:27');
+  button('Save changes').click();
+  const req = http.expectOne('https://api.test/Expense/7');
+  expect(req.request.body.bookingDate).toBe('2026-07-02T05:45:27.123456+05:30');
+  req.flush({}, { status: 409, statusText: 'Rejected' });
+});
+it('reverting native minute-form zero seconds restores the exact known fold instant and clean navigation', async () => {
+  await open({ ...detail, bookingDate: '2026-10-25T01:30:00.123456+00:00' });
+  set('time', '02:30'); set('time', '01:30');
+  expect(harness.fixture.nativeElement.textContent).toContain('Original precision retained');
+  button('Save changes').click();
+  const req = http.expectOne('https://api.test/Expense/7');
+  expect(req.request.body.bookingDate).toBe('2026-10-25T01:30:00.123456+00:00');
+  req.flush({}, { status: 409, statusText: 'Rejected' });
+});
+it('rejects subsecond edits unsupported by the whole-second native Time contract', async () => {
+  await open(); set('time', '14:23:45.123'); button('Save changes').click(); harness.detectChanges();
+  expect(harness.fixture.nativeElement.textContent).toContain('Enter a valid time');
+  http.expectNone('https://api.test/Expense/7');
+});
+it('date-only changes retain original seconds and microseconds in a newly resolved Lisbon offset', async () => {
+  await open(); set('date', '2026-07-03');
+  expect(harness.fixture.nativeElement.textContent).not.toContain('Original precision retained');
+  button('Save changes').click();
+  const req = http.expectOne('https://api.test/Expense/7');
+  expect(req.request.body.bookingDate).toBe('2026-07-03T01:15:27.123456+01:00');
+  req.flush({}, { status: 409, statusText: 'Rejected' });
 });
 it('reports both invalid Amount and Lisbon Time and marks the controls accessibly', async () => {
   await open(); set('amount', '1,2,3'); set('date', '2026-03-29'); set('time', '01:30'); button('Save changes').click(); harness.detectChanges();

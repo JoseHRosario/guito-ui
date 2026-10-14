@@ -62,7 +62,7 @@
             </div>
             <div class="flex min-w-0 flex-col gap-2">
               <label [attr.for]="prefix + '-time'">Time</label>
-              <input [id]="prefix + '-time'" [attr.aria-invalid]="errors().time !== ''" [attr.aria-describedby]="errors().time ? prefix + '-time-error' : null" type="text" placeholder="HH:mm:ss" class="input h-10 w-full min-w-0 rounded-lg border-base-content/20 bg-base-100 px-4" [value]="time()" (input)="change('time', $event)" />
+              <input [id]="prefix + '-time'" [attr.aria-invalid]="errors().time !== ''" [attr.aria-describedby]="errors().time ? prefix + '-time-error' : null" type="time" step="1" class="input h-10 w-full min-w-0 rounded-lg border-base-content/20 bg-base-100 px-4" [value]="time()" (input)="change('time', $event)" />
             </div>
           </div>
           <div class="order-4 flex flex-col gap-2 lg:col-span-2">

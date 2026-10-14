@@ -36,14 +36,23 @@ Date/Time right, full Description, half Category, Save/Cancel/Delete row.
 Existing shell chrome and token theme are retained. Creation, favorites, voice
 and Bank create flows retain their existing contracts.
 
-The edit Time field accepts `HH:mm`, optional seconds and up to six fractional
-digits as text: native HTML time controls reject six-digit fractions and render
-an empty value. This preserves the approved full-precision display; creation's
-native Time remains unchanged. Unchanged edit saves preserve the original offset,
-seconds/microseconds and decimal string/scale (including signed zero). Date/time
-changes resolve against Lisbon; DST gaps and unresolved folds are rejected.
-Changed amounts use the existing textual .NET decimal validation. Description
-may be empty and is not trimmed. Currency is EUR.
+The edit Time field uses daisyUI's browser-native `input type="time"` with
+`step="1"` (whole seconds), per José's explicit follow-up request. Figma edit,
+validation/rejection exemplars and the interaction annotation were updated first;
+canonical create frames remain unchanged. This is a styled native picker, not a
+custom daisyUI popup: segments/appearance follow the browser locale. Never bind
+six-digit fractions to this control (browsers blank them). Retain the exact original
+wire timestamp independently. Unchanged or reverted Date/Time saves preserve its
+offset, seconds/microseconds verbatim; amount/description/category edits do not
+invalidate it. Date-only changes retain original seconds/fraction when Time is
+unchanged but resolve the new Lisbon offset. Actual Time edits use selected whole
+seconds without inherited fractions. The original-precision helper is shown only
+when both occurrence fields match the original. Full exact offset timestamps
+remain visible separately in recovery summaries. Minute-form `HH:mm` and
+`HH:mm:00` are equivalent for zero-second reversion. DST gaps and unresolved
+folds are rejected. Unchanged decimal string/scale (including signed zero) is
+preserved; changed amounts use existing textual .NET decimal validation.
+Description may be empty and is not trimmed. Currency is EUR.
 
 ## HTTP boundary
 
