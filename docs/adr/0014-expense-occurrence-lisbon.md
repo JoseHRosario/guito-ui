@@ -1,5 +1,7 @@
 # Expense booking date: Lisbon wall clock and numeric identity
 
+> Source/verification scope: this record describes the #128/#145 code and its recorded verification, not an undated live deployment claim. The #149 baseline is `744797e6335875850559eae2261d4dacd7fa4278`; UI reconciliation/edit-delete are still unmerged there (see [domain prerequisites](../agents/domain.md)). Before release/cutover operations read [operations guidance](../agents/operations.md) and verify served API/UI stamps and authority separately.
+
 ## Decision (guito-api#128)
 
 Europe/Lisbon is the business timezone, independent of the browser's timezone.

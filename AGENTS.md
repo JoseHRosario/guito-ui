@@ -1,74 +1,53 @@
-# AGENTS.md
+# Guito UI agent router
 
-Rules for AI coding agents working in guito-ui. Overview and architecture story live in [README.md](README.md); domain glossary in [CONTEXT.md](CONTEXT.md); coding conventions (styling, code structure, testing) live in [docs/CONVENTIONS.md](docs/CONVENTIONS.md); UI decision records in [docs/adr/](docs/adr/).
+Human overview: [README.md](README.md). Read the task-scoped documents below **before** the corresponding edits; links do not load themselves. Cross-repo sessions explicitly read each target worktree's root AGENTS.
 
 ## Commands
 
-```bash
-npm run tokens          # regenerate src/theme/tokens.css from design/tokens.json (run after any token change, BEFORE build)
-npm run build           # tokens + Angular production build → dist/guito-ui/browser
-npm test                # Vitest unit tests (ng test). Do NOT use bare `npx vitest run` — it also picks up e2e/*.spec.ts and fails
-npx playwright test     # e2e: Playwright serves dist/guito-ui/browser on :8081 itself
-SMOKE_URL=https://guito.web.kerumirembora.com/ npx playwright test e2e/deployed-smoke.spec.ts
-                        # deployed smoke: same stubbed sign-in flow against the live site (CI-only by default)
-npm start               # ng serve (dev server, :4200)
+Use Node 22 (CI) and npm; `npm ci` installs the locked dependencies. In an owned worktree:
+
+```sh
+npm run tokens                 # design/tokens.json → src/theme/tokens.css
+npm run build                  # Angular production build; DOES NOT run tokens
+npm test                       # ng test / Vitest; not bare npx vitest run
+npx playwright test            # requires built dist/guito-ui/browser; serves :8081
+npm start                      # ng serve on :4200; development API configuration
 ```
 
-Deploy gate on every PR (CI): tokens → build → Vitest → Playwright. Run all four locally before pushing.
+Run tokens → build → unit → Playwright before pushing. Keep local checks hermetic: stub API/Google/speech/bank transports, with no network credentials or live Sheets/Postgres dependencies. Deployed checks require separate approval; green stubs are not persistence, visual approval or production acceptance.
 
-## Git workflow
+## Read by task
 
-- `git pull` from `master` first; **one branch per issue**, named `feature/<issue#>-<slug>` or `bug/<issue#>-<slug>` (issue number first — e.g. `feature/9-user-flow`, `bug/40-token-crash`; no `t6a2`-style prefixes on new work). Bugs = something that worked as intended is broken (code regression, wrong behavior, broken config); environment/CI/docs work stays under existing informal prefixes. Work lands via PR, and the PR body **must end with `Closes #N`** so GitHub closes the issue on merge into `master` (staging merges don't close — that's deliberate). **Version (ADR 0013)**: every feature/bug issue carries a mandatory *Proposed version*; the agent bumps the declared version (`package.json` `"version"`) on the branch as part of the work — no git tags, every build stamps `<version>+<UTCts>.<shortsha>`. **Never push to `master`.**
-- Agent commits/PRs are authored as the bot: `Meireles (Hermes Agent) <332697001+xungameireles@users.noreply.github.com>`; José's commits stay under his name.
-- PRs carry the issue reference; José reviews and merges.
-- **Parallel sessions use git worktrees.** The main tree (`/d/srv/projects/guito-ui`) stays on `master` and is shared (José's Windows sync + any agent session) — never check a feature branch out there. For work on a separate issue while another session works, create a worktree **inside the repo** under the gitignored `.worktrees/` dir: `git worktree add .worktrees/<issue#>-<slug> feature/<issue#>-<slug>`. Branches are exclusive per worktree, so sessions cannot collide.
-- **Before any blanket `git add -A`, verify `.worktrees/` is ignored on the current branch** (`git check-ignore .worktrees/` — branch history may predate the ignore entry); otherwise prefer adding explicit paths. A branch without the ignore entry would stage an entire nested repo copy.
-- **Always run `git branch --show-current` before starting work** — the shared tree may have been switched by another session since you last looked.
-- Remove the worktree when its PR merges: `git worktree remove .worktrees/<name> && git worktree prune`.
+| Before… | Read… |
+|---|---|
+| Angular, template, style or test edits | [CONVENTIONS](docs/CONVENTIONS.md) (full coding/testing rules) |
+| Domain, DTO, amount/date/identity changes | [GLOSSARY](GLOSSARY.md), [domain guide](docs/agents/domain.md), [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md) |
+| Visual/interaction or token changes | [design guide](docs/agents/design.md), [ADR 0010](docs/adr/0010-figma-token-source-mcp-sync.md); auth/navigation interactions also [ADR 0011](docs/adr/0011-auth-gate-all-routes-google-only.md) |
+| Auth/guard or API transport edits | [domain guide](docs/agents/domain.md), [ADR 0011](docs/adr/0011-auth-gate-all-routes-google-only.md); consult design only if interaction changes |
+| Expense edit/delete or bank reconciliation | [domain guide](docs/agents/domain.md), including live PR/contract prerequisites (not yet merged here) |
+| Version, deployment, storage/cutover, financial operations or deployed verification | [operations guide](docs/agents/operations.md), [ADR 0013](docs/adr/0013-build-version-declared-no-tags.md); explicitly read API worktree instructions/contracts for backend operations |
+| Issue/PR creation, updates or triage | [tracker](docs/agents/issue-tracker.md); triage also [label map](docs/agents/triage-labels.md) |
 
-## Stack (verified — do not suggest older patterns)
+## Essential conventions
 
-- Angular **22.2**: standalone components, signals (`signal`/`computed`/`input.required`), `@if`/`@for` with `track`, `inject()`, `ChangeDetectionStrategy.OnPush` everywhere, no `any`.
-- Tailwind **4.3** + daisyUI **5** (user-settled choice — do not re-litigate). TypeScript ~6.0.2, Vitest 5, Playwright 1.63.
-- Routing uses `withComponentInputBinding`; route `data` binds to component `input()` by name.
+- Angular 22.2, TypeScript ~6.0.2, Tailwind 4.3 + daisyUI 5 (settled). Use standalone OnPush components, signals, `inject()`, typed code without `any`, and `@if`/`@for` with stable tracking.
+- One class/interface/type per file. Feature code belongs under `features/<feature>/{pages,components,models,services}`; core owns cross-cutting wiring. Route data binds to defaulted `input()` via `withComponentInputBinding`.
+- Visual/interaction changes require Figma draft → José's approval → implementation from the approved frame, including follow-up tweaks. Code does not prove approval. Theme styles come from tokens; never hand-edit generated CSS.
+- Preserve exact decimal text, numeric durable Expense IDs and Lisbon `bookingDate`. Never invent identity from ordinals or use audit dates as occurrence fallbacks.
 
-Styling, code-structure, and testing rules live in [docs/CONVENTIONS.md](docs/CONVENTIONS.md).
+## Git and ownership
 
-## Figma design loop
-
-Designs live on the **Guito App** page of the Guito design file (duplicate of Simple Design System, key `UoIK5MnIqDrgfHqMmBZoYk`); the Community original is never edited. Flow: Hermes drafts in Figma (MCP) → José validates → the approved frame is the implement source; design changes happen in Figma, never as code-side drift. Token source is the MCP sync (ADR 0010) — `tools/tokens/pull-figma.mjs` is dead on this plan (`file_variables:read` is Enterprise-only). Token sync regenerates `design/tokens.json` (mapping in `tools/tokens/figma.json`, fileKey = the duplicate).
-
-Current design state on the Guito App page:
-- **Create Expense (#128)** — approved canonical mobile `3094:35`, desktop `3094:9704`, validation `3094:9937`, save failure `3094:10011`, voice `3134:10053`. Native Time beside Date on both breakpoints; Europe/Lisbon semantics and compatibility rules in [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
-- **Workspace** frame (expenses list, mobile + desktop) — José's design, approved and implemented.
-- **SignIn** (mobile `node-id=3071-35`) and **SignIn Desktop** (`node-id=3080-53`) — minimalist, Google-only direction; centered logo/tagline/button with the official Google G mark and a bottom trust line. **Pending José's Figma approval** — approval is the implement source for the Sign In screen and the auth route guard. Button is a token-faithful copy of the DS Primary Button (DS instances cannot take an icon child).
-- Pinning convention for fixed elements: bottom nav / FAB are direct children rendered last, scrolling content lives in a clipped sub-frame — see the annotated Workspace frame.
-
-## User flow
-
-The **interaction contract** (auth gate → Sign In → Expenses List → Create Expense, sign-out via header avatar) is the FigJam board "Guito User Flow": https://www.figma.com/board/TulG8ptcGlLxQI78GciXr3 — also linked from the Guito App page. Decisions behind it (all routes gated, Google-only, returnUrl) are in **ADR 0011**. Read both before implementing any screen or route; the board is the live artifact — don't copy it into the repo.
-
-## Deployment
-
-- `deploy.yml` on push to `master` (e2e-gated) → OIDC-assumes `arn:aws:iam::497087877832:role/guito-ui-deploy` → S3 sync + CloudFront invalidation → **deployed smoke** (`smoke` job): runs `e2e/deployed-smoke.spec.ts` with `SMOKE_URL` = the live URL — same stubbed sign-in flow, real prod build + CloudFront SPA fallback for deep links (Google/token exchange stay stubbed). `workflow_dispatch` can deploy any branch for review-before-merge. Pushes to `feature/**` / `bug/**` branches AUTO-deploy to staging (`guito-staging.web.kerumirembora.com`, staging build config) — one shared distribution, last push wins, and staging runs can never cancel a production deploy.
-- Live demo: https://guito.web.kerumirembora.com/
+- Check `git branch --show-current` and `git status --short` before work. Every issue, sequential or parallel, uses its own `.worktrees/<issue#>-<slug>` worktree and `feature/<issue#>-<slug>` or `bug/<issue#>-<slug>` branch from refreshed `origin/master`. Inspect ownership before fetching/creating; never switch, reset or pull over the shared dirty root.
+- Verify `.worktrees/` and dependency symlinks are ignored; stage **explicit owned paths only**, never blanket-add. Preserve other sessions' staged/untracked files.
+- PR → José reviews/merges; never push master. Agent attribution: `Meireles (Hermes Agent) <332697001+xungameireles@users.noreply.github.com>`; leave José's identity unchanged. Check a PR is still open before further pushes; remove only your worktree after merge.
+- Same-repo implementation PRs may end `Closes #N`. Cross-repo work references `JoseHRosario/guito-api#N`, never bare closing keywords. No component PR auto-closes the shared docs issue; José owns final disposition. Version policy is ADR 0013; issue #149 explicitly preserves application versions for docs-only work.
 
 ## Boundaries
 
-- **Never** commit secrets (`.env` holds the Figma PAT and is gitignored); never edit the Community Figma file; never push to `master`.
-- **Ask first** before: adding a dependency, deviating from a token color (document each deviation in the PR body), changing the deploy pipeline, or touching the token mapping (`tools/tokens/figma.json`).
-- **Always** run the full local suite before pushing; keep this file current — add a rule whenever an agent correction recurs, prune stale ones in the same commit.
+- **Always:** retain auth/privacy, exact financial contracts and owner gates. Use only the approved agent AWS role for authorized operations; routine deployments/migrations go through the agreed pipeline. Select staging explicitly for separately approved UI review dispatches and verify shared-staging provenance (last deployment wins).
+- **Ask first:** dependencies, token-map changes, token-color deviations (cite each approved deviation in the PR), pipeline changes, exceptional operator actions, live financial writes/deletes/imports/resets or production operations.
+- **Never:** commit or print secrets, modify files under `~/.aws` (José owns credentials), mutate personal/production financial data without explicit approval, edit the Community Figma original, or treat isolated Sheets smoke cleanup as permission to delete personal/Postgres records.
 
-## Agent skills
+## Living doc
 
-### Issue tracker
-
-Issues live in GitHub Issues on this repo (`gh` CLI); one branch per issue, PR closes #N. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Five canonical roles used as-is: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+Retain rules for recurring corrections; prune obsolete/duplicate rules with the invalidating change. Keep detail task-scoped, validate routing links and measure entry-point size. The ~1,000–1,500-token target is editorial, not a model limit; preserve safety over a hard count.

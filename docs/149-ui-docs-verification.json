@@ -1,0 +1,328 @@
+{
+  "scope": "UI documentation only; static checks, not model trials or live acceptance",
+  "base": "744797e6335875850559eae2261d4dacd7fa4278",
+  "branch": "feature/149-docs-router",
+  "token_units": "ceil(Unicode characters/4), not validated Sol tokenizer",
+  "inventory": [
+    {
+      "path": "AGENTS.md",
+      "before": {
+        "characters": 7580,
+        "utf8_bytes": 7650,
+        "lines": 74,
+        "character_div_4_token_estimate": 1895
+      },
+      "after": {
+        "characters": 5492,
+        "utf8_bytes": 5517,
+        "lines": 53,
+        "character_div_4_token_estimate": 1373
+      }
+    },
+    {
+      "path": "GLOSSARY.md",
+      "before": {
+        "characters": 2812,
+        "utf8_bytes": 2848,
+        "lines": 13,
+        "character_div_4_token_estimate": 703
+      },
+      "after": {
+        "characters": 3284,
+        "utf8_bytes": 3312,
+        "lines": 13,
+        "character_div_4_token_estimate": 821
+      }
+    },
+    {
+      "path": "README.md",
+      "before": {
+        "characters": 4291,
+        "utf8_bytes": 4333,
+        "lines": 67,
+        "character_div_4_token_estimate": 1073
+      },
+      "after": {
+        "characters": 5200,
+        "utf8_bytes": 5207,
+        "lines": 76,
+        "character_div_4_token_estimate": 1300
+      }
+    },
+    {
+      "path": "docs/CONVENTIONS.md",
+      "before": {
+        "characters": 3595,
+        "utf8_bytes": 3621,
+        "lines": 38,
+        "character_div_4_token_estimate": 899
+      },
+      "after": {
+        "characters": 3883,
+        "utf8_bytes": 3905,
+        "lines": 27,
+        "character_div_4_token_estimate": 971
+      }
+    },
+    {
+      "path": "docs/adr/0010-figma-token-source-mcp-sync.md",
+      "before": {
+        "characters": 2084,
+        "utf8_bytes": 2102,
+        "lines": 18,
+        "character_div_4_token_estimate": 521
+      },
+      "after": {
+        "characters": 2084,
+        "utf8_bytes": 2102,
+        "lines": 18,
+        "character_div_4_token_estimate": 521
+      }
+    },
+    {
+      "path": "docs/adr/0011-auth-gate-all-routes-google-only.md",
+      "before": {
+        "characters": 2495,
+        "utf8_bytes": 2507,
+        "lines": 21,
+        "character_div_4_token_estimate": 624
+      },
+      "after": {
+        "characters": 3034,
+        "utf8_bytes": 3046,
+        "lines": 23,
+        "character_div_4_token_estimate": 759
+      }
+    },
+    {
+      "path": "docs/adr/0013-build-version-declared-no-tags.md",
+      "before": {
+        "characters": 2319,
+        "utf8_bytes": 2332,
+        "lines": 11,
+        "character_div_4_token_estimate": 580
+      },
+      "after": {
+        "characters": 2319,
+        "utf8_bytes": 2332,
+        "lines": 11,
+        "character_div_4_token_estimate": 580
+      }
+    },
+    {
+      "path": "docs/adr/0014-expense-occurrence-lisbon.md",
+      "before": {
+        "characters": 9782,
+        "utf8_bytes": 9782,
+        "lines": 151,
+        "character_div_4_token_estimate": 2446
+      },
+      "after": {
+        "characters": 10237,
+        "utf8_bytes": 10237,
+        "lines": 153,
+        "character_div_4_token_estimate": 2560
+      }
+    },
+    {
+      "path": "docs/agents/design.md",
+      "before": null,
+      "after": {
+        "characters": 3211,
+        "utf8_bytes": 3219,
+        "lines": 18,
+        "character_div_4_token_estimate": 803
+      }
+    },
+    {
+      "path": "docs/agents/domain.md",
+      "before": {
+        "characters": 1934,
+        "utf8_bytes": 2032,
+        "lines": 51,
+        "character_div_4_token_estimate": 484
+      },
+      "after": {
+        "characters": 4234,
+        "utf8_bytes": 4240,
+        "lines": 25,
+        "character_div_4_token_estimate": 1059
+      }
+    },
+    {
+      "path": "docs/agents/issue-tracker.md",
+      "before": {
+        "characters": 5584,
+        "utf8_bytes": 5596,
+        "lines": 101,
+        "character_div_4_token_estimate": 1396
+      },
+      "after": {
+        "characters": 5089,
+        "utf8_bytes": 5092,
+        "lines": 55,
+        "character_div_4_token_estimate": 1273
+      }
+    },
+    {
+      "path": "docs/agents/operations.md",
+      "before": null,
+      "after": {
+        "characters": 4448,
+        "utf8_bytes": 4449,
+        "lines": 28,
+        "character_div_4_token_estimate": 1112
+      }
+    },
+    {
+      "path": "docs/agents/triage-labels.md",
+      "before": {
+        "characters": 1087,
+        "utf8_bytes": 1087,
+        "lines": 15,
+        "character_div_4_token_estimate": 272
+      },
+      "after": {
+        "characters": 1371,
+        "utf8_bytes": 1372,
+        "lines": 15,
+        "character_div_4_token_estimate": 343
+      }
+    }
+  ],
+  "archive_totals": {
+    "before": {
+      "characters": 43563,
+      "utf8_bytes": 43890,
+      "lines": 560,
+      "character_div_4_token_estimate": 10893
+    },
+    "after": {
+      "characters": 53878,
+      "utf8_bytes": 54022,
+      "lines": 514,
+      "character_div_4_token_estimate": 13473
+    }
+  },
+  "conditional_chain_estimates": {
+    "static_revised_document_chains": {
+      "source_test_edit": {
+        "paths": [
+          "AGENTS.md",
+          "docs/CONVENTIONS.md"
+        ],
+        "character_div_4_estimate_sum": 2342
+      },
+      "visual_token_edit": {
+        "paths": [
+          "AGENTS.md",
+          "docs/CONVENTIONS.md",
+          "docs/agents/design.md",
+          "docs/adr/0010-figma-token-source-mcp-sync.md"
+        ],
+        "character_div_4_estimate_sum": 3666
+      },
+      "expense_contract_edit": {
+        "paths": [
+          "AGENTS.md",
+          "docs/CONVENTIONS.md",
+          "GLOSSARY.md",
+          "docs/agents/domain.md",
+          "docs/adr/0014-expense-occurrence-lisbon.md"
+        ],
+        "character_div_4_estimate_sum": 6782
+      },
+      "deployment_review": {
+        "paths": [
+          "AGENTS.md",
+          "docs/agents/operations.md",
+          "docs/adr/0013-build-version-declared-no-tags.md"
+        ],
+        "character_div_4_estimate_sum": 3063
+      },
+      "tracker_triage": {
+        "paths": [
+          "AGENTS.md",
+          "docs/agents/issue-tracker.md",
+          "docs/agents/triage-labels.md"
+        ],
+        "character_div_4_estimate_sum": 2987
+      }
+    },
+    "chain_limitations": "Conditional minimum repository routes only, not observed model reads or total runner context. Task-specific source/API contracts, relevant interactions and skills add context. Parent owns Hermes/Sol trials and cross-repo skill evidence."
+  },
+  "checks": {
+    "local_markdown_links_checked": 50,
+    "broken_local_links": [],
+    "package_script_assertions": "passed: explicit tokens, ng build without prebuild, ng test, unchanged version 0.7.0",
+    "angular_config": "production default; staging/prod replacements inspected",
+    "workflow_checks": "ci explicit tokens/build/unit/Playwright; deploy no actual token step, default-production dispatch, automatic feature/bug staging, concurrency lanes; no workflow edited",
+    "source_checks": "ExpenseApi/model/time/amount helpers, BankApi, routes, core tree, auth dual-header interceptor, Playwright config, issue forms; branch-local UI71 ADR0015 and UI72 issue70 contract; live API148 merged at 49ffc0242fa5d6b138f8cb0a79060f13e84bd5a2",
+    "diff_check": "passed: git diff --check; no app/package/version/workflow/angular diff; no staged changes",
+    "runtime_build_tests": "not run: documentation-only; command definitions checked statically; no dependency or app changes",
+    "external_links": "GitHub issue/PR refs read; other external URLs not fetched; no live Figma/AWS/deployment claims"
+  },
+  "safety_retention": [
+    {
+      "requirement": "Visual-first owner approval, token styling, no Community edits",
+      "location": "AGENTS.md; docs/agents/design.md; docs/CONVENTIONS.md; ADR0010",
+      "trigger": "before visual/interaction/token edits"
+    },
+    {
+      "requirement": "Exact amount, Lisbon date/offset/DST, numeric Expense ID; no ordinal identity; unknown legacy handling",
+      "location": "AGENTS.md; GLOSSARY.md; docs/agents/domain.md; ADR0014",
+      "trigger": "before domain/DTO/financial behavior edits"
+    },
+    {
+      "requirement": "One type/file, OnPush/signals/no any, feature/core boundaries, test isolation/testid assertions",
+      "location": "AGENTS.md; docs/CONVENTIONS.md",
+      "trigger": "before Angular/source/test edits"
+    },
+    {
+      "requirement": "Hermetic unit/browser tests versus live persistence and visual acceptance",
+      "location": "AGENTS.md; CONVENTIONS; operations",
+      "trigger": "before testing/deployed verification"
+    },
+    {
+      "requirement": "Worktree every issue, dirty root preservation, explicit paths, bot attribution, owner merge, no master push",
+      "location": "AGENTS.md",
+      "trigger": "always"
+    },
+    {
+      "requirement": "Secrets and ~/.aws restrictions, approved AWS role, pipeline migrations/deploy, operator exception scope",
+      "location": "AGENTS.md; docs/agents/operations.md",
+      "trigger": "always; before operational work"
+    },
+    {
+      "requirement": "No unapproved financial mutations; isolated Sheets cleanup is not personal/Postgres deletion permission",
+      "location": "AGENTS.md; docs/agents/operations.md",
+      "trigger": "always; before datastore/cutover/reporting/mutation work"
+    },
+    {
+      "requirement": "Explicit staging, auto-deploy risk, shared staging provenance, stub smoke limits",
+      "location": "AGENTS.md; docs/agents/operations.md",
+      "trigger": "before release/deployment/review"
+    },
+    {
+      "requirement": "Explicit repos, full body files, explicit existing labels, readback, cross-repo references, owner closure",
+      "location": "AGENTS.md; docs/agents/issue-tracker.md; triage-labels.md",
+      "trigger": "before tracker writes/triage"
+    },
+    {
+      "requirement": "Both ID-token headers, same-origin credential privacy",
+      "location": "docs/agents/domain.md",
+      "trigger": "before auth/API transport edits"
+    },
+    {
+      "requirement": "Open UI71/UI72 not master implementation; API148 merge not UI/deployment evidence",
+      "location": "README.md; docs/agents/domain.md; design guide",
+      "trigger": "before bank reconciliation/edit-delete"
+    },
+    {
+      "requirement": "No runtime/version/workflow changes for issue149",
+      "location": "AGENTS.md; operations; tracker",
+      "trigger": "this task"
+    }
+  ],
+  "snapshot_note": "Initial UI per-file evidence with final AGENTS metrics after review. Use API docs/149-docs-inventory.json for regenerated combined static chains."
+}

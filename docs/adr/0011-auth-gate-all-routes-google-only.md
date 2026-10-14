@@ -1,5 +1,7 @@
 # Auth gate: all routes gated, Google-only sign-in, returnUrl redirect
 
+> Historical decision record: avatar/menu and stub statements below describe the design point when this ADR was accepted, not a current implementation/approval inventory. At the #149 base (`744797e6335875850559eae2261d4dacd7fa4278`), routes include real Bank/Settings and shell sign-out; sign-in/callback remain bare exceptions to the guarded app shell. Read [domain guidance](../agents/domain.md) for current source checks and [design guidance](../agents/design.md) for approval discovery. The original decisions/rationale are retained.
+
 Follows the guito-api auth ADRs (Google PKCE for humans + X-Api-Key for agents). This ADR covers the **UI-side** interaction model, settled while drafting the user flow board (guito-ui#7, FigJam "Guito User Flow").
 
 **Decision**:

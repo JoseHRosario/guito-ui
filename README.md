@@ -1,67 +1,76 @@
 # Guito UI
 
-The web frontend of **Guito**, a personal expense tracker: control expenses and maximize savings. This SPA consumes the [guito-api](https://github.com/JoseHRosario/guito-api) HTTP API and is designed screen-by-screen in Figma before any code is written.
+The Angular frontend of **Guito**, a personal expense tracker consuming [guito-api](https://github.com/JoseHRosario/guito-api). Visual/interaction work follows Figma draft → José's validation → implementation from the approved frame. Backend tracker issues may cover work in both repositories.
 
-> Live demo: https://guito.web.kerumirembora.com/ (deployed from `master`). Local tests stub the API; production consumes guito-api.
+Production entry: https://guito.web.kerumirembora.com/ ; shared staging: https://guito-staging.web.kerumirembora.com/ . These are configured entry points, not a live deployment verification.
 
-> Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and opaque expense IDs. Production now enables the existing timestamp capability after the approved guito-api#132 Postgres cutover (fix guito-api#145); dev/staging settings are unchanged. All create paths send `bookingDate`, and exact decimal strings preserve POST/prefill precision. Production release and an owner-confirmed genuine save remain merge/deploy verification gates; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
+## Implementation scope
 
-## Tech stack
+At the #149 documentation baseline (`744797e6335875850559eae2261d4dacd7fa4278`, 14 October 2026), code includes auth-gated expenses, manual/voice/favorite creation, Bank sync/Accept-to-prefill and Settings version/bank-connection flows. Dashboard/Budgets remain title-only screens. Expense creates use `bookingDate` and exact decimal strings with the checked-in timestamp capability enabled for production/dev/staging. This is source evidence, not served-production or genuine-save acceptance.
 
-| Layer     | Choice                                                        |
-| --------- | ------------------------------------------------------------- |
-| Framework | Angular 22 (standalone components, signals, zoneless-friendly) |
-| Styling   | Tailwind CSS 4 + daisyUI 5, themed entirely by design tokens   |
-| Tests     | Vitest (unit, jsdom) + Playwright (e2e, both breakpoints)      |
-| Hosting   | S3 + CloudFront (eu-west-1), deployed by GitHub Actions (OIDC)  |
+The newer reconciliation inbox (UI PR #71) and expense edit/delete (UI PR #72) are **open/unmerged** at this snapshot; merged API #148 does not implement either in this UI baseline. Recheck live refs and owner decisions before feature work; [domain prerequisites](docs/agents/domain.md) distinguish branch-local contracts from landed code. Approval and deployment must be verified independently of implementation existence.
 
-## Design loop (how UI work happens)
+## Stack and architecture
 
-1. **Draft**: Hermes (the AI agent) composes the screen on the **Guito App** page of the Guito design file — José's duplicate of the *Simple Design System (Community)* Figma file — using the design system's components, icons, and variables.
-2. **Validate**: José reviews/edits the frame in Figma. Approval = the implement source; designs change in Figma, never as code-side drift.
-3. **Implement**: the agent reads the approved frame, converts it to Angular components, and styles everything from the token-generated theme.
+Angular 22 standalone components/signals, TypeScript 6, Tailwind CSS 4 + daisyUI 5, Vitest/jsdom and Playwright. S3 + CloudFront hosting is delivered through GitHub Actions/OIDC. See [CONVENTIONS](docs/CONVENTIONS.md) before source/test changes.
 
-**Tokens pipeline**: the design file's 'Color' variables (SDS Light mode) are synced via the Figma MCP into `design/tokens.json` (style-dictionary shape; mapping in `tools/tokens/figma.json`) → `npm run tokens` → `src/theme/tokens.css` (`--guito-*` custom properties + daisyUI semantic aliases). Light mode only. No ad-hoc hex values in components — see [AGENTS.md](AGENTS.md) for the hard rules.
+```text
+src/app/
+  features/<feature>/
+    pages/       top-level screens
+    components/  reusable regions; shell/components holds layout chrome
+    models/      feature types
+    services/    HTTP adapters, feature helpers and fixtures
+  core/          cross-cutting auth, environment, bootstrap and router wiring
+  shared/        cross-feature presentational pieces
+src/theme/       generated tokens.css (outside app/)
+design/          tokens.json theme source
+tools/tokens/    token compiler and Figma role mapping
+e2e/             built-browser tests
+docs/adr/        UI decisions and rationale
+```
+
+Single-feature helpers stay with their feature; core is not a general dumping ground or a frozen list of auth-only files. API origins/capabilities are injected via `APP_ENVIRONMENT`, not imported by components from environment files.
 
 ## Getting started
 
-```bash
+CI uses Node 22; `package.json` declares npm 11.19.1. Use the locked dependency graph:
+
+```sh
 npm ci
-npm run tokens   # regenerate the theme from design/tokens.json
-npm start        # ng serve → http://localhost:4200/
+npm run tokens   # compile theme from design/tokens.json
+npm start        # localhost:4200, development configuration targets staging API
 ```
 
-## Testing
+Local development can reach the configured API: do not treat it as an isolated financial sandbox. Tests must stub transports.
 
-```bash
-npm test                 # Vitest unit tests (specs live next to the code)
-npx playwright test      # e2e against the built app (serves dist on :8081)
-npm run build            # production build (runs the token pipeline first)
+## Build and test
+
+With dependencies and Playwright Chromium installed, unset `SMOKE_URL` for local tests. Playwright starts the SPA-fallback server on :8081 and requires the built application:
+
+```sh
+npm run tokens
+npm run build                  # production → dist/guito-ui/browser
+npm test                       # ng test / Vitest, specs next to code
+npx playwright test            # local built-browser transport stubs
+# To verify the staging configuration separately:
+npm run build -- --configuration staging
+npx playwright test
 ```
 
-## Project structure
+`npm run build` does **not** run tokens; there is no prebuild hook. Do not use bare `npx vitest run` (it discovers unconfigured e2e/nested-worktree specs). The local sequence mirrors PR CI's explicit token generation. No local test result proves live persistence or Figma approval.
 
-```
-src/app/
-  core/       models + pure functions (money formatting, day grouping), stub data
-  core/auth/  Google PKCE session: AuthService (signals), session storage, pkce
-  shell/      header, nav, bottom navigation, footer
-  features/   one folder per screen (expenses/, auth/ — callback screen today)
-  shared/     cross-feature components (inline SVG icon set)
-  theme/      tokens.css — GENERATED, never hand-edited
-design/       tokens.json — style-dictionary source of the theme
-tools/tokens/ token pipeline: build-tokens.mjs, figma.json (role→variable map)
-e2e/          Playwright specs
-docs/adr/     UI decision records (0001–0010+)
-```
+## Design and release references
 
-## Deployment
+[Design guide](docs/agents/design.md) routes visual/interaction work to the relevant frames, board and ADRs. Tokens sync via Figma MCP (Color/SDS Light) into `design/tokens.json`, then `npm run tokens` generates `src/theme/tokens.css`; do not hand-edit output or invent styles. Light mode only.
 
-`.github/workflows/`: `ci.yml` runs the full gate (tokens → build → Vitest → Playwright) on every PR; `deploy.yml` on push to `master` syncs `dist/` to S3 and invalidates CloudFront — AWS authentication is OIDC-only (role `guito-ui-deploy`, no long-lived keys). Any branch can be deployed on demand via `workflow_dispatch` for review-before-merge.
+[Operations guide](docs/agents/operations.md) covers explicit staging selection, provenance, version policy and financial/credential gates. Pushes to feature/bug branches auto-deploy shared staging; **last deployment wins**, so even docs pushes can replace it. Manual dispatch defaults to production. This docs task triggers no deployment. The deployed smoke verifies hosting with auth/API stubs, not genuine login or datastore persistence.
 
-## Docs
+## Document ownership
 
-- [GLOSSARY.md](GLOSSARY.md) — glossary (design file, design loop, token sync)
-- [docs/adr/](docs/adr/) — decisions (token source = Figma MCP sync, …)
-- [AGENTS.md](AGENTS.md) — rules for AI coding agents
-- [guito-api](https://github.com/JoseHRosario/guito-api) — the backend (issues for both repos live there)
+- [AGENTS.md](AGENTS.md): concise operational rules and conditional task router.
+- [GLOSSARY.md](GLOSSARY.md): domain vocabulary, identity/date/amount semantics.
+- [CONVENTIONS](docs/CONVENTIONS.md): source/style/testing standards, read before applicable edits.
+- [Domain guide](docs/agents/domain.md): contract discovery and unmerged-feature prerequisites.
+- [Tracker guide](docs/agents/issue-tracker.md): explicit repo selection, body-file creation, labels and owner closure.
+- [ADRs](docs/adr/): historical decisions/rationale; read only those relevant to the task, separating historical state from current code and live evidence.
