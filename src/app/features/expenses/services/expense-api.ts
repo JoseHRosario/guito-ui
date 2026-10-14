@@ -58,7 +58,8 @@ export class ExpenseApi {
   async detail(id: number): Promise<ExpenseDetail> {
     if (expenseId(id) !== id) throw new Error('expense-id-invalid');
     const response = await firstValueFrom(this.http.get<ExpenseDetail>(`${this.env.apiBaseUrl}/Expense/${id}`, {
-      observe: 'response', headers: { 'Cache-Control': 'no-store' },
+      // The API response sets no-store; adding it to this request breaks CORS.
+      observe: 'response',
     }).pipe(timeout(15000)));
     const dto = response.body;
     const etag = response.headers.get('ETag');

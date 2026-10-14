@@ -17,9 +17,10 @@ it('reads the exact immutable ID and retains decimal scale, timestamp and quoted
   const pending = TestBed.inject(ExpenseApi).detail(7);
   const req = http.expectOne('https://api.test/Expense/7');
   expect(req.request.method).toBe('GET');
-  expect(req.request.headers.get('Cache-Control')).toBe('no-store');
-  req.flush(detail, { headers: { ETag: '"1"' } });
+  req.flush(detail, { headers: { ETag: '"1"', 'Cache-Control': 'no-store' } });
   await expect(pending).resolves.toEqual({ ...detail, etag: '"1"' });
+  // Cache policy belongs on the response; this request header is not CORS-allowed.
+  expect(req.request.headers.has('Cache-Control')).toBe(false);
 });
 it('updates every editable field using the received If-Match without precision conversion', async () => {
   const input = { amount: '-0.0000', description: '', category: 'Groceries', bookingDate: detail.bookingDate, currency: 'EUR' as const };
