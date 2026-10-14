@@ -138,6 +138,12 @@
     </div>
   }
 
+  @if (mutationToast(); as toast) {
+    <div class="fixed bottom-24 left-1/2 z-20 flex h-11 w-fit -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-content shadow-lg lg:bottom-10" role="status">
+      <g-icon name="check" class="size-4" />{{ toast }}
+    </div>
+  }
+
   <!-- Voice failure toast (issue #44): same pill as the save toast, error role -->
   @if (voiceToast(); as voiceError) {
     <div
@@ -175,7 +181,7 @@
           <hr class="w-full border-base-content/10" />
         </div>
         @for (expense of group.expenses; track expense.id ?? expense) {
-          <div class="flex w-full items-center gap-3 border-b border-base-content/10 px-4 py-3" data-testid="expense-row" [attr.data-expense-id]="expense.id">
+          <a (click)="expense.id === null ? null : rememberScroll()" [routerLink]="expense.id === null ? null : ['/expenses', expense.id, 'edit']" [attr.tabindex]="expense.id === null ? null : 0" [attr.role]="expense.id === null ? null : 'link'" [attr.aria-label]="expense.id === null ? null : 'Edit expense: ' + expense.description" class="flex w-full items-center gap-3 border-b border-base-content/10 px-4 py-3" data-testid="expense-row" [attr.data-expense-id]="expense.id">
             <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-success-content text-success">
               <g-icon [name]="expense.icon" class="size-5" />
             </span>
@@ -186,7 +192,7 @@
             <div class="flex flex-col items-end">
               <p class="text-base font-semibold leading-tight tracking-tight text-error text-right">{{ amount(expense.amount) }}</p>
             </div>
-          </div>
+          </a>
         }
       }
     </div>

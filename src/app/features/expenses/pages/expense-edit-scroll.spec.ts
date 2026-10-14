@@ -1,0 +1,37 @@
+import '@angular/compiler';
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter, RouteReuseStrategy } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { afterEach, expect, it, vi } from 'vitest';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { routes } from '../../../app.routes';
+import { SESSION_STORAGE_KEY, serializeSession } from '../../../core/auth/auth-session';
+import { ExpensesRouteReuseStrategy } from '../../../core/route-reuse/expenses-reuse-strategy';
+
+afterEach(() => { vi.restoreAllMocks(); localStorage.removeItem(SESSION_STORAGE_KEY); });
+it('restores remembered list scroll after returning from an edit and refreshing latest', async () => {
+  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'stub', accessToken: 'stub', expiresAt: Date.now() + 3600000 }));
+  TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter(routes), { provide: RouteReuseStrategy, useExisting: ExpensesRouteReuseStrategy }, { provide: APP_ENVIRONMENT, useValue: { apiBaseUrl: 'https://api.test' } }] });
+  const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+  vi.spyOn(window, 'scrollY', 'get').mockReturnValue(320);
+  const harness = await RouterTestingHarness.create();
+  const http = TestBed.inject(HttpTestingController);
+  const detail = { id: 7, amount: '0.0000', description: 'Scroll fixture', category: 'Groceries', bookingDate: '2026-07-02T14:23:45.123456+01:00', currency: 'EUR', revision: '1' };
+  await harness.navigateByUrl('/');
+  http.expectOne('https://api.test/Expense/latest/20').flush({ expenses: [detail] });
+  await vi.waitFor(() => { harness.detectChanges(); expect(harness.fixture.nativeElement.querySelector('[data-expense-id="7"]')).not.toBeNull(); });
+  const row: HTMLAnchorElement = harness.fixture.nativeElement.querySelector('[data-expense-id="7"]'); row.click();
+  await harness.fixture.whenStable();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  http.expectOne('https://api.test/Expense/7').flush(detail, { headers: { ETag: '"1"' } });
+  http.expectOne('https://api.test/Category').flush({ categories: [{ name: 'Groceries' }] });
+  await vi.waitFor(() => { harness.detectChanges(); expect(harness.fixture.nativeElement.querySelector('#mobile-amount')).not.toBeNull(); });
+  const save: HTMLButtonElement = Array.from(harness.fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b => b.textContent?.trim() === 'Save changes')!; save.click();
+  http.expectOne('https://api.test/Expense/7').flush(detail);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  http.match('https://api.test/Expense/latest/20').forEach(r => r.flush({ expenses: [detail] }));
+  await vi.waitFor(() => { harness.detectChanges(); expect(scroll).toHaveBeenCalledWith(0, 320); });
+  http.verify();
+});

@@ -1,6 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
+import type { ExpenseDetail } from '../models/expense-detail';
+import type { ExpenseUpdate } from '../models/expense-update';
+import { knownOccurrence } from './expense-time';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import type { IconName } from '../../../shared/gicon';
 import { occurrenceDay } from './expense-time';
@@ -28,7 +31,7 @@ interface ExpenseDto {
 function expenseId(value: number | string | null | undefined): number | null {
   if (typeof value === 'string' && !/^\d+$/.test(value)) return null;
   const id = typeof value === 'string' ? Number(value) : value;
-  return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : null;
+  return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 && id <= 2147483647 ? id : null;
 }
 
 /** Maps the API's category to its list-row lucide glyph; 'tag' fallback for unknown categories. */
@@ -50,6 +53,50 @@ function categoryIcon(category: string): IconName {
 export class ExpenseApi {
   private readonly http = inject(HttpClient);
   private readonly env = inject(APP_ENVIRONMENT);
+
+  /** Read authority on entry/reload; do not consult the cached list. */
+  async detail(id: number): Promise<ExpenseDetail> {
+    if (expenseId(id) !== id) throw new Error('expense-id-invalid');
+    const response = await firstValueFrom(this.http.get<ExpenseDetail>(`${this.env.apiBaseUrl}/Expense/${id}`, {
+      observe: 'response', headers: { 'Cache-Control': 'no-store' },
+    }).pipe(timeout(15000)));
+    const dto = response.body;
+    const etag = response.headers.get('ETag');
+    if (response.status !== 200 || !dto || dto.id !== id || typeof dto.amount !== 'string' ||
+        amountDecimal(dto.amount) === null || !knownOccurrence(dto.bookingDate) ||
+        typeof dto.description !== 'string' || typeof dto.category !== 'string' || dto.currency !== 'EUR' ||
+        typeof dto.revision !== 'string' || !/^[1-9]\d*$/.test(dto.revision) ||
+        BigInt(dto.revision) > 9223372036854775807n || etag !== `"${dto.revision}"`) {
+      throw new Error('expense-detail-invalid');
+    }
+    return { id: dto.id, amount: dto.amount, description: dto.description, category: dto.category,
+      bookingDate: dto.bookingDate, currency: dto.currency, revision: dto.revision, etag };
+  }
+
+  /** Only a received PUT 200 acknowledges this write; no retry interceptor. */
+  async update(id: number, etag: string, input: ExpenseUpdate): Promise<void> {
+    this.requireRevision(id, etag);
+    const response = await firstValueFrom(this.http.put(`${this.env.apiBaseUrl}/Expense/${id}`, {
+      amount: input.amount, description: input.description, category: input.category,
+      bookingDate: input.bookingDate, currency: input.currency,
+    }, { observe: 'response', headers: { 'If-Match': etag } }).pipe(timeout(15000)));
+    if (response.status !== 200) throw new Error('expense-write-unconfirmed');
+  }
+
+  async delete(id: number, etag: string): Promise<void> {
+    this.requireRevision(id, etag);
+    const response = await firstValueFrom(this.http.delete(`${this.env.apiBaseUrl}/Expense/${id}`, {
+      observe: 'response', headers: { 'If-Match': etag },
+    }).pipe(timeout(15000)));
+    if (response.status !== 204) throw new Error('expense-write-unconfirmed');
+  }
+
+  private requireRevision(id: number, etag: string): void {
+    if (expenseId(id) !== id) throw new Error('expense-id-invalid');
+    if (!/^"[1-9]\d*"$/.test(etag) || BigInt(etag.slice(1, -1)) > 9223372036854775807n) {
+      throw new Error('expense-revision-invalid');
+    }
+  }
 
   /** Latest expenses, newest first. `id` is the numeric Expense Id; pre-cutover missing identity stays null. */
   async latest(count = 20): Promise<Expense[]> {

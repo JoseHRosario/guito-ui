@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Rules for AI coding agents working in guito-ui. Overview and architecture story live in [README.md](README.md); domain glossary in [CONTEXT.md](CONTEXT.md); coding conventions (styling, code structure, testing) live in [docs/CONVENTIONS.md](docs/CONVENTIONS.md); UI decision records in [docs/adr/](docs/adr/).
+Rules for AI coding agents working in guito-ui. Overview and architecture story live in [README.md](README.md); domain glossary in [GLOSSARY.md](GLOSSARY.md); coding conventions (styling, code structure, testing) live in [docs/CONVENTIONS.md](docs/CONVENTIONS.md); UI decision records in [docs/adr/](docs/adr/).
 
 ## Commands
 
@@ -39,6 +39,7 @@ Styling, code-structure, and testing rules live in [docs/CONVENTIONS.md](docs/CO
 Designs live on the **Guito App** page of the Guito design file (duplicate of Simple Design System, key `UoIK5MnIqDrgfHqMmBZoYk`); the Community original is never edited. Flow: Hermes drafts in Figma (MCP) → José validates → the approved frame is the implement source; design changes happen in Figma, never as code-side drift. Token source is the MCP sync (ADR 0010) — `tools/tokens/pull-figma.mjs` is dead on this plan (`file_variables:read` is Enterprise-only). Token sync regenerates `design/tokens.json` (mapping in `tools/tokens/figma.json`, fileKey = the duplicate).
 
 Current design state on the Guito App page:
+- **Edit/Delete Expense (#70)** — approved [mobile `3359:570`](https://www.figma.com/design/UoIK5MnIqDrgfHqMmBZoYk/Guito?node-id=3359-570), [desktop `3359:644`](https://www.figma.com/design/UoIK5MnIqDrgfHqMmBZoYk/Guito?node-id=3359-644), [recovery gallery `3361:681`](https://www.figma.com/design/UoIK5MnIqDrgfHqMmBZoYk/Guito?node-id=3361-681), validation `3362:859`/`3362:935`, rejection `3362:1024`/`3362:1100`, contract `3362:1189`; approval [6167052038](https://github.com/JoseHRosario/guito-ui/issues/70#issuecomment-6167052038). When changing edit, recovery or dirty navigation, read [the issue contract](docs/issue70-edit-delete-expenses.md). Keep the existing shell; exact-ID reads and loaded quoted ETags govern mutations. Matching remains follow-up.
 - **Create Expense (#128)** — approved canonical mobile `3094:35`, desktop `3094:9704`, validation `3094:9937`, save failure `3094:10011`, voice `3134:10053`. Native Time beside Date on both breakpoints; Europe/Lisbon semantics and compatibility rules in [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
 - **Workspace** frame (expenses list, mobile + desktop) — José's design, approved and implemented.
 - **SignIn** (mobile `node-id=3071-35`) and **SignIn Desktop** (`node-id=3080-53`) — minimalist, Google-only direction; centered logo/tagline/button with the official Google G mark and a bottom trust line. **Pending José's Figma approval** — approval is the implement source for the Sign In screen and the auth route guard. Button is a token-faithful copy of the DS Primary Button (DS instances cannot take an icon child).
@@ -57,6 +58,7 @@ The **interaction contract** (auth gate → Sign In → Expenses List → Create
 
 - **Never** commit secrets (`.env` holds the Figma PAT and is gitignored); never edit the Community Figma file; never push to `master`.
 - **Ask first** before: adding a dependency, deviating from a token color (document each deviation in the PR body), changing the deploy pipeline, or touching the token mapping (`tools/tokens/figma.json`).
+- **Node modules symlink:** use `/node_modules` without a trailing slash in `.gitignore`; verify `git check-ignore node_modules` before staging.
 - **Always** run the full local suite before pushing; keep this file current — add a rule whenever an agent correction recurs, prune stale ones in the same commit.
 
 ## Agent skills
@@ -71,4 +73,4 @@ Five canonical roles used as-is: `needs-triage`, `needs-info`, `ready-for-agent`
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.

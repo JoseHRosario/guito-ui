@@ -6,14 +6,14 @@ import { ActivatedRouteSnapshot, DetachedRouteHandle, RouteReuseStrategy } from 
  * leaving to Dashboard/Budgets/Settings detaches the component instead of
  * destroying it, so returning to the Expenses tab restores the loaded list
  * without re-issuing GET /Expense/latest/20. The list refreshes ONLY through
- * the month-nav refresh button or after an expense creation (saved=1 path).
+ * the month-nav refresh button or after an acknowledged expense creation/update/deletion.
  * Every other route is destroyed/recreated as usual.
  */
 @Injectable({ providedIn: 'root' })
 export class ExpensesRouteReuseStrategy implements RouteReuseStrategy {
-  private static handler: DetachedRouteHandle | null = null;
+  private handler: DetachedRouteHandle | null = null;
 
-  static hasDetachedRoute(): boolean {
+  hasDetachedRoute(): boolean {
     return this.handler !== null;
   }
 
@@ -26,15 +26,15 @@ export class ExpensesRouteReuseStrategy implements RouteReuseStrategy {
   }
 
   store(route: ActivatedRouteSnapshot, handle: DetachedRouteHandle | null): void {
-    ExpensesRouteReuseStrategy.handler = handle;
+    this.handler = handle;
   }
 
   shouldAttach(route: ActivatedRouteSnapshot): boolean {
-    return ExpensesRouteReuseStrategy.isReusable(route) && ExpensesRouteReuseStrategy.handler !== null;
+    return ExpensesRouteReuseStrategy.isReusable(route) && this.handler !== null;
   }
 
   retrieve(route: ActivatedRouteSnapshot): DetachedRouteHandle | null {
-    return ExpensesRouteReuseStrategy.isReusable(route) ? ExpensesRouteReuseStrategy.handler : null;
+    return ExpensesRouteReuseStrategy.isReusable(route) ? this.handler : null;
   }
 
   /** Tab targets can never differ in matrix/query params today; keep future-proof anyway. */
