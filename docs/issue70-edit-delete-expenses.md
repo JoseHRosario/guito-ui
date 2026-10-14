@@ -101,8 +101,11 @@ scratch artifacts, summarized in `issue70-result.md`. Production and staging
 configurations must each be built and run against the full hermetic browser
 suite. Unit tests use `npm test -- --include=...`, Angular's builder.
 
-Live staging integration is separate and **not exercised**: sibling feature
-#133 / PR #71 is deployed at `33f760c` on the shared staging distribution.
-No push/deploy, live financial mutation or AWS credential write is authorized.
+Live staging integration is separate and **not exercised**. The owner gave #70
+priority to merge to master first; parent publication/deployment need not wait for
+sibling feature #133 / PR #71. That sibling Bank inbox (deployed at `33f760c`
+before this work) is not included in #70's pinned baseline. Parent review and
+served-build verification still precede live acceptance. This implementation
+worker is not authorized to push/deploy, mutate live finances or write AWS credentials.
 The local stubs do not establish Postgres persistence, live CORS or live staging
 acceptance. Safari/Firefox and unsupported browser exit paths are not claimed.
