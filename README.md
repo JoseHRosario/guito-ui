@@ -26,6 +26,22 @@ See [the inbox design/contract](docs/adr/0015-bank-review-inbox.md) for expanded
 frames and the HTTP boundary. Local tests are hermetic; live API integration and
 served visual acceptance remain separate owner/parent verification gates.
 
+## Expense edit/delete (#70)
+
+Expense rows with a numeric ID open `/expenses/:id/edit`. The editor reads current
+values and revision by ID, preserves untouched exact decimal text and timestamp
+precision, and updates/deletes with `If-Match`. Dirty navigation requires an
+explicit discard; uncertain responses require GET-only checking and deliberate
+reload before a new write. Only acknowledged PUT 200/DELETE 204 return to the
+refreshed list with an updated/deleted toast. Matching is follow-up because the
+current detail DTO exposes no verified link state. See the [issue #70 contract](docs/issue70-edit-delete-expenses.md).
+Local production and staging browser suites use hermetic fixtures. This branch
+reconciles #133 with merged #70 / PR #72, retaining its native minute-only Time
+control, exact timestamp preservation, recovery and route-cache behavior. Local
+checks do not establish live API/Postgres acceptance for #133; rollout and owner
+acceptance remain separate gates. No deployment or financial mutation is part of
+this reconciliation.
+
 ## Tech stack
 
 | Layer     | Choice                                                        |
@@ -63,12 +79,11 @@ npm run build            # production build (runs the token pipeline first)
 
 ```
 src/app/
-  core/       models + pure functions (money formatting, day grouping), stub data
+  core/       cross-feature environment, auth, bootstrap and route reuse
   core/auth/  Google PKCE session: AuthService (signals), session storage, pkce
-  shell/      header, nav, bottom navigation, footer
-  features/   one folder per screen (expenses/, auth/ — callback screen today)
+  features/   feature-nested pages, components, models and services (shell included)
   shared/     cross-feature components (inline SVG icon set)
-  theme/      tokens.css — GENERATED, never hand-edited
+src/theme/    tokens.css — GENERATED, never hand-edited
 design/       tokens.json — style-dictionary source of the theme
 tools/tokens/ token pipeline: build-tokens.mjs, figma.json (role→variable map)
 e2e/          Playwright specs

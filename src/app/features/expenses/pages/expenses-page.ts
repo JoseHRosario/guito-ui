@@ -1,6 +1,6 @@
-import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
-import { NavigationEnd, Router } from '@angular/router';
+import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, inject, Injector, signal } from '@angular/core';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { formatEur } from '../services/money';
 import { lisbonNow, occurrenceDay } from '../services/expense-time';
 
@@ -64,7 +64,7 @@ import { MonthNav } from '../components/month-nav';
   templateUrl: './expenses-page.html',
   styleUrl: './expenses-page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MonthNav, GIcon, NgTemplateOutlet],
+  imports: [MonthNav, GIcon, NgTemplateOutlet, RouterLink],
 })
 export class ExpensesPage {
   private readonly expenseApi = inject(ExpenseApi);
@@ -72,6 +72,10 @@ export class ExpensesPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private destroyed = false;
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
+  private editScroll: number | null = null;
+  private restoreEditScroll = false;
   /** Guards against a stale response (e.g. a retry racing a slow first load). */
   private loadSequence = 0;
 
@@ -87,6 +91,8 @@ export class ExpensesPage {
 
   /** "Expense saved" toast (frame 3094:10243): bottom-center above nav, auto-dismiss ~3s. */
   protected readonly savedToast = signal(false);
+  protected readonly mutationToast = signal<string | null>(null);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly amount = formatEur;
 
@@ -213,6 +219,7 @@ export class ExpensesPage {
     this.destroyRef.onDestroy(() => {
       this.destroyed = true;
       if (this.voiceToastTimer !== null) clearTimeout(this.voiceToastTimer);
+      if (this.toastTimer !== null) clearTimeout(this.toastTimer);
     });
     this.load();
     // The create page lands back here with saved=1 → reload the list (route reuse
@@ -220,17 +227,49 @@ export class ExpensesPage {
     // fires on return), show the toast once, then clear the param.
     this.router.events.subscribe((event) => {
       if (this.destroyed || !(event instanceof NavigationEnd)) return;
-      if (this.router.parseUrl(event.urlAfterRedirects).queryParams['saved'] === '1') {
+      const url = this.router.parseUrl(event.urlAfterRedirects);
+      if (url.root.children['primary']?.segments.length) return;
+      const params = url.queryParams;
+      if (this.editScroll !== null) this.restoreEditScroll = true;
+      if (params['saved'] === '1') {
         this.load();
         this.savedToast.set(true);
-        setTimeout(() => {
+        if (this.toastTimer !== null) clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
           if (!this.destroyed) {
             this.savedToast.set(false);
-            void this.router.navigate([], { queryParams: { saved: null }, queryParamsHandling: 'merge' });
+            // Do not let a toast from the detached list interrupt a later edit.
+            if (this.router.url === '/?saved=1') void this.router.navigate([], { queryParams: { saved: null }, queryParamsHandling: 'merge' });
           }
         }, 3000);
+      } else if (params['updated'] === '1' || params['deleted'] === '1') {
+        this.load();
+        this.mutationToast.set(params['updated'] === '1' ? 'Expense updated' : 'Expense deleted');
+        if (this.toastTimer !== null) clearTimeout(this.toastTimer);
+        void this.router.navigate([], { queryParams: { updated: null, deleted: null }, queryParamsHandling: 'merge', replaceUrl: true });
+        this.toastTimer = setTimeout(() => {
+          if (!this.destroyed) this.mutationToast.set(null);
+        }, 3000);
+      } else if (this.restoreEditScroll && !this.refreshing()) {
+        this.restoreScroll();
       }
     });
+  }
+
+  protected rememberScroll(): void {
+    this.editScroll = this.document.defaultView?.scrollY ?? 0;
+  }
+
+  private restoreScroll(): void {
+    const position = this.editScroll;
+    if (!this.restoreEditScroll || position === null) return;
+    afterNextRender(() => {
+      if (!this.destroyed && this.router.url.split('?')[0] === '/') {
+        this.document.defaultView?.scrollTo(0, position);
+        this.editScroll = null;
+        this.restoreEditScroll = false;
+      }
+    }, { injector: this.injector });
   }
 
   protected createExpense(): void {
@@ -248,7 +287,10 @@ export class ExpensesPage {
     const seq = ++this.loadSequence;
     void this.expenseApi.latest().then(
       (expenses) => {
-        if (!this.destroyed && seq === this.loadSequence) this.expenses.set(expenses);
+        if (!this.destroyed && seq === this.loadSequence) {
+          this.expenses.set(expenses);
+          this.restoreScroll();
+        }
       },
       () => {
         if (!this.destroyed && seq === this.loadSequence) {

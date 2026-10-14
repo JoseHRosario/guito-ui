@@ -1,7 +1,10 @@
 # Context & Glossary (guito-ui)
 
 - **Expense occurrence** — the purchase instant (`bookingDate`), distinct from creation/update audit dates. Editable Date/Time use Europe/Lisbon; new expenses default to now, not historical-import midnight. Known offset prefills retain their instant; DST gaps/folds are validated (ADR 0014).
-- **Expense ID** — durable Int32 JSON number, distinct from the bank transaction Int64 identity normalized to text. Missing legacy expense identity remains null; storedOrder and array positions are never reconciliation references.
+- **Expense ID** — immutable positive numeric Int32 backend identity, distinct from the bank transaction Int64 identity normalized to text. Digit-only legacy strings adapt at the HTTP boundary; missing/invalid IDs remain null and cannot open an editor. List position, description and `storedOrder` never identify an expense or a reconciliation reference.
+- **Expense revision** — API decimal Int64 revision string with a strong quoted ETag. Edit/delete send the received ETag unchanged as `If-Match`; a stale token yields 412.
+- **Uncertain mutation outcome** — a timeout, lost response or 5xx after a write. Exact-ID readback establishes current state only. Original intent/revision stays separate; renewed writes require deliberate reload/review. See [issue #70 contract](docs/issue70-edit-delete-expenses.md).
+- **Edit Expense canonical frames** — approved mobile `3359:570`, desktop `3359:644`, recovery gallery `3361:681`, interaction contract `3362:1189`; approval comment `6167052038`.
 - **Create Expense canonical frames** — approved mobile `3094:35`, desktop `3094:9704`, validation `3094:9937`, save failure `3094:10011`, voice prefill `3134:10053`; native Time shares the Date row (ADR 0014).
 
 - **Guito design file** — José's duplicate of the "Simple Design System (Community)" Figma file, key `UoIK5MnIqDrgfHqMmBZoYk` (owner José). The Community original is read-only source and never edited. App designs live on its dedicated **Guito App** page. See ADR 0010.
