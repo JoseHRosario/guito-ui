@@ -106,10 +106,8 @@ export class EditExpensePage {
       this.category.set(detail.category);
       const fields = lisbonFields(new Date(detail.bookingDate));
       this.date.set(fields.date);
-      const seconds = detail.bookingDate.slice(17, 19);
-      // Native time controls support seconds, not the API's six-digit fraction.
-      // The exact wire timestamp is retained independently in knownInstant.
-      this.time.set(`${fields.time}:${seconds}`);
+      // Minute-only native picker; exact seconds/fraction/offset stay independent.
+      this.time.set(fields.time);
       this.originalOccurrenceFields = `${this.date()}|${this.time()}`;
       this.knownInstant = detail.bookingDate;
       this.originalFields = this.fields();
@@ -126,7 +124,7 @@ export class EditExpensePage {
 
   protected change(field: 'amount' | 'description' | 'date' | 'time' | 'category', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
-    this[field].set(field === 'time' && /^\d{2}:\d{2}$/.test(value) ? `${value}:00` : value);
+    this[field].set(field === 'time' && /^\d{2}:\d{2}:00$/.test(value) ? value.slice(0, 5) : value);
     if (field === 'date' || field === 'time') {
       this.knownInstant = `${this.date()}|${this.time()}` === this.originalOccurrenceFields ? this.loaded()?.bookingDate ?? null : null;
     }
@@ -137,14 +135,16 @@ export class EditExpensePage {
     if (!detail || this.loading() || this.busy() || this.recovery() !== 'ready') return;
     const parsed = parseAmount(this.amount());
     const occurrence = resolveOccurrence(this.date(), this.time().slice(0, 5), this.knownInstant);
-    if (!/^\d{2}:\d{2}(?::[0-5]\d)?$/.test(this.time())) {
+    if (!/^\d{2}:\d{2}$/.test(this.time())) {
       occurrence.occurredAt = null;
       occurrence.error = 'Enter a valid time';
     } else if (occurrence.occurredAt && !this.knownInstant) {
-      const seconds = this.time().slice(6) || '00';
-      // Date-only edits retain subsecond precision without reusing the old instant.
+      // Date-only edits retain hidden precision, but resolve the new Lisbon offset.
+      // An actual minute edit starts at :00, without an inherited fraction.
       const originalTime = this.originalOccurrenceFields.split('|')[1];
-      const fraction = this.time() === originalTime ? detail.bookingDate.match(/\.(\d+)/)?.[1] : undefined;
+      const unchangedTime = this.time() === originalTime;
+      const seconds = unchangedTime ? detail.bookingDate.slice(17, 19) : '00';
+      const fraction = unchangedTime ? detail.bookingDate.match(/\.(\d+)/)?.[1] : undefined;
       occurrence.occurredAt = occurrence.occurredAt.replace(/:00([+-]\d{2}:\d{2})$/, `:${seconds}${fraction ? '.' + fraction : ''}$1`);
     }
     const errors = {

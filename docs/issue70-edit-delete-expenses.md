@@ -37,7 +37,8 @@ Existing shell chrome and token theme are retained. Creation, favorites, voice
 and Bank create flows retain their existing contracts.
 
 The edit Time field uses daisyUI's browser-native `input type="time"` with
-`step="1"` (whole seconds), per José's explicit follow-up request. Figma edit,
+`step="60"` and bound `HH:mm` only, approved by José: “Use the native
+minute-only clock picker first; I’ll verify its appearance on Android”. Figma edit,
 validation/rejection exemplars and the interaction annotation were updated first;
 canonical create frames remain unchanged. This is a styled native picker, not a
 custom daisyUI popup: segments/appearance follow the browser locale. Never bind
@@ -45,20 +46,26 @@ six-digit fractions to this control (browsers blank them). Retain the exact orig
 wire timestamp independently. Unchanged or reverted Date/Time saves preserve its
 offset, seconds/microseconds verbatim; amount/description/category edits do not
 invalidate it. Date-only changes retain original seconds/fraction when Time is
-unchanged but resolve the new Lisbon offset. Actual Time edits use selected whole
-seconds without inherited fractions. The original-precision helper is shown only
+unchanged but resolve the new Lisbon offset. Actual minute edits set seconds to `00`
+without inherited fractions. Reverting the displayed original minute restores
+its nonzero seconds/fraction and exact known DST-fold instant too. The original-precision helper is shown only
 when both occurrence fields match the original. Full exact offset timestamps
 remain visible separately in recovery summaries. Minute-form `HH:mm` and
 `HH:mm:00` are equivalent for zero-second reversion. DST gaps and unresolved
 folds are rejected. Unchanged decimal string/scale (including signed zero) is
 preserved; changed amounts use existing textual .NET decimal validation.
+Native modal appearance is browser/OS-owned. Chromium Android selects its platform
+clock path at minute step; identical Date/Time appearance is not guaranteed and
+awaits José’s actual Android verification (desktop emulation is not evidence).
+No dependency or creation-control change.
 Description may be empty and is not trimmed. Currency is EUR.
 
 ## HTTP boundary
 
 - Identity is a positive numeric Int32, at most 2147483647. No ordinal fallback.
 - GET `/Expense/{id}` on entry, direct reload, explicit reload and readback,
-  requested with `Cache-Control: no-store`. Valid detail requires exact-string
+  with response-owned no-store policy (no request Cache-Control header, which
+  staging CORS does not allow). Valid detail requires exact-string
   amount, offset timestamp, EUR, same ID and strong quoted ETag consistent with
   decimal Int64 `revision`. Missing/malformed tokens block mutation.
 - PUT `/Expense/{id}` sends only `amount`, `description`, `category`,

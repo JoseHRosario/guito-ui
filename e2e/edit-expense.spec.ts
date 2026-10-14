@@ -42,7 +42,7 @@ for (const [name, viewport] of [['mobile', { width: 402, height: 874 }], ['deskt
     await row.focus(); await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/expenses\/7\/edit$/);
     await expect(field(page, 'amount')).toHaveValue('-65,5500');
-    await expect(field(page, 'time')).toHaveValue('14:23:45');
+    await expect(field(page, 'time')).toHaveValue('14:23');
     const amount = (await field(page, 'amount').boundingBox())!;
     const date = (await field(page, 'date').boundingBox())!;
     const time = (await field(page, 'time').boundingBox())!;
@@ -87,8 +87,8 @@ for (const [name, viewport] of [['mobile', { width: 402, height: 874 }], ['deskt
     await page.goto('/expenses/7/edit');
     const time = field(page, 'time');
     await expect(time).toHaveAttribute('type', 'time');
-    await expect(time).toHaveAttribute('step', '1');
-    await expect(time).toHaveValue('14:23:45');
+    await expect(time).toHaveAttribute('step', '60');
+    await expect(time).toHaveValue('14:23');
     async function save(expected: string) {
       const count = bodies.length;
       await action(page, 'Save changes').click();
@@ -105,18 +105,40 @@ for (const [name, viewport] of [['mobile', { width: 402, height: 874 }], ['deskt
     await field(page, 'date').fill('2026-01-03');
     await expect(page.locator('g-edit-expense-page')).not.toContainText('Original precision retained');
     await save('2026-01-03T14:23:45.123456+00:00');
-    await time.fill('16:24:46');
-    await save('2026-01-03T16:24:46+00:00');
+    await time.fill('16:24');
+    await save('2026-01-03T16:24:00+00:00');
     await time.focus(); await page.keyboard.press('ArrowUp');
-    await expect(time).not.toHaveValue('16:24:46');
+    await expect(time).not.toHaveValue('16:24');
     expect(await time.evaluate((node: HTMLInputElement) => node.validity.valid)).toBe(true);
-    await time.fill('14:23:45'); await field(page, 'date').fill('2026-07-02');
+    await time.fill('14:23'); await field(page, 'date').fill('2026-07-02');
     await expect(page.locator('g-edit-expense-page')).toContainText('Original precision retained');
     await save(original.bookingDate);
     await time.fill(''); await action(page, 'Save changes').click();
     await expect(page.locator('g-edit-expense-page')).toContainText('Enter a valid time');
     expect(bodies.length).toBe(5);
     if (evidence) await page.screenshot({ path: `${evidence}/${name}-native-time-validation.png`, fullPage: true });
+  });
+
+  test(`${name}: minute reversion restores nonzero-second fold and leaves without dirty prompt`, async ({ page }) => {
+    await page.setViewportSize(viewport); await setup(page);
+    const fold = { ...original, bookingDate: '2026-10-25T01:30:42.654321+00:00' };
+    let writes = 0;
+    await page.route('**/Expense/latest/20', route => route.fulfill({ json: { expenses: [fold] } }));
+    await page.route('**/Expense/7', route => {
+      if (route.request().method() === 'GET') return route.fulfill({ json: fold, headers: { 'Access-Control-Expose-Headers': 'ETag', ETag: '"1"' } });
+      writes++;
+      expect(route.request().postDataJSON().bookingDate).toBe(fold.bookingDate);
+      return route.fulfill({ status: 409, json: {} });
+    });
+    await page.goto('/'); await page.locator('[data-expense-id="7"]:visible').click();
+    await expect(field(page, 'time')).toHaveValue('01:30');
+    await field(page, 'date').fill('2026-10-26'); await field(page, 'time').fill('02:30');
+    await field(page, 'date').fill('2026-10-25'); await field(page, 'time').fill('01:30');
+    await action(page, 'Save changes').click();
+    await expect.poll(() => writes).toBe(1);
+    await expect(page.locator('[role="alert"]:visible')).toContainText('Request rejected');
+    await action(page, 'Cancel').click(); await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   test(`${name}: direct reload, dirty back guard, stale reload confirmation and retained values`, async ({ page }) => {
@@ -194,10 +216,10 @@ for (const [name, viewport] of [['mobile', { width: 402, height: 874 }], ['deskt
     await field(page, 'amount').fill('0'); await field(page, 'date').fill('2026-10-25'); await field(page, 'time').fill('01:30');
     await action(page, 'Save changes').click();
     await expect(page.locator('g-edit-expense-page')).toContainText('occurs twice in Lisbon'); expect(writes).toBe(0);
-    await field(page, 'date').fill('2026-07-03'); await field(page, 'time').fill('14:23:45');
+    await field(page, 'date').fill('2026-07-03'); await field(page, 'time').fill('14:23');
     await action(page, 'Save changes').click();
     await expect(page.locator('[role="alert"]:visible')).toContainText('Request rejected');
-    await expect(field(page, 'amount')).toHaveValue('0'); await expect(field(page, 'time')).toHaveValue('14:23:45');
+    await expect(field(page, 'amount')).toHaveValue('0'); await expect(field(page, 'time')).toHaveValue('14:23');
     if (evidence) await page.screenshot({ path: `${evidence}/${name}-rejected.png`, fullPage: true });
     expect(writes).toBe(1);
   });
@@ -235,7 +257,7 @@ for (const [name, viewport] of [['mobile', { width: 402, height: 874 }], ['deskt
       await dialog.getByRole('button', { name: 'Keep editing' }).click();
       await expectCurrent();
       await expect(field(page, 'description')).toHaveValue('My retained intent');
-      await expect(field(page, 'time')).toHaveValue('14:23:45');
+      await expect(field(page, 'time')).toHaveValue('14:23');
       await expect(page.locator('select[id$="-category"]:visible')).toHaveValue('Groceries');
       await expect(action(page, 'Save changes')).toBeDisabled();
       expect(await page.locator('body').evaluate(body => body.scrollWidth <= innerWidth)).toBe(true);

@@ -94,7 +94,7 @@ test('native cross-origin policy blocks the old header but loads Edit Expense wi
     await page.goto(`${appOrigin}/expenses/7/edit`);
     await expect(page.locator('input[id$="-description"]:visible')).toHaveValue(detail.description);
     await expect(page.locator('input[id$="-amount"]:visible')).toHaveValue('-65,5500');
-    await expect(page.locator('input[id$="-time"]:visible')).toHaveValue('14:23:45');
+    await expect(page.locator('input[id$="-time"]:visible')).toHaveValue('14:23');
     await expect(page.getByRole('button', { name: 'Save changes', exact: true }).filter({ visible: true })).toBeEnabled();
     expect(configuredBundles).toBeGreaterThan(0);
     expect(reads).toHaveLength(1);
