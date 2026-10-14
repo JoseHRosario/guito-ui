@@ -116,7 +116,7 @@ describe('Expenses page survives tab navigation (issue #47 follow-up)', () => {
   it('ShouldDetachTheExpensesComponent_WhenAnotherTabActivates', async () => {
     await landOnExpenses();
     await harness.navigateByUrl('/budgets', Shell);
-    expect(ExpensesRouteReuseStrategy.hasDetachedRoute()).toBe(true);
+    expect(TestBed.inject(ExpensesRouteReuseStrategy).hasDetachedRoute()).toBe(true);
   });
 
   it('ShouldWireTheReuseStrategy_IntoTheRealAppConfig', () => {

@@ -4,7 +4,20 @@ The web frontend of **Guito**, a personal expense tracker: control expenses and 
 
 > Live demo: https://guito.web.kerumirembora.com/ (deployed from `master`). Local tests stub the API; production consumes guito-api.
 
-> Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and opaque expense IDs. Production now enables the existing timestamp capability after the approved guito-api#132 Postgres cutover (fix guito-api#145); dev/staging settings are unchanged. All create paths send `bookingDate`, and exact decimal strings preserve POST/prefill precision. Production release and an owner-confirmed genuine save remain merge/deploy verification gates; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
+> Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and numeric expense IDs. Production now enables the existing timestamp capability after the approved guito-api#132 Postgres cutover (fix guito-api#145); dev/staging settings are unchanged. All create paths send `bookingDate`, and exact decimal strings preserve POST/prefill precision. Production release and an owner-confirmed genuine save remain merge/deploy verification gates; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
+
+
+Expense rows with a numeric ID open `/expenses/:id/edit`. The editor reads current
+values and revision by ID, preserves untouched exact decimal text and timestamp
+precision, and updates/deletes with `If-Match`. Dirty navigation requires an
+explicit discard; uncertain responses require GET-only checking and deliberate
+reload before a new write. Only acknowledged PUT 200/DELETE 204 return to the
+refreshed list with an updated/deleted toast. Matching is follow-up because the
+current detail DTO exposes no verified link state. See the [issue #70 contract](docs/issue70-edit-delete-expenses.md).
+Local production and staging browser suites use transport stubs. Live isolated
+staging acceptance remains outstanding: the shared staging deployment belongs
+to sibling feature #133 / PR #71 (`33f760c`); this work does not deploy or mutate
+financial data.
 
 ## Tech stack
 
@@ -43,12 +56,11 @@ npm run build            # production build (runs the token pipeline first)
 
 ```
 src/app/
-  core/       models + pure functions (money formatting, day grouping), stub data
+  core/       cross-feature environment, auth, bootstrap and route reuse
   core/auth/  Google PKCE session: AuthService (signals), session storage, pkce
-  shell/      header, nav, bottom navigation, footer
-  features/   one folder per screen (expenses/, auth/ — callback screen today)
+  features/   feature-nested pages, components, models and services (shell included)
   shared/     cross-feature components (inline SVG icon set)
-  theme/      tokens.css — GENERATED, never hand-edited
+src/theme/    tokens.css — GENERATED, never hand-edited
 design/       tokens.json — style-dictionary source of the theme
 tools/tokens/ token pipeline: build-tokens.mjs, figma.json (role→variable map)
 e2e/          Playwright specs

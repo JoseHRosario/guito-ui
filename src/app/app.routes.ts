@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { ExpensesPage } from './features/expenses/pages/expenses-page';
+import { EditExpensePage } from './features/expenses/pages/edit-expense-page';
 import { CreateExpensePage } from './features/expenses/pages/create-expense-page';
 import { SignIn } from './features/signin/pages/signin';
 import { AuthCallback } from './features/auth/pages/auth-callback';
@@ -50,6 +51,12 @@ export const routes: Routes = [
         path: 'settings',
         component: SettingsPage,
         title: 'Guito · Settings',
+      },
+      {
+        path: 'expenses/:id/edit',
+        component: EditExpensePage,
+        canDeactivate: [(page: EditExpensePage) => page.canLeave()],
+        title: 'Guito · Edit Expense',
       },
       {
         path: 'expenses/create',
