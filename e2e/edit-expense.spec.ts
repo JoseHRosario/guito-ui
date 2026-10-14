@@ -125,6 +125,14 @@ for (const [name, viewport] of [['mobile', { width: 402, height: 874 }], ['deskt
     await expect(page).toHaveURL(/\/expenses\/7\/edit$/);
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(writes).toBe(1); expect(reads).toBe(3);
+    await action(page, 'Back to expenses').click();
+    const discard = page.getByRole('dialog');
+    await expect(discard).toContainText('previous write outcome is not confirmed');
+    await expect(discard).not.toContainText('Your saved expense is unchanged');
+    if (evidence) await page.screenshot({ path: `${evidence}/${name}-absent-discard.png`, fullPage: true });
+    await discard.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(field(page, 'description')).toHaveValue('Retained intent');
+    expect(writes).toBe(1); expect(reads).toBe(3);
   });
   test(`${name}: Lisbon validation and definite rejection retain values`, async ({ page }) => {
     await page.setViewportSize(viewport); await setup(page);
@@ -150,6 +158,48 @@ for (const [name, viewport] of [['mobile', { width: 402, height: 874 }], ['deskt
     if (evidence) await page.screenshot({ path: `${evidence}/${name}-rejected.png`, fullPage: true });
     expect(writes).toBe(1);
   });
+
+  for (const [changeName, change] of [
+    ['category-only', { category: 'Restaurants' }],
+    ['time-only', { bookingDate: '2026-07-02T14:23:45.654321+01:00' }],
+  ] as const) {
+    test(`${name}: ${changeName} current resource is complete and separate from retained intent`, async ({ page }) => {
+      await page.setViewportSize(viewport); await setup(page);
+      let reads = 0; let writes = 0;
+      const current = { ...original, ...change, revision: '9223372036854775807' };
+      await page.route('**/Expense/7', route => {
+        if (route.request().method() !== 'GET') { writes++; return route.fulfill({ status: 503, json: {} }); }
+        reads++;
+        return route.fulfill({ json: reads === 1 ? original : current, headers: { 'Access-Control-Expose-Headers': 'ETag', ETag: reads === 1 ? '"1"' : '"9223372036854775807"' } });
+      });
+      await page.goto('/expenses/7/edit'); await field(page, 'description').fill('My retained intent');
+      await action(page, 'Save changes').click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toContainText('does not prove your operation succeeded');
+      async function expectCurrent() {
+        const summary = page.getByRole('region', { name: 'Current expense', exact: true }).filter({ visible: true });
+        await expect(summary).toContainText(`Description: ${original.description}`);
+        await expect(summary).toContainText('Amount: -65.5500 €');
+        await expect(summary).toContainText(`Category: ${current.category}`);
+        await expect(summary).toContainText(`Booking date: ${current.bookingDate}`);
+        await expect(summary).toContainText('Revision: 9223372036854775807');
+        await expect(summary).not.toContainText('My retained intent');
+        expect(await summary.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+      }
+      await expectCurrent();
+      expect(await dialog.evaluate(node => node.scrollHeight <= node.clientHeight)).toBe(true);
+      if (evidence) await page.screenshot({ path: `${evidence}/${name}-${changeName}-recovery.png`, fullPage: true });
+      await dialog.getByRole('button', { name: 'Keep editing' }).click();
+      await expectCurrent();
+      await expect(field(page, 'description')).toHaveValue('My retained intent');
+      await expect(field(page, 'time')).toHaveValue('14:23:45.123456');
+      await expect(page.locator('select[id$="-category"]:visible')).toHaveValue('Groceries');
+      await expect(action(page, 'Save changes')).toBeDisabled();
+      expect(await page.locator('body').evaluate(body => body.scrollWidth <= innerWidth)).toBe(true);
+      if (evidence) await page.screenshot({ path: `${evidence}/${name}-${changeName}-retained.png`, fullPage: true });
+      expect(writes).toBe(1); expect(reads).toBe(2);
+    });
+  }
 
   test(`${name}: uncertain matching readback is not success; explicit reload starts fresh intent`, async ({ page }) => {
     await page.setViewportSize(viewport); await setup(page);

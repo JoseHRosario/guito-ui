@@ -97,7 +97,7 @@
       <button type="button" class="btn btn-outline" (click)="requestReload()">Reload expense</button>
     }
     @if (modal() !== 'recovery' && current(); as resource) {
-      <p class="w-full rounded-lg bg-base-100 p-4 text-sm">Current expense: {{ resource.description || '(No description)' }} · {{ resource.amount }} € · {{ dateLabel(resource.bookingDate) }}</p>
+      <div class="w-full rounded-lg bg-base-100 p-4 text-sm"><ng-container *ngTemplateOutlet="currentSummary; context: { $implicit: resource }" /></div>
     }
     @if (recovery() === 'check-failed' && modal() !== 'recovery') {
       <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="checkOutcome()">Check again</button>
@@ -112,12 +112,23 @@
   </ng-template>
 </div>
 
+<ng-template #currentSummary let-resource>
+  <section aria-label="Current expense" class="break-words">
+    <p class="font-semibold">Current expense</p>
+    <p>Description: {{ resource.description || '(No description)' }}</p>
+    <p>Amount: {{ resource.amount }} €</p>
+    <p>Category: {{ resource.category }}</p>
+    <p>Booking date: {{ resource.bookingDate }}</p>
+    <p>Revision: {{ resource.revision }}</p>
+  </section>
+</ng-template>
+
 <dialog class="m-auto w-[calc(100%_-_2rem)] max-w-lg rounded-lg border border-base-content/10 bg-base-100 p-6 text-base-content shadow-xl" tabindex="-1" aria-labelledby="edit-dialog-title" aria-describedby="edit-dialog-description" (cancel)="$event.preventDefault(); closeModal()" (keydown)="trapFocus($event)">
   @if (modal() === 'recovery') {
     <section [attr.role]="recovery() === 'checking' ? 'status' : 'alert'" [attr.aria-busy]="recovery() === 'checking'">
       <h2 id="edit-dialog-title" class="text-2xl font-semibold">{{ recoveryTitle() }}</h2>
       <div id="edit-dialog-description" class="mt-3 text-sm">
-        @if (current(); as resource) { <p class="mb-4">Current expense: {{ resource.description || '(No description)' }}<br />{{ resource.amount }} € · {{ dateLabel(resource.bookingDate) }}</p> }
+        @if (current(); as resource) { <div class="mb-4"><ng-container *ngTemplateOutlet="currentSummary; context: { $implicit: resource }" /></div> }
         <p>{{ message() }}</p>
       </div>
       @if (recovery() !== 'checking') {
@@ -158,8 +169,8 @@
   }
   @if (modal() === 'discard') {
     <h2 id="edit-dialog-title" class="text-2xl font-semibold">Discard changes?</h2>
-    <p id="edit-dialog-description" class="mt-3 text-sm">@if (recovery() === 'found' || recovery() === 'check-failed') { The previous write outcome is not confirmed. Leaving discards your retained edits and intent. }
-      @else { You have unsaved changes. Leaving now discards them. Your saved expense is unchanged. }</p>
+    <p id="edit-dialog-description" class="mt-3 text-sm">@if (recovery() === 'found' || recovery() === 'check-failed' || recovery() === 'absent') { The previous write outcome is not confirmed. Leaving discards your retained edits and intent. }
+      @else { You have unsaved changes. Leaving now discards your retained edits. }</p>
     <div class="mt-6 flex justify-end gap-3">
       <button type="button" class="btn btn-outline" autofocus (click)="closeModal()">Keep editing</button>
       <button type="button" class="btn btn-primary" (click)="closeModal(true)">Discard changes</button>

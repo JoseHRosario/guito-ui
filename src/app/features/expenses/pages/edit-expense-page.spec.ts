@@ -32,6 +32,59 @@ async function open() {
 function input(name: string): HTMLInputElement { return harness.fixture.nativeElement.querySelector(`#mobile-${name}`); }
 function button(text: string): HTMLButtonElement { return Array.from(harness.fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b => b.textContent?.trim() === text)!; }
 function set(name: string, value: string) { input(name).value = value; input(name).dispatchEvent(new Event('input')); harness.detectChanges(); }
+it.each([412, 404, 'uncertain-absent'] as const)('dirty Back after recovery %s never claims the saved expense is unchanged', async outcome => {
+  await open(); set('description', 'Retained intent'); button('Save changes').click();
+  http.expectOne('https://api.test/Expense/7').flush({}, { status: outcome === 'uncertain-absent' ? 503 : outcome, statusText: 'Failed' });
+  if (outcome === 'uncertain-absent') {
+    await new Promise(resolve => setTimeout(resolve, 0));
+    http.expectOne('https://api.test/Expense/7').flush({}, { status: 404, statusText: 'Not Found' });
+  }
+  await vi.waitFor(() => { harness.detectChanges(); expect(harness.fixture.nativeElement.querySelector('dialog').textContent).toContain(outcome === 412 ? 'Expense changed' : outcome === 404 ? 'Expense unavailable' : 'Expense is now absent'); });
+  if (outcome === 412) { button('Keep editing').click(); harness.detectChanges(); button('Cancel').click(); }
+  else button('Back to expenses').click();
+  await vi.waitFor(() => { harness.detectChanges(); expect(button('Discard changes')).toBeDefined(); });
+  const dialog: HTMLDialogElement = harness.fixture.nativeElement.querySelector('dialog');
+  expect(dialog.textContent).not.toContain('Your saved expense is unchanged');
+  if (outcome === 'uncertain-absent') expect(dialog.textContent).toContain('previous write outcome is not confirmed');
+  button('Keep editing').click(); await harness.fixture.whenStable(); harness.detectChanges();
+  expect(input('description').value).toBe('Retained intent');
+  expect(TestBed.inject(Router).url).toBe('/expenses/7/edit');
+  button('Cancel').click();
+  await vi.waitFor(() => { harness.detectChanges(); expect(button('Discard changes')).toBeDefined(); });
+  button('Discard changes').click();
+  await vi.waitFor(() => expect(TestBed.inject(Router).url).toBe('/'));
+  http.match('https://api.test/Expense/latest/20').forEach(r => r.flush({ expenses: [] }));
+  http.expectNone('https://api.test/Expense/7');
+});
+it.each([
+  { category: 'Restaurants' },
+  { bookingDate: '2026-07-02T05:45:27.654321+05:30' },
+])('shows full current resource separately from retained edits after a concurrent change %j', async change => {
+  await open(); set('description', 'My retained intent'); button('Save changes').click();
+  http.expectOne('https://api.test/Expense/7').flush({}, { status: 503, statusText: 'Unavailable' });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const current = { ...detail, ...change, revision: '9223372036854775807' };
+  http.expectOne('https://api.test/Expense/7').flush(current, { headers: { ETag: '"9223372036854775807"' } });
+  await vi.waitFor(() => { harness.detectChanges(); expect(harness.fixture.nativeElement.querySelector('dialog').textContent).toContain('Review current expense'); });
+  function expectCurrent(summary: HTMLElement) {
+    expect(summary.textContent).toContain('Veggies and fruit');
+    expect(summary.textContent).toContain('-65.5500');
+    expect(summary.textContent).toContain(`Category: ${current.category}`);
+    expect(summary.textContent).toContain(`Booking date: ${current.bookingDate}`);
+    expect(summary.textContent).toContain('Revision: 9223372036854775807');
+    expect(summary.textContent).not.toContain('My retained intent');
+  }
+  expectCurrent(harness.fixture.nativeElement.querySelector('dialog'));
+  button('Keep editing').click(); harness.detectChanges();
+  const summaries = harness.fixture.nativeElement.querySelectorAll('[aria-label="Current expense"]') as NodeListOf<HTMLElement>;
+  expect(summaries.length).toBe(2);
+  summaries.forEach(expectCurrent);
+  expect(input('description').value).toBe('My retained intent');
+  expect(input('category').value).toBe('Groceries');
+  expect(input('time').value).toBe('01:15:27.123456');
+  expect(button('Save changes').disabled).toBe(true);
+  http.expectNone('https://api.test/Expense/7');
+});
 it('loads direct edit route and saves blank description with exact untouched amount and timestamp', async () => {
   await open();
   expect(input('amount').value).toBe('-65,5500');

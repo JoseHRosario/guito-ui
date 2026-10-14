@@ -72,6 +72,11 @@ may be empty and is not trimmed. Currency is EUR.
 | Readback fails | Outcome unknown; Check again sends GET only; no write retry |
 
 Dirty fields use a routed canDeactivate prompt: Keep editing / Discard changes.
+Discard copy describes only leaving retained edits, never the saved resource's
+state. An uncertain outcome remains unconfirmed even when readback finds absence.
+Current-resource summaries in both the recovery dialog and retained-edit view
+show description, exact amount, category, full offset bookingDate (including
+seconds/microseconds), and revision separately from the original editable fields.
 Clean Cancel/Back leaves immediately. In-flight writes and outcome checking block
 in-app departures. Supported browser exits use native beforeunload protection.
 Dialogs use native modal/inert semantics, explicit Tab cycling, safe initial
