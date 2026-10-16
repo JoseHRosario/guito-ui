@@ -5,6 +5,7 @@ import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { amountDecimal } from '../../expenses/services/validate-expense';
 import type { BankConnection } from '../models/bank-connection';
 import type { BankTransaction } from '../models/bank-transaction';
+import type { LinkedExpense } from '../models/linked-expense';
 import type { BankSyncResult } from '../models/bank-sync-result';
 import type { BankReviewStatus } from '../models/bank-review-status';
 import type { BankConnectionDto } from '../models/bank-connection-dto';
@@ -30,6 +31,7 @@ function transaction(dto: BankTransactionDto): BankTransaction {
     description: dto.remittanceInformation ?? '',
     status: dto.status ?? '',
     reviewStatus: dto.reviewStatus ?? 'needsReview',
+    suggestedExpenseCount: dto.suggestedExpenseCount ?? 0,
     suggestedCategory: dto.suggestedCategory ? { id: String(dto.suggestedCategory.id), name: dto.suggestedCategory.name } : null,
     linkedExpense: dto.linkedExpense ? { ...dto.linkedExpense, amount: amountDecimal(dto.linkedExpense.amount) ?? '' } : null,
   };
@@ -49,6 +51,22 @@ export class BankApi {
     return (response ?? [])
       .filter(dto => dto !== null && typeof dto === 'object' && dto.id !== null && dto.id !== undefined && String(dto.id) !== '')
       .map(transaction);
+  }
+
+  async suggestions(id: string): Promise<LinkedExpense[]> {
+    return firstValueFrom(this.http.get<LinkedExpense[]>(
+      `${this.env.apiBaseUrl}/BankTransaction/${encodeURIComponent(id)}/suggestions`,
+    ));
+  }
+
+  async match(id: string, expenseId: number): Promise<BankTransaction> { return this.link(id, expenseId, 'match'); }
+  async unmatch(id: string, expenseId: number): Promise<BankTransaction> { return this.link(id, expenseId, 'unmatch'); }
+  private async link(id: string, expenseId: number, action: 'match' | 'unmatch'): Promise<BankTransaction> {
+    if (!Number.isInteger(expenseId) || expenseId < 1 || expenseId > 2147483647) throw new Error('expense-id-invalid');
+    const body = await firstValueFrom(this.http.post(
+      `${this.env.apiBaseUrl}/BankTransaction/${encodeURIComponent(id)}/${action}`, { expenseId }, { responseType: 'text' },
+    ));
+    return transaction(bankJson<BankTransactionDto>(body));
   }
 
   async ignore(id: string): Promise<BankTransaction> { return this.transition(id, 'ignore'); }

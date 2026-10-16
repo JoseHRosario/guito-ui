@@ -42,6 +42,16 @@ describe('ExpenseApi.latest', () => {
     localStorage.removeItem(SESSION_STORAGE_KEY);
   });
 
+  it('reads authenticated contextual history pages with untouched exact amount and occurrence text', async () => {
+    const promise = TestBed.inject(ExpenseApi).history(1);
+    const req = http.expectOne('https://api.test/Expense/history?pageSize=100&pageIndex=1');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer id-token');
+    expect(req.request.headers.get('x-google-idtoken')).toBe('id-token');
+    const page = { pageSize: 100, pageIndex: 1, totalCount: 101, hasMore: false, expenses: [{ id: 2147483647, amount: '12345678901234567890.12345678901234567890', bookingDate: '2026-10-02T23:59:59.123456+01:00', description: 'History', category: 'Shopping', currency: 'EUR' }] };
+    req.flush(page);
+    expect(await promise).toEqual(page);
+  });
+
   it('requests the latest endpoint with the Bearer ID token and maps the DTO list', async () => {
     const promise = TestBed.inject(ExpenseApi).latest();
 

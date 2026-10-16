@@ -1,149 +1,127 @@
-<div class="relative flex w-full flex-col lg:flex-row lg:items-start lg:gap-8 lg:px-12 lg:pt-10 lg:pb-16">
-  <!-- Mobile body -->
-  <div class="flex flex-1 flex-col items-start gap-4 p-4 lg:hidden">
-    <div class="flex w-full items-center justify-between py-3">
-      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Bank transactions</h2>
-      <g-sync-button [syncing]="syncing()" [disabled]="busy()" (syncRequested)="sync()" />
-    </div>
-    <ng-container [ngTemplateOutlet]="reviewList" />
+<div class="review-page">
+  <div class="flex items-center justify-between py-3 lg:justify-start lg:gap-4">
+    <h2 class="text-2xl font-semibold tracking-tight">Bank review</h2>
+    <g-sync-button [syncing]="syncing()" [disabled]="busy() || loadError()" (syncRequested)="sync()" />
   </div>
-
-  <!-- Desktop: sidebar (same chrome as the expense list frame) -->
-  <aside class="hidden w-80 shrink-0 flex-col gap-6 lg:flex">
-    <div class="flex w-full flex-col items-start gap-4 rounded-2xl border border-base-content/10 bg-base-100 p-6">
-      <div class="flex items-center gap-3">
-        <span class="flex size-12 items-center justify-center rounded-full bg-neutral text-neutral-content">
-          <span class="text-lg leading-none">JD</span>
-        </span>
-        <div class="flex flex-col items-start gap-1">
-          <p class="text-base font-semibold leading-snug text-base-content">John Doe</p>
-          <p class="text-xs leading-normal text-base-content/50">Premium Tier Member</p>
-        </div>
-      </div>
-      <hr class="w-full border-base-content/10" />
-      <div class="flex w-full items-start justify-between text-sm">
-        <p class="text-base-content/50">Main Wallet</p>
-        <p class="font-bold text-success" data-testid="sidebar-wallet">+12.450,00 €</p>
-      </div>
-    </div>
-
-    <div class="flex w-full flex-col items-start gap-4 rounded-2xl bg-primary p-6">
-      <p class="min-w-full max-w-fit text-2xl leading-tight font-semibold tracking-tight text-primary-content">
-        Get complete clarity on your spendings
-      </p>
-      <p class="min-w-full max-w-fit text-[13px] leading-normal text-primary-content/80">
-        Create smart budget targets to save up to 25% more every month.
-      </p>
-      <button type="button" class="btn btn-neutral btn-sm">Setup Budget</button>
-    </div>
-  </aside>
-
-  <!-- Desktop: main panel -->
-  <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
-    <div class="flex w-full items-center gap-6">
-      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Bank transactions</h2>
-      <g-sync-button [syncing]="syncing()" [disabled]="busy()" (syncRequested)="sync()" />
-    </div>
-    <ng-container [ngTemplateOutlet]="reviewList" />
+  <div class="flex gap-2 lg:hidden" role="group" aria-label="Bank review view">
+    <button class="view-tab" [class.bg-primary]="view() === 'transactions'" [class.bg-base-100]="view() !== 'transactions'" [class.text-primary-content]="view() === 'transactions'" [attr.aria-pressed]="view() === 'transactions'" (click)="view.set('transactions')">Transactions</button>
+    <button class="view-tab" [class.bg-primary]="view() === 'expenses'" [class.bg-base-100]="view() !== 'expenses'" [class.text-primary-content]="view() === 'expenses'" [attr.aria-pressed]="view() === 'expenses'" (click)="view.set('expenses')">Expenses</button>
   </div>
-
-  <ng-template #reviewList>
-    <div class="flex flex-wrap gap-2" role="group" aria-label="Review status">
-      @for (item of filters; track item.value) {
-        <button type="button" class="rounded-full px-2 py-2 text-xs font-normal lg:text-sm"
-          [class.bg-primary]="filter() === item.value" [class.text-primary-content]="filter() === item.value"
-          [class.bg-base-200]="filter() !== item.value" [attr.aria-pressed]="filter() === item.value"
-          data-testid="bank-filter" (click)="selectFilter(item.value)">{{ item.label }}</button>
-      }
-    </div>
-    @if (linkedConfirmed(); as linkedAccounts) {
-      <!-- Landing after the EB consent → API callback 302 (issue #64, guito-api#117).
-           A 0-account landing renders NO banner (the lazy probe drives the empty state instead). -->
-      <p class="w-full rounded-2xl border border-base-content/10 bg-base-100 px-4 py-3 text-sm font-medium text-success" data-testid="bank-linked-confirm">
-        Bank connected — {{ linkedAccounts === 1 ? '1 account' : linkedAccounts + ' accounts' }} linked.
-      </p>
-    }
-    @if (syncResult() !== null) {
-      <p class="w-full text-sm text-base-content/60" data-testid="sync-result">{{ syncResult() }}</p>
-    }
-    @if (notLinked() && transactions().length > 0) {
-      <button type="button" class="btn btn-primary btn-sm rounded-full px-5" data-testid="open-settings" (click)="openSettings()">Open Settings</button>
-    }
-    @if (loadError()) {
-      <p class="w-full text-sm text-error" data-testid="bank-error">
-        Could not load bank transactions. Your previous list is unchanged.
-      </p>
-      <button type="button" class="btn btn-primary btn-sm" data-testid="bank-retry" [disabled]="busy()" (click)="retry()">Retry</button>
-    }
-    @if (!loading() && !loadError() && transactions().length === 0) {
-      <div class="w-full rounded-2xl border border-base-content/10 bg-base-100 p-6" data-testid="bank-empty">
-        <span class="flex size-12 items-center justify-center rounded-full bg-base-200 text-base-content/60">
-          <g-icon name="briefcase" class="size-6" />
-        </span>
-        <p class="mt-3 text-base font-semibold text-base-content">No bank transactions</p>
-        <p class="mt-1 text-sm text-base-content/60">Sync to pull the latest bookings from your bank.</p>
-        @if (notLinked()) {
-          <hr class="mt-5 border-base-content/10" />
-          <p class="mt-4 text-sm font-semibold text-base-content/60">Bank connection</p>
-          <p class="mt-1 text-sm leading-normal text-base-content/60" data-testid="bank-not-linked">
-            No bank connected — open Settings to link your bank.
-          </p>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm mt-4 rounded-full px-5"
-            data-testid="open-settings"
-            (click)="openSettings()"
-          >
-            Open Settings
-          </button>
+  <div class="review-columns">
+    <section class="review-column" [class.is-inactive]="view() !== 'transactions'" aria-label="Transactions view">
+      <div class="flex flex-wrap gap-2 pb-4" role="group" aria-label="Review status">
+        @for (item of filters; track item.value) {
+          <button type="button" class="rounded-full px-2 py-2 text-xs font-normal lg:text-sm"
+            [class.bg-primary]="filter() === item.value" [class.text-primary-content]="filter() === item.value"
+            [class.bg-base-100]="filter() !== item.value" [attr.aria-pressed]="filter() === item.value"
+            data-testid="bank-filter" (click)="selectFilter(item.value)">{{ item.label }}</button>
         }
       </div>
-    }
-    @if (!loading()) {
-      <section class="w-full overflow-hidden rounded-2xl border border-base-content/10 bg-base-100" aria-label="Bank transactions">
-        @for (tx of rows(); track tx.id) {
-          <article class="p-4" data-testid="bank-row" [attr.data-tx-id]="tx.id">
-            <button type="button" class="flex w-full items-start gap-2 text-left" data-testid="bank-row-toggle"
-              [attr.aria-expanded]="expandedId() === tx.id" (click)="toggle(tx.id)">
-              <span class="flex min-w-0 flex-1 flex-col gap-2">
-                <span class="break-words text-sm font-semibold text-base-content">{{ tx.description }}</span>
-                <span class="text-sm text-base-content/60">{{ tx.meta }}</span>
-                @if (tx.reviewStatus === 'matched' && tx.linkedExpense) {
-                  <span class="text-sm text-base-content/60">Expense: {{ tx.linkedExpense.description }}</span>
+      <h3 class="hidden pb-2 text-sm lg:block">Bank Transactions</h3>
+      <div class="review-scroll" role="region" aria-label="Bank Transaction list" tabindex="0">
+        @if (linkedConfirmed(); as count) { <p class="mb-3 text-sm text-success" data-testid="bank-linked-confirm">Bank connected — {{ count === 1 ? '1 account' : count + ' accounts' }} linked.</p> }
+        @if (syncResult() !== null) { <p class="mb-3 text-sm text-base-content/60" data-testid="sync-result">{{ syncResult() }}</p> }
+        @if (notLinked() && transactions().length > 0) { <button type="button" class="btn btn-primary btn-sm review-action" data-testid="open-settings" (click)="openSettings()">Open Settings</button> }
+        @if (loadError()) {
+          <p class="mb-2 text-sm text-error" data-testid="bank-error">Could not load bank transactions. Your previous list is unchanged.</p>
+          <button type="button" class="btn btn-primary btn-sm review-action mb-2" data-testid="bank-retry" [disabled]="busy()" (click)="retry()">Retry</button>
+        }
+        @if (!loading() && !loadError() && transactions().length === 0) {
+          <div class="list-card p-6" data-testid="bank-empty">
+            <p class="font-semibold">No bank transactions</p><p class="mt-1 text-sm text-base-content/60">Sync to pull the latest bookings from your bank.</p>
+            @if (notLinked()) {
+              <p class="mt-4 text-sm text-base-content/60" data-testid="bank-not-linked">No bank connected — open Settings to link your bank.</p>
+              <button type="button" class="btn btn-primary btn-sm review-action mt-4" data-testid="open-settings" (click)="openSettings()">Open Settings</button>
+            }
+          </div>
+        }
+        @if (!loading()) {
+          <section class="list-card" aria-label="Bank transactions">
+            @for (tx of rows(); track tx.id; let index = $index) {
+              @if (index === 0 || rows()[index - 1].dayKey !== tx.dayKey) {
+                <div class="date-heading">{{ tx.dayLabel }}<hr class="mt-1 border-base-content/10" /></div>
+              }
+              <article data-testid="bank-row" [attr.data-tx-id]="tx.id">
+                <button type="button" class="review-row w-full text-left" data-testid="bank-row-toggle"
+                  [attr.aria-expanded]="expandedId() === tx.id" (click)="toggle(tx.id)">
+                  <span class="row-icon"><g-icon name="credit-card" class="size-5" /></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="row-title block">{{ tx.description }}</span>
+                    <span class="row-meta block">{{ tx.summary }} · {{ expandedId() === tx.id ? 'Hide details' : 'Show details' }}</span>
+                  </span>
+                  <span class="row-amount" data-testid="bank-amount">{{ tx.displayAmount }}</span>
+                </button>
+                @if (expandedId() === tx.id) {
+                  <div class="flex flex-col items-start gap-2 bg-base-200 p-4" data-testid="bank-details">
+                    @if (tx.linkedView; as expense) {
+                      <p class="text-sm text-base-content/60">Linked Expense</p>
+                      <div class="w-full">
+                        <div class="review-row !px-4">
+                          <span class="row-icon"><g-icon [name]="expense.icon" class="size-5" /></span>
+                          <div class="min-w-0 flex-1"><p class="row-title">{{ expense.description }}</p><p class="row-meta">{{ expense.timeLabel }} · {{ expense.category }} · Matched</p></div>
+                          <p class="row-amount">{{ expense.displayAmount }}</p>
+                        </div>
+                      </div>
+                      <p class="text-sm text-base-content/60">{{ expense.dateLabel }}</p>
+                      <button type="button" class="btn btn-primary btn-sm review-action" data-testid="unmatch-expense" [disabled]="busy() || loadError() || historyLoading()" (click)="link(tx, expense.id, 'unmatch')">Unmatch</button>
+                    } @else if (tx.reviewStatus === 'needsReview') {
+                      @if (suggestionError()) {
+                        <p class="text-sm text-error" role="alert">Could not load suggested matches.</p>
+                        <button type="button" class="btn btn-primary btn-sm review-action" [disabled]="busy()" (click)="loadSuggestions()">Retry suggestions</button>
+                      } @else if (suggestions() === null) {
+                        <span class="loading loading-spinner loading-sm" aria-label="Loading suggested matches"></span>
+                      } @else if (candidates().length === 0) {
+                        <p class="text-sm text-base-content/60">No suggested matches</p>
+                        <button type="button" class="btn btn-primary btn-sm review-action" disabled aria-label="Create expense (not available yet)" title="Atomic create and link is a future feature (#135).">Create expense</button>
+                      } @else {
+                        <div class="w-full overflow-hidden rounded-lg border border-base-content/10 bg-base-100">
+                          @for (expense of candidates(); track expense.id) {
+                            <div class="review-row" [attr.data-candidate-id]="expense.id">
+                              <span class="row-icon"><g-icon [name]="expense.icon" class="size-5" /></span>
+                              <div class="min-w-0 flex-1"><p class="row-title">{{ expense.description }}</p><p class="row-meta">{{ expense.dateLabel }}</p></div>
+                              <div class="flex shrink-0 flex-col items-end gap-2"><p class="row-amount">{{ expense.displayAmount }}</p><button type="button" class="btn btn-primary btn-sm review-action" data-testid="match-expense" [disabled]="busy() || loadError() || historyLoading()" (click)="link(tx, expense.id, 'match')">Match</button></div>
+                            </div>
+                          }
+                        </div>
+                        @if (remaining() > 0) { <button type="button" class="btn btn-primary btn-sm review-action" data-testid="show-more-suggestions" (click)="showMore()">Show more ({{ remaining() }})</button> }
+                      }
+                    }
+                    @if (tx.reviewStatus !== 'matched') {
+                      <button type="button" class="btn btn-primary btn-sm review-action" data-testid="bank-action" [disabled]="busy() || loadError()" (click)="transition(tx)">
+                        @if (pendingId() === tx.id) { <span class="loading loading-spinner loading-xs" data-testid="bank-action-spinner"></span> }
+                        {{ tx.reviewStatus === 'ignored' ? 'Return to review' : 'Ignore' }}
+                      </button>
+                    }
+                  </div>
                 }
-                <span class="text-xs text-base-content/60">{{ expandedId() === tx.id ? 'Hide details' : 'Show details' }}</span>
-              </span>
-              <span class="shrink-0 text-sm font-semibold text-base-content" data-testid="bank-amount">{{ tx.displayAmount }}</span>
-            </button>
-            @if (expandedId() === tx.id) {
-              <div class="mt-3 flex flex-col gap-2 rounded-lg bg-base-200 p-3 text-sm" data-testid="bank-details">
-                <p class="text-base-content/60">Bank booking status: {{ tx.status }}</p>
-                <p class="text-base-content/60">Currency: {{ tx.currency }}</p>
-                @if (tx.reviewStatus === 'matched' && tx.linkedExpense) {
-                  <p class="font-semibold">Linked expense</p>
-                  <p>{{ tx.linkedExpense.description }}</p>
-                  <p>{{ tx.expenseDate }} · {{ tx.expenseAmount }} · {{ tx.linkedExpense.category }}</p>
-                }
-                @if (tx.reviewStatus !== 'matched') {
-                  <button type="button" class="btn btn-primary btn-sm h-9 min-w-26 self-start rounded-lg px-4 text-sm font-normal shadow-none" data-testid="bank-action"
-                    [class.min-w-44]="tx.reviewStatus === 'ignored'"
-                    [disabled]="busy()" (click)="transition(tx)">
-                    @if (pendingId() === tx.id) { <span class="loading loading-spinner loading-xs" data-testid="bank-action-spinner"></span> }
-                    {{ tx.reviewStatus === 'ignored' ? 'Return to review' : 'Ignore' }}
-                  </button>
-                }
+                @if (rowError()?.id === tx.id) { <p class="p-4 text-sm text-error" role="alert" data-testid="bank-row-error">{{ rowError()?.message }}</p> }
+              </article>
+            } @empty {
+              @if (transactions().length > 0) { <p class="p-4 text-sm text-base-content/60">No transactions in this filter.</p> }
+            }
+          </section>
+        } @else { <div class="flex justify-center py-8"><span class="loading loading-lg" data-testid="bank-loading"></span></div> }
+      </div>
+    </section>
+    <section class="review-column history-column" [class.is-inactive]="view() !== 'expenses'" aria-label="Expenses view">
+      <h3 class="hidden pb-2 text-sm lg:block">Existing Expenses</h3>
+      <div class="review-scroll" role="region" aria-label="Expense history list" tabindex="0" data-testid="expense-history">
+        @if (historyError()) { <p class="mb-2 text-sm text-error" role="alert">Could not load Expense history. Previous history unchanged.</p><button type="button" class="btn btn-primary btn-sm review-action mb-2" [disabled]="historyLoading() || busy()" (click)="loadHistory()">Retry history</button> }
+        @if (historyLoading()) { <span class="loading loading-spinner loading-sm" aria-label="Loading Expense history"></span> }
+        <div class="list-card">
+          @for (group of historyGroups(); track group.key) {
+            <div class="date-heading">{{ group.label }}<hr class="mt-1 border-base-content/10" /></div>
+            @for (expense of group.rows; track expense.id) {
+              <div class="review-row" [attr.data-history-id]="expense.id">
+                <span class="row-icon"><g-icon [name]="expense.icon" class="size-5" /></span>
+                <div class="min-w-0 flex-1"><p class="row-title">{{ expense.description }}</p><p class="row-meta">{{ expense.timeLabel }} · {{ expense.category }}</p></div>
+                <p class="row-amount">{{ expense.displayAmount }}</p>
               </div>
             }
-            @if (rowError()?.id === tx.id) {
-              <p class="mt-2 text-sm text-error" role="alert" data-testid="bank-row-error">{{ rowError()?.message }}</p>
-            }
-          </article>
-        } @empty {
-          @if (transactions().length > 0) { <p class="p-4 text-sm text-base-content/60">No transactions in this filter.</p> }
-        }
-      </section>
-    } @else {
-      <div class="flex w-full justify-center py-8"><span class="loading loading-lg" data-testid="bank-loading"></span></div>
-    }
-  </ng-template>
+          } @empty { @if (!historyLoading() && !historyError()) { <p class="p-4 text-sm">No Expenses yet</p> } }
+        </div>
+        @if (hasOlder()) { <button type="button" class="btn btn-primary btn-sm review-action mt-2" [disabled]="historyLoading() || busy()" (click)="loadHistory(true)">Load older Expenses</button> }
+      </div>
+    </section>
+  </div>
 </div>

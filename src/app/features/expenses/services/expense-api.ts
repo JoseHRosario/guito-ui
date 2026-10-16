@@ -1,11 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, timeout } from 'rxjs';
+import type { ExpenseHistoryPage } from '../models/expense-history-page';
 import type { ExpenseDetail } from '../models/expense-detail';
 import type { ExpenseUpdate } from '../models/expense-update';
 import { knownOccurrence } from './expense-time';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
-import type { IconName } from '../../../shared/gicon';
+import { categoryIcon } from './category-icon';
 import { occurrenceDay } from './expense-time';
 import { amountDecimal } from './validate-expense';
 import type { Expense } from '../models/expense';
@@ -34,25 +35,18 @@ function expenseId(value: number | string | null | undefined): number | null {
   return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 && id <= 2147483647 ? id : null;
 }
 
-/** Maps the API's category to its list-row lucide glyph; 'tag' fallback for unknown categories. */
-function categoryIcon(category: string): IconName {
-  const ICONS: Readonly<Record<string, IconName>> = {
-    clothing: 'tag',
-    broadband: 'wifi',
-    shopping: 'shopping-bag',
-    bills: 'zap',
-    entertainment: 'film',
-    snacks: 'utensils',
-    health: 'heart',
-  };
-  return ICONS[category.toLowerCase()] ?? 'tag';
-}
-
 /** The latest-expenses list and create endpoints of the deployed API (guito-api#9, guito-ui#32). */
 @Injectable({ providedIn: 'root' })
 export class ExpenseApi {
   private readonly http = inject(HttpClient);
   private readonly env = inject(APP_ENVIRONMENT);
+
+  /** Read-only context, independent from Bank suggestions; preserve stored numeric text. */
+  async history(pageIndex = 0): Promise<ExpenseHistoryPage> {
+    return firstValueFrom(this.http.get<ExpenseHistoryPage>(`${this.env.apiBaseUrl}/Expense/history`, {
+      params: { pageSize: 100, pageIndex },
+    }));
+  }
 
   /** Read authority on entry/reload; do not consult the cached list. */
   async detail(id: number): Promise<ExpenseDetail> {

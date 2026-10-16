@@ -26,6 +26,9 @@ const STUB_API_EXPENSES = {
 };
 
 export async function stubExpensesApi(page: Page | BrowserContext): Promise<void> {
+  await page.route('**/Expense/history?*', route => route.fulfill({ json: {
+    ...STUB_API_EXPENSES, pageSize: 100, pageIndex: 0, totalCount: STUB_API_EXPENSES.expenses.length, hasMore: false,
+  } }));
   await page.route('**/Expense/latest/**', (route: Route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(STUB_API_EXPENSES) }),
   );

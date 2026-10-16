@@ -61,7 +61,7 @@ describe('BankApi', () => {
     const req = http.expectOne('https://api.test/BankTransaction?reviewStatus=matched');
     expect(req.request.headers.get('x-google-idtoken')).toBe('id-token');
     req.flush([{ id: '9223372036854775807', accountUid: 'account-test', bookingDate: '2026-10-02', amount: '123456789.123456789', currency: 'EUR', status: 'BOOK', reviewStatus: 'matched', remittanceInformation: 'Bank description', suggestedCategory: { id: 3, name: 'Shopping' }, linkedExpense: { id: 12, bookingDate: '2026-10-02T23:30:00+01:00', amount: '123456789.123456789', currency: 'EUR', description: 'Expense description', category: 'Shopping' } }]);
-    expect(await promise).toEqual([{ id: '9223372036854775807', accountUid: 'account-test', date: '2026-10-02', amount: '123456789.123456789', currency: 'EUR', status: 'BOOK', reviewStatus: 'matched', description: 'Bank description', suggestedCategory: { id: '3', name: 'Shopping' }, linkedExpense: { id: 12, bookingDate: '2026-10-02T23:30:00+01:00', amount: '123456789.123456789', currency: 'EUR', description: 'Expense description', category: 'Shopping' } }]);
+    expect(await promise).toEqual([{ id: '9223372036854775807', accountUid: 'account-test', date: '2026-10-02', amount: '123456789.123456789', currency: 'EUR', status: 'BOOK', reviewStatus: 'matched', suggestedExpenseCount: 0, description: 'Bank description', suggestedCategory: { id: '3', name: 'Shopping' }, linkedExpense: { id: 12, bookingDate: '2026-10-02T23:30:00+01:00', amount: '123456789.123456789', currency: 'EUR', description: 'Expense description', category: 'Shopping' } }]);
   });
 
   it('preserves distinct numeric Int64 IDs from the actual JSON list without rounding', async () => {
@@ -85,7 +85,7 @@ describe('BankApi', () => {
     const rows = await promise;
     expect(rows).toEqual([
       {
-        id: '7', accountUid: '', status: 'BOOK', reviewStatus: 'needsReview', linkedExpense: null,
+        id: '7', accountUid: '', status: 'BOOK', reviewStatus: 'needsReview', suggestedExpenseCount: 0, linkedExpense: null,
         date: '2026-10-02',
         amount: '58.93',
         currency: 'EUR',
@@ -93,7 +93,7 @@ describe('BankApi', () => {
         suggestedCategory: { id: '3', name: 'Shopping' },
       },
       {
-        id: '8', accountUid: '', status: '', reviewStatus: 'needsReview', linkedExpense: null,
+        id: '8', accountUid: '', status: '', reviewStatus: 'needsReview', suggestedExpenseCount: 0, linkedExpense: null,
         date: '2026-10-01',
         amount: '200',
         currency: 'EUR',
@@ -161,6 +161,25 @@ describe('BankApi', () => {
     req.flush('{"id":9223372036854775807,"reviewStatus":"ignored","linkedExpense":null}');
 
     expect((await action).id).toBe('9223372036854775807');
+  });
+
+  it('loads complete suggestions without losing exact expense amounts or bank identity', async () => {
+    const api = TestBed.inject(BankApi);
+    const promise = api.suggestions('9223372036854775807');
+    const req = http.expectOne('https://api.test/BankTransaction/9223372036854775807/suggestions');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer id-token');
+    const expense = { id: 2147483647, bookingDate: '2026-10-02T12:34:56.123456+01:00', amount: '9999999999999999.99', currency: 'EUR', description: 'Candidate', category: 'Shopping' };
+    req.flush([expense]);
+    expect(await promise).toEqual([expense]);
+  });
+
+  it.each(['match', 'unmatch'] as const)('POST %s carries explicit expected expense identity and reads raw numeric Int64 response', async action => {
+    const promise = TestBed.inject(BankApi)[action]('9223372036854775807', 2147483647);
+    const req = http.expectOne(`https://api.test/BankTransaction/9223372036854775807/${action}`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ expenseId: 2147483647 });
+    req.flush('{"id":9223372036854775807,"reviewStatus":"needsReview","suggestedExpenseCount":5}');
+    expect(await promise).toMatchObject({ id: '9223372036854775807', suggestedExpenseCount: 5 });
   });
 
   it('POST /BankTransaction/sync returns the fetched/new counts', async () => {
