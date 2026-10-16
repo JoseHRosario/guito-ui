@@ -46,8 +46,9 @@ approved action's representation, not implementation of #135.
   `{expenseId:number}`. Both return the updated Bank Transaction and count.
 - `GET /Expense/history?pageSize=100&pageIndex=0`: existing authenticated human
   read, `{pageSize,pageIndex,totalCount,hasMore,expenses}`. Load older Expenses
-  advances offset pages; duplicate IDs from live-page drift are deduplicated.
-  Refresh re-reads loaded pages. This is not a snapshot/export guarantee.
+  advances offset pages; duplicate IDs from live-page drift are deduplicated,
+  then sorted by exact occurrence instant (including microseconds) and numeric
+  Expense ID descending. Refresh re-reads loaded pages. This is not a snapshot/export guarantee.
 
 Bank Int64 identities retain original raw JSON numeric tokens through `bankJson`;
 Expense Int32 IDs remain numbers. Exact decimal strings survive service and view

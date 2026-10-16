@@ -124,6 +124,26 @@ describe('Manual matching through rendered component and HTTP (#134)', () => {
     http.expectNone('https://api.test/Expense/latest/20');
   });
 
+  it.each([
+    ['changed occurrence', '2026-10-02T19:00:00+01:00', '2026-10-02T18:00:00+01:00', '2026-10-02T17:00:00+01:00', '2026-10-02T16:00:00+01:00', ['2', '3', '1']],
+    ['microseconds and numeric ties', '2026-10-02T18:00:00.000001+01:00', '2026-10-02T18:00:00.000001+01:00', '2026-10-02T18:00:00.000000+01:00', '2026-10-02T18:00:00.000001+01:00', ['2', '1', '3']],
+    ['Lisbon fold offsets', '2026-10-25T01:45:00+00:00', '2026-10-25T01:30:00+00:00', '2026-10-25T01:45:00+01:00', '2026-10-25T01:00:00+01:00', ['2', '3', '1']],
+  ] as const)('keeps merged history chronological after live-page drift: %s', async (_case, firstDate, secondDate, editedDate, olderDate, expected) => {
+    fixture = TestBed.createComponent(BankPage); el = fixture.nativeElement;
+    http.expectOne('https://api.test/BankTransaction').flush(ROWS);
+    history([{ ...EXPENSES[0], id: 3, bookingDate: firstDate as string },
+      { ...EXPENSES[0], id: 2, bookingDate: secondDate as string }], 0, true);
+    await tick(); fixture.detectChanges();
+
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === 'Load older Expenses')!.click();
+    history([{ ...EXPENSES[0], id: 3, bookingDate: editedDate as string },
+      { ...EXPENSES[0], id: 1, bookingDate: olderDate as string }], 1, false);
+    await tick(); fixture.detectChanges();
+
+    expect([...el.querySelectorAll<HTMLElement>('[data-history-id]')]
+      .map(row => row.dataset['historyId'])).toEqual(expected);
+  });
+
   it('keeps actions disabled after a failed recovery read until explicit Retry refreshes state', async () => {
     await start(); await open(); button('[data-testid=match-expense]').click();
     http.expectOne('https://api.test/BankTransaction/7/match').flush({}, { status: 502, statusText: 'Failure' });

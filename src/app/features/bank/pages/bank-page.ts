@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ExpenseApi } from '../../expenses/services/expense-api';
 import { occurrenceDay } from '../../expenses/services/expense-time';
 import type { LinkedExpense } from '../models/linked-expense';
-import { dayLabel, debit, expenseView } from '../services/review-display';
+import { categoryIcon } from '../../expenses/services/category-icon';
 import { GIcon } from '../../../shared/gicon';
 import { SyncButton } from '../components/sync-button';
 import { BankApi } from '../services/bank-api';
@@ -13,6 +13,39 @@ import type { BankReviewStatus } from '../models/bank-review-status';
 
 function isHttp(error: unknown, status: number): boolean {
   return error instanceof HttpErrorResponse && error.status === status;
+}
+
+function dayLabel(value: string): string {
+  if (!value) return 'Unknown date';
+  const date = new Date(`${value}T12:00:00Z`);
+  return `${new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit', timeZone: 'UTC' }).format(date)}, ${new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(date)}`;
+}
+
+/** Display-only debit convention from canonical List Expenses. Never alter wire amounts. */
+function debit(amount: string, currency: string): string {
+  if (!amount) return '—';
+  const value = amount.startsWith('-') ? amount : `-${amount.replace(/^\+/, '')}`;
+  const format = new Intl.NumberFormat('pt-PT', { style: 'currency', currency }).format as unknown as (value: string) => string;
+  return format(value);
+}
+
+function expenseView<T extends { bookingDate: string; amount: string; currency: string; category: string }>(expense: T) {
+  const instant = new Date(expense.bookingDate);
+  return { ...expense, icon: categoryIcon(expense.category), displayAmount: debit(expense.amount, expense.currency),
+    dateLabel: new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Lisbon', day: '2-digit', month: '2-digit', year: 'numeric' }).format(instant),
+    timeLabel: new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(instant),
+  };
+}
+
+function occurrenceFraction(value: string): string {
+  return (/\.(\d+)(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1] ?? '').padEnd(6, '0');
+}
+
+function historyOrder(a: LinkedExpense, b: LinkedExpense): number {
+  // Date.parse resolves offsets but truncates microseconds; retain the fractional tie-break.
+  return Date.parse(b.bookingDate) - Date.parse(a.bookingDate)
+    || occurrenceFraction(b.bookingDate).localeCompare(occurrenceFraction(a.bookingDate))
+    || b.id - a.id;
 }
 
 const LABELS = { needsReview: 'Needs review', matched: 'Matched', ignored: 'Ignored' };
@@ -42,10 +75,10 @@ export class BankPage {
   protected readonly historyGroups = computed(() => {
     const linked = new Set(this.transactions().flatMap(tx => tx.linkedExpense ? [tx.linkedExpense.id] : []));
     const suggested = new Set((this.suggestions() ?? []).map(expense => expense.id));
-    const groups = new Map<string, ReturnType<typeof expenseView<LinkedExpense>>[]>();
+    const groups = new Map<string, (ReturnType<typeof expenseView<LinkedExpense>> & { meta: string })[]>();
     for (const expense of this.history()) {
       const key = occurrenceDay(expense.bookingDate);
-      const row = { ...expenseView(expense), category: `${expense.category} · ${linked.has(expense.id) ? 'Matched' : suggested.has(expense.id) ? 'Suggested' : 'Unlinked'}` };
+      const row = { ...expenseView(expense), meta: `${expense.category} · ${linked.has(expense.id) ? 'Matched' : suggested.has(expense.id) ? 'Suggested' : 'Unlinked'}` };
       groups.set(key, [...(groups.get(key) ?? []), row]);
     }
     return [...groups].sort((a, b) => b[0].localeCompare(a[0])).map(([key, rows]) => ({ key, label: dayLabel(key), rows }));
@@ -66,7 +99,7 @@ export class BankPage {
         if (!hasMore) break;
       }
       // Offset pages are live: dedupe repeated IDs without inventing identities.
-      this.history.set([...new Map(rows.map(row => [row.id, row])).values()]);
+      this.history.set([...new Map(rows.map(row => [row.id, row])).values()].sort(historyOrder));
       this.historyPages = older ? this.historyPages + 1 : count;
       this.hasOlder.set(hasMore);
     } catch { this.historyError.set(true); }

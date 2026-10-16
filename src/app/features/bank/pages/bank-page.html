@@ -114,7 +114,7 @@
             @for (expense of group.rows; track expense.id) {
               <div class="review-row" [attr.data-history-id]="expense.id">
                 <span class="row-icon"><g-icon [name]="expense.icon" class="size-5" /></span>
-                <div class="min-w-0 flex-1"><p class="row-title">{{ expense.description }}</p><p class="row-meta">{{ expense.timeLabel }} · {{ expense.category }}</p></div>
+                <div class="min-w-0 flex-1"><p class="row-title">{{ expense.description }}</p><p class="row-meta">{{ expense.timeLabel }} · {{ expense.meta }}</p></div>
                 <p class="row-amount">{{ expense.displayAmount }}</p>
               </div>
             }
