@@ -37,6 +37,24 @@ describe('Manual matching through rendered component and HTTP (#134)', () => {
   });
   afterEach(() => http.verify());
 
+  it('orders same-day Bank rows by descending numeric Int64 identity without rounding', async () => {
+    fixture = TestBed.createComponent(BankPage); el = fixture.nativeElement;
+    const response = `[${[
+      ['9007199254740992', 'Lower unsafe identity'],
+      ['10', 'Ten'],
+      ['9007199254740993', 'Higher unsafe identity'],
+      ['9', 'Nine'],
+    ].map(([id, description]) => JSON.stringify({ ...ROWS[0], id, remittanceInformation: description })
+      .replace(`"id":"${id}"`, `"id":${id}`)).join(',')}]`;
+    http.expectOne('https://api.test/BankTransaction').flush(response);
+    history(); await tick(); fixture.detectChanges();
+
+    const renderedIds = [...el.querySelectorAll<HTMLElement>('[data-tx-id]')]
+      .map(row => row.dataset['txId']);
+
+    expect(renderedIds).toEqual(['9007199254740993', '9007199254740992', '10', '9']);
+  });
+
   it('starts collapsed, uses server count and shows first three clean candidates independently of contextual history', async () => {
     await start();
     expect(el.querySelector('[data-testid=bank-details]')).toBeNull();

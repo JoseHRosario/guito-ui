@@ -92,7 +92,7 @@ describe('BankPage (issue #61)', () => {
     await tick();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click();
+    el.querySelector<HTMLButtonElement>('[data-tx-id="7"] [data-testid=bank-row-toggle]')!.click();
     fixture.detectChanges();
 
     const panel = el.querySelector('[data-testid=bank-details]')!;
@@ -121,14 +121,14 @@ describe('BankPage (issue #61)', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    // jsdom renders BOTH responsive branches — every testid appears twice.
     const rows = Array.from(el.querySelectorAll('[data-testid=bank-row]'));
     expect(rows.length).toBe(3);
-    expect((rows[0].textContent ?? '')).toContain('CONTINENTE ONLINE 8831');
+    expect((rows[0].textContent ?? '')).toContain('MB WAY PURCHASE 4477 LISBOA');
+    expect((rows[1].textContent ?? '')).toContain('CONTINENTE ONLINE 8831');
     expect((rows[2].textContent ?? '')).toContain('TRF MB WAY PARA MARIA S');
     // amount rendering (testid assertion per CONVENTIONS.md)
-    const amounts = Array.from(el.querySelectorAll('[data-testid=bank-amount]'));
-    expect(amounts[0].textContent?.trim()).toMatch(/^-58,93[ .\u00a0\u202f]€$/);
+    const amount = el.querySelector('[data-tx-id="7"] [data-testid=bank-amount]');
+    expect(amount?.textContent?.trim()).toMatch(/^-58,93[ .\u00a0\u202f]€$/);
     // desktop sidebar stub widget (both branches render in jsdom)
     expect(el.querySelector('aside')).toBeNull();
   });
@@ -329,7 +329,7 @@ describe('BankPage (issue #61)', () => {
     expect(el.textContent).toContain('Needs review');
     filters[2].click(); fixture.detectChanges();
     expect(el.querySelectorAll('[data-testid=bank-row]')).toHaveLength(1);
-    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-tx-id="9"] [data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
     expect(el.querySelector('[data-testid=bank-details]')?.textContent).toContain('02/10/2026');
     expect(el.querySelector('[data-testid=bank-details]')?.textContent).toContain('Bills');
     expect(el.querySelector('[data-testid=bank-action]')).toBeNull();
@@ -343,7 +343,7 @@ describe('BankPage (issue #61)', () => {
     const fixture = TestBed.createComponent(BankPage);
     flushPending(http); await tick(); fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-tx-id="7"] [data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
     const button = el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!;
     expect(button?.textContent).toContain('Ignore');
     button.click(); button.click(); fixture.detectChanges();
@@ -371,12 +371,12 @@ describe('BankPage (issue #61)', () => {
     const fixture = TestBed.createComponent(BankPage);
     flushPending(http); await tick(); fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-tx-id="7"] [data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
     el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click();
     http.expectOne('https://api.test/BankTransaction/7/ignore').flush({}, { status, statusText: 'Failure' });
     await tick(); fixture.detectChanges();
     expect(el.querySelector('[data-testid=bank-row-error]')?.textContent).toContain('Could not update');
-    expect(el.querySelector('[data-testid=bank-row]')?.textContent).toContain('Needs review');
+    expect(el.querySelector('[data-tx-id="7"]')?.textContent).toContain('Needs review');
     expect(el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')?.disabled).toBe(false);
     expect(el.querySelector('[data-testid=bank-action-spinner]')).toBeNull();
     el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click();
@@ -389,7 +389,7 @@ describe('BankPage (issue #61)', () => {
     const fixture = TestBed.createComponent(BankPage);
     flushPending(http); await tick(); fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-tx-id="7"] [data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
     el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click();
     http.expectOne('https://api.test/BankTransaction/7/ignore').flush({}, { status: 409, statusText: 'Conflict' });
     await tick(); fixture.detectChanges();
@@ -417,7 +417,7 @@ describe('BankPage (issue #61)', () => {
     const fixture = TestBed.createComponent(BankPage);
     flushPending(http); await tick(); fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-tx-id="7"] [data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
     el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')!.click(); fixture.detectChanges();
     expect(el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]')?.disabled).toBe(true);
     el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
@@ -431,7 +431,7 @@ describe('BankPage (issue #61)', () => {
     el.querySelector<HTMLButtonElement>('[data-testid=sync-bank]')!.click();
     http.expectOne('https://api.test/BankTransaction/sync').flush({ fetched: 3, new: 0 });
     await tick(); fixture.detectChanges();
-    el.querySelector<HTMLButtonElement>('[data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
+    el.querySelector<HTMLButtonElement>('[data-tx-id="7"] [data-testid=bank-row-toggle]')!.click(); fixture.detectChanges();
     expect(el.querySelector<HTMLButtonElement>('[data-testid=bank-action]')?.disabled).toBe(true);
     http.expectOne('https://api.test/BankTransaction').flush({}, { status: 500, statusText: 'Failure' });
     await tick(); fixture.detectChanges();

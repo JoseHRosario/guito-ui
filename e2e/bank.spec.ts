@@ -39,7 +39,9 @@ test.describe('Bank review inbox (#133, stubbed, signed in)', () => {
       await expect(rows.first().getByTestId('bank-row-toggle')).toHaveAttribute('aria-expanded', 'false');
       await expect(rows.first()).toContainText('Needs review · No suggested matches');
       await expect(rows.first().getByTestId('bank-amount')).toHaveText(/-58,93[ .\u00a0\u202f]€/);
-      await expect(rows.nth(2)).toContainText('Expense paid');
+      await expect(rows.nth(1)).toHaveAttribute('data-tx-id', '9');
+      await expect(rows.nth(2)).toHaveAttribute('data-tx-id', '8');
+      await expect(page.locator('[data-tx-id="9"]')).toContainText('Expense paid');
       await expect(page.getByRole('button', { name: 'Accept', exact: true })).toHaveCount(0);
       await page.screenshot({ path: `test-results/bank-review-${viewport.name}-initial.png`, fullPage: true });
       const first = rows.first().getByTestId('bank-row-toggle');
@@ -49,19 +51,19 @@ test.describe('Bank review inbox (#133, stubbed, signed in)', () => {
       await expect(details).not.toContainText('BOOK');
       await expect(details.getByTestId('bank-action')).toHaveText('Ignore');
       await page.screenshot({ path: `test-results/bank-review-${viewport.name}-needs-review.png`, fullPage: true });
-      await rows.nth(1).getByTestId('bank-row-toggle').click();
+      await page.locator('[data-tx-id="8"]').getByTestId('bank-row-toggle').click();
       await expect(first).toHaveAttribute('aria-expanded', 'false');
       await expect(details).toHaveCount(1);
       await expect(details.getByTestId('bank-action')).toHaveText('Return to review');
       await page.screenshot({ path: `test-results/bank-review-${viewport.name}-ignored.png`, fullPage: true });
-      await rows.nth(2).getByTestId('bank-row-toggle').click();
+      await page.locator('[data-tx-id="9"]').getByTestId('bank-row-toggle').click();
       await expect(details).toHaveCount(1);
       await expect(details).toContainText('02/10/2026');
       await expect(details).toContainText('00:30');
       await expect(details).toContainText('Bills');
       await expect(details.getByTestId('bank-action')).toHaveCount(0);
       await page.screenshot({ path: `test-results/bank-review-${viewport.name}-matched.png`, fullPage: true });
-      await rows.nth(2).getByTestId('bank-row-toggle').press('Space');
+      await page.locator('[data-tx-id="9"]').getByTestId('bank-row-toggle').press('Space');
       await expect(details).toHaveCount(0);
       for (const index of [1, 2, 3]) {
         await filters.nth(index).click();

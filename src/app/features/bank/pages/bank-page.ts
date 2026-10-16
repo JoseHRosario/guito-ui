@@ -158,7 +158,7 @@ export class BankPage {
   });
   protected readonly rows = computed(() => this.transactions()
     .filter(tx => this.filter() === 'all' || tx.reviewStatus === this.filter())
-    .sort((a, b) => b.date.localeCompare(a.date) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .sort((a, b) => b.date.localeCompare(a.date) || (BigInt(a.id) === BigInt(b.id) ? 0 : BigInt(a.id) > BigInt(b.id) ? -1 : 1))
     .map(tx => ({
       ...tx,
       displayAmount: debit(tx.amount, tx.currency),
