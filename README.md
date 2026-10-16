@@ -6,6 +6,27 @@ The web frontend of **Guito**, a personal expense tracker: control expenses and 
 
 > Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and numeric expense IDs. Production now enables the existing timestamp capability after the approved guito-api#132 Postgres cutover (fix guito-api#145); dev/staging settings are unchanged. All create paths send `bookingDate`, and exact decimal strings preserve POST/prefill precision. Production release and an owner-confirmed genuine save remain merge/deploy verification gates; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
 
+## Bank review inbox (#133)
+
+Bank opens on **All** with every transaction collapsed. Clicking a row (or
+Enter/Space on its native button) expands exactly one inline detail; clicking it
+again collapses it. Filters are All / Needs review / Matched / Ignored. Booking
+status (for example BOOK) is distinct from Guito review state. Matched rows show
+the linked expense; dates render in Europe/Lisbon. Ignore and Return to review
+apply without confirmation. Failed updates preserve the row, and a conflict
+refreshes authoritative state without retrying the mutation. Initial load errors
+have Retry; failed refreshes preserve the previous list. Sync and Open Settings
+for missing bank connections are retained.
+
+The old Accept/create-prefill action is removed: this issue offers no Match,
+Unmatch, candidate selection or Create expense; atomic create+link is #135.
+The approved initial frames are [mobile 3328:523](https://www.figma.com/design/UoIK5MnIqDrgfHqMmBZoYk/Guito?node-id=3328-523)
+and [desktop 3328:603](https://www.figma.com/design/UoIK5MnIqDrgfHqMmBZoYk/Guito?node-id=3328-603).
+See [the inbox design/contract](docs/adr/0015-bank-review-inbox.md) for expanded
+frames and the HTTP boundary. Local tests are hermetic; live API integration and
+served visual acceptance remain separate owner/parent verification gates.
+
+## Expense edit/delete (#70)
 
 Expense rows with a numeric ID open `/expenses/:id/edit`. The editor reads current
 values and revision by ID, preserves untouched exact decimal text and timestamp
@@ -14,10 +35,12 @@ explicit discard; uncertain responses require GET-only checking and deliberate
 reload before a new write. Only acknowledged PUT 200/DELETE 204 return to the
 refreshed list with an updated/deleted toast. Matching is follow-up because the
 current detail DTO exposes no verified link state. See the [issue #70 contract](docs/issue70-edit-delete-expenses.md).
-Local production and staging browser suites use transport stubs. Live isolated
-staging acceptance remains outstanding: the shared staging deployment belongs
-to sibling feature #133 / PR #71 (`33f760c`); this work does not deploy or mutate
-financial data.
+Local production and staging browser suites use hermetic fixtures. This branch
+reconciles #133 with merged #70 / PR #72, retaining its native minute-only Time
+control, exact timestamp preservation, recovery and route-cache behavior. Local
+checks do not establish live API/Postgres acceptance for #133; rollout and owner
+acceptance remain separate gates. No deployment or financial mutation is part of
+this reconciliation.
 
 ## Tech stack
 

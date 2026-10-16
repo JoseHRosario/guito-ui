@@ -2,10 +2,10 @@
   <!-- Mobile body -->
   <div class="flex flex-1 flex-col items-start gap-4 p-4 lg:hidden">
     <div class="flex w-full items-center justify-between py-3">
-      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Pending transactions</h2>
-      <g-sync-button [syncing]="syncing()" (syncRequested)="sync()" />
+      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Bank transactions</h2>
+      <g-sync-button [syncing]="syncing()" [disabled]="busy()" (syncRequested)="sync()" />
     </div>
-    <ng-container *ngTemplateOutlet="pendingList" />
+    <ng-container [ngTemplateOutlet]="reviewList" />
   </div>
 
   <!-- Desktop: sidebar (same chrome as the expense list frame) -->
@@ -41,13 +41,21 @@
   <!-- Desktop: main panel -->
   <div class="hidden min-w-0 flex-1 flex-col items-start gap-6 lg:flex">
     <div class="flex w-full items-center gap-6">
-      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Pending transactions</h2>
-      <g-sync-button [syncing]="syncing()" (syncRequested)="sync()" />
+      <h2 class="text-2xl font-semibold tracking-tight text-base-content">Bank transactions</h2>
+      <g-sync-button [syncing]="syncing()" [disabled]="busy()" (syncRequested)="sync()" />
     </div>
-    <ng-container *ngTemplateOutlet="pendingList" />
+    <ng-container [ngTemplateOutlet]="reviewList" />
   </div>
 
-  <ng-template #pendingList>
+  <ng-template #reviewList>
+    <div class="flex flex-wrap gap-2" role="group" aria-label="Review status">
+      @for (item of filters; track item.value) {
+        <button type="button" class="rounded-full px-2 py-2 text-xs font-normal lg:text-sm"
+          [class.bg-primary]="filter() === item.value" [class.text-primary-content]="filter() === item.value"
+          [class.bg-base-200]="filter() !== item.value" [attr.aria-pressed]="filter() === item.value"
+          data-testid="bank-filter" (click)="selectFilter(item.value)">{{ item.label }}</button>
+      }
+    </div>
     @if (linkedConfirmed(); as linkedAccounts) {
       <!-- Landing after the EB consent → API callback 302 (issue #64, guito-api#117).
            A 0-account landing renders NO banner (the lazy probe drives the empty state instead). -->
@@ -58,17 +66,21 @@
     @if (syncResult() !== null) {
       <p class="w-full text-sm text-base-content/60" data-testid="sync-result">{{ syncResult() }}</p>
     }
+    @if (notLinked() && transactions().length > 0) {
+      <button type="button" class="btn btn-primary btn-sm rounded-full px-5" data-testid="open-settings" (click)="openSettings()">Open Settings</button>
+    }
     @if (loadError()) {
       <p class="w-full text-sm text-error" data-testid="bank-error">
-        Could not load pending transactions. Check your connection and sync again.
+        Could not load bank transactions. Your previous list is unchanged.
       </p>
+      <button type="button" class="btn btn-primary btn-sm" data-testid="bank-retry" [disabled]="busy()" (click)="retry()">Retry</button>
     }
     @if (!loading() && !loadError() && transactions().length === 0) {
       <div class="w-full rounded-2xl border border-base-content/10 bg-base-100 p-6" data-testid="bank-empty">
         <span class="flex size-12 items-center justify-center rounded-full bg-base-200 text-base-content/60">
           <g-icon name="briefcase" class="size-6" />
         </span>
-        <p class="mt-3 text-base font-semibold text-base-content">No pending transactions</p>
+        <p class="mt-3 text-base font-semibold text-base-content">No bank transactions</p>
         <p class="mt-1 text-sm text-base-content/60">Sync to pull the latest bookings from your bank.</p>
         @if (notLinked()) {
           <hr class="mt-5 border-base-content/10" />
@@ -88,41 +100,48 @@
       </div>
     }
     @if (!loading()) {
-      @for (group of groups(); track group.date) {
-        <section class="w-full rounded-2xl border border-base-content/10 bg-base-100" data-testid="bank-group">
-          <header class="border-b border-base-content/10 px-4 pb-2.5 pt-4">
-            <h3 class="text-sm font-semibold text-base-content/80" [attr.data-date]="group.date">{{ group.label }}</h3>
-          </header>
-          @for (tx of group.transactions; track tx.id) {
-            <article
-              class="flex items-center gap-3 border-b border-base-content/5 px-4 py-3 last:border-b-0"
-              data-testid="bank-row"
-              [attr.data-tx-id]="tx.id"
-            >
-              <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-success/20 text-success">
-                <g-icon [name]="iconFor(tx)" class="size-5" />
+      <section class="w-full overflow-hidden rounded-2xl border border-base-content/10 bg-base-100" aria-label="Bank transactions">
+        @for (tx of rows(); track tx.id) {
+          <article class="p-4" data-testid="bank-row" [attr.data-tx-id]="tx.id">
+            <button type="button" class="flex w-full items-start gap-2 text-left" data-testid="bank-row-toggle"
+              [attr.aria-expanded]="expandedId() === tx.id" (click)="toggle(tx.id)">
+              <span class="flex min-w-0 flex-1 flex-col gap-2">
+                <span class="break-words text-sm font-semibold text-base-content">{{ tx.description }}</span>
+                <span class="text-sm text-base-content/60">{{ tx.meta }}</span>
+                @if (tx.reviewStatus === 'matched' && tx.linkedExpense) {
+                  <span class="text-sm text-base-content/60">Expense: {{ tx.linkedExpense.description }}</span>
+                }
+                <span class="text-xs text-base-content/60">{{ expandedId() === tx.id ? 'Hide details' : 'Show details' }}</span>
               </span>
-              <div class="flex min-w-0 flex-1 flex-col gap-1">
-                <p class="break-words text-sm font-medium leading-snug text-base-content">{{ tx.description }}</p>
-                <p class="text-xs leading-none" [class.text-base-content/50]="tx.suggestedCategory === null">
-                  {{ tx.suggestedCategory?.name ?? 'No suggestion' }}
-                </p>
+              <span class="shrink-0 text-sm font-semibold text-base-content" data-testid="bank-amount">{{ tx.displayAmount }}</span>
+            </button>
+            @if (expandedId() === tx.id) {
+              <div class="mt-3 flex flex-col gap-2 rounded-lg bg-base-200 p-3 text-sm" data-testid="bank-details">
+                <p class="text-base-content/60">Bank booking status: {{ tx.status }}</p>
+                <p class="text-base-content/60">Currency: {{ tx.currency }}</p>
+                @if (tx.reviewStatus === 'matched' && tx.linkedExpense) {
+                  <p class="font-semibold">Linked expense</p>
+                  <p>{{ tx.linkedExpense.description }}</p>
+                  <p>{{ tx.expenseDate }} · {{ tx.expenseAmount }} · {{ tx.linkedExpense.category }}</p>
+                }
+                @if (tx.reviewStatus !== 'matched') {
+                  <button type="button" class="btn btn-primary btn-sm h-9 min-w-26 self-start rounded-lg px-4 text-sm font-normal shadow-none" data-testid="bank-action"
+                    [class.min-w-44]="tx.reviewStatus === 'ignored'"
+                    [disabled]="busy()" (click)="transition(tx)">
+                    @if (pendingId() === tx.id) { <span class="loading loading-spinner loading-xs" data-testid="bank-action-spinner"></span> }
+                    {{ tx.reviewStatus === 'ignored' ? 'Return to review' : 'Ignore' }}
+                  </button>
+                }
               </div>
-              <span class="shrink-0 text-sm font-semibold text-base-content" data-testid="bank-amount">
-                {{ amountFor(tx) }}
-              </span>
-              <button
-                type="button"
-                class="btn btn-primary btn-sm shrink-0 rounded-full px-4"
-                data-testid="accept-transaction"
-                (click)="accept(tx)"
-              >
-                Accept
-              </button>
-            </article>
-          }
-        </section>
-      }
+            }
+            @if (rowError()?.id === tx.id) {
+              <p class="mt-2 text-sm text-error" role="alert" data-testid="bank-row-error">{{ rowError()?.message }}</p>
+            }
+          </article>
+        } @empty {
+          @if (transactions().length > 0) { <p class="p-4 text-sm text-base-content/60">No transactions in this filter.</p> }
+        }
+      </section>
     } @else {
       <div class="flex w-full justify-center py-8"><span class="loading loading-lg" data-testid="bank-loading"></span></div>
     }

@@ -4,60 +4,60 @@ import { firstValueFrom } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { amountDecimal } from '../../expenses/services/validate-expense';
 import type { BankConnection } from '../models/bank-connection';
-import type { BankSyncResult, BankTransaction } from '../models/bank-transaction';
+import type { BankTransaction } from '../models/bank-transaction';
+import type { BankSyncResult } from '../models/bank-sync-result';
+import type { BankReviewStatus } from '../models/bank-review-status';
+import type { BankConnectionDto } from '../models/bank-connection-dto';
+import type { BankTransactionDto } from '../models/bank-transaction-dto';
 
-/** Wire shape of one linked account (guito-api#117): camelCase, tolerant mapping. */
-interface BankConnectionDto {
-  name?: string | null;
-  ibanMasked?: string | null;
-  currency?: string | null;
-  aspspName?: string | null;
-  aspspCountry?: string | null;
-  consentStatus?: string | null;
-  consentExpiresAt?: string | null;
+/** Read unsafe numeric IDs from their original JSON tokens, before Number can round them. */
+function bankJson<T>(body: string): T {
+  return JSON.parse(body, (key: string, value: unknown, context?: { source?: string }) => {
+    if (key !== 'id' || typeof value !== 'number' || Number.isSafeInteger(value)) return value;
+    if (context?.source && /^[1-9]\d*$/.test(context.source)) return context.source;
+    // Older engines without reviver source must never target a rounded financial identity.
+    throw new Error('This browser cannot preserve the Bank Transaction identity. Update your browser.');
+  }) as T;
 }
 
-/**
- * Wire shape of the pending bank-transaction rows (guito-api#91/#112).
- * camelCase per the API's System.Text.Json defaults; nullable fields mirror
- * the Postgres-backed rows. This is the UI's provisional contract — the
- * endpoint is not implemented yet (tracked in guito-api#91).
- */
-interface BankTransactionDto {
-  id?: number | string | null;
-  bookingDate?: string | null;
-  amount?: number | null;
-  amountExact?: string | null;
-  currency?: string | null;
-  remittanceInformation?: string | null;
-  /** FK id of the Jev-suggested category (guito-api#112). */
-  suggestedCategoryId?: number | string | null;
-  /** Category NAME resolved from the categories mirror table (guito-api#112). */
-  suggestedCategory?: string | null;
+function transaction(dto: BankTransactionDto): BankTransaction {
+  return {
+    id: String(dto.id),
+    accountUid: dto.accountUid ?? '',
+    date: dto.bookingDate ?? '',
+    amount: amountDecimal(dto.amount ?? '') ?? '',
+    currency: dto.currency ?? 'EUR',
+    description: dto.remittanceInformation ?? '',
+    status: dto.status ?? '',
+    reviewStatus: dto.reviewStatus ?? 'needsReview',
+    suggestedCategory: dto.suggestedCategory ? { id: String(dto.suggestedCategory.id), name: dto.suggestedCategory.name } : null,
+    linkedExpense: dto.linkedExpense ? { ...dto.linkedExpense, amount: amountDecimal(dto.linkedExpense.amount) ?? '' } : null,
+  };
 }
 
-/** Pending list + sync endpoints of the bank feature (guito-api#90/#91, guito-ui#61). */
 @Injectable({ providedIn: 'root' })
 export class BankApi {
   private readonly http = inject(HttpClient);
   private readonly env = inject(APP_ENVIRONMENT);
 
-  /** Pending (unmatched) bank transactions, oldest booking first per the API. */
-  async pending(): Promise<BankTransaction[]> {
-    const response = await firstValueFrom(this.http.get<BankTransactionDto[]>(`${this.env.apiBaseUrl}/BankTransaction`));
+  /** Bare array, all states by default. Filtering is optional at the HTTP seam. */
+  async list(reviewStatus?: BankReviewStatus | 'all'): Promise<BankTransaction[]> {
+    const body = await firstValueFrom(this.http.get(`${this.env.apiBaseUrl}/BankTransaction`, {
+      params: reviewStatus ? { reviewStatus } : {}, responseType: 'text',
+    }));
+    const response = bankJson<BankTransactionDto[]>(body);
     return (response ?? [])
-      .filter((dto): dto is BankTransactionDto => dto !== null && typeof dto === 'object')
-      .map((dto) => ({
-        id: dto.id === null || dto.id === undefined ? '' : String(dto.id),
-        date: dto.bookingDate ?? '',
-        amount: amountDecimal(dto.amountExact ?? dto.amount ?? 0) ?? '',
-        currency: dto.currency ?? 'EUR',
-        description: dto.remittanceInformation ?? '',
-        suggestedCategory:
-          dto.suggestedCategoryId !== null && dto.suggestedCategoryId !== undefined && dto.suggestedCategory
-            ? { id: String(dto.suggestedCategoryId), name: dto.suggestedCategory }
-            : null,
-      }));
+      .filter(dto => dto !== null && typeof dto === 'object' && dto.id !== null && dto.id !== undefined && String(dto.id) !== '')
+      .map(transaction);
+  }
+
+  async ignore(id: string): Promise<BankTransaction> { return this.transition(id, 'ignore'); }
+  async review(id: string): Promise<BankTransaction> { return this.transition(id, 'review'); }
+  private async transition(id: string, action: 'ignore' | 'review'): Promise<BankTransaction> {
+    const body = await firstValueFrom(this.http.post(
+      `${this.env.apiBaseUrl}/BankTransaction/${encodeURIComponent(id)}/${action}`, {}, { responseType: 'text' },
+    ));
+    return transaction(bankJson<BankTransactionDto>(body));
   }
 
   /** Triggers a sync against Enable Banking; resolves `{fetched, new}` (guito-api#90). */
