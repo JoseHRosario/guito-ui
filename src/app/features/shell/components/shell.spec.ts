@@ -2,7 +2,7 @@ import { provideRouter } from '@angular/router';
 import { Router } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Shell } from './shell';
 import { routes } from '../../../app.routes';
 import { SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
@@ -36,6 +36,7 @@ function setup(session: object | null) {
 
 describe('Shell header auth state', () => {
   beforeEach(() => vi.unstubAllGlobals());
+  afterEach(() => vi.unstubAllGlobals());
 
   it('ShouldShowAvatarAndHideSignInButton_WhenAuthenticated', () => {
     setup(LIVE_SESSION);
