@@ -28,10 +28,10 @@ Panels show candidate description/date/amount and Match, Show more (remaining),
 and Ignore. No BOOK/currency commentary, eligibility reasons or helper paragraphs.
 The linked panel shows Linked Expense, occurrence/category data, date and Unmatch.
 The empty panel says No suggested matches, not that no Expense exists.
-Its Create expense action is visibly disabled, with an accessible future-feature
-label/title: atomic create-and-link belongs to guito-api#135. It never navigates or
-creates an unlinked Expense. This is a deliberate safety restriction on the
-approved action's representation, not implementation of #135.
+Create expense is enabled for every Needs review row, including zero suggestions.
+It opens the existing canonical Create Expense page and uses the atomic #135
+endpoint; see [the create-and-match contract](issue135-create-and-match.md).
+History remains read-only and never supplies candidates.
 
 ## HTTP boundaries
 

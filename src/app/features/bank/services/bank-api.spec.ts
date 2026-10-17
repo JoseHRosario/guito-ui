@@ -55,6 +55,28 @@ describe('BankApi', () => {
     localStorage.removeItem(SESSION_STORAGE_KEY);
   });
 
+  it('creates with only ExpenseCreate fields and returns the current review DTO with exact Int64 identity', async () => {
+    const id = '9223372036854775807';
+    const input = { bookingDate: '2026-10-02T12:00:00+01:00', currency: 'EUR' as const, amount: '12.345', description: 'Edited', category: 'Shopping' };
+    const pending = TestBed.inject(BankApi).createAndMatch(id, input);
+    const result = expect(pending).resolves.toMatchObject({ id, reviewStatus: 'matched', linkedExpense: { id: 123, description: 'Current expense' } });
+    const post = http.expectOne(`https://api.test/BankTransaction/${id}/create-and-match`);
+    expect(post.request.body).toEqual(input);
+    post.flush('{"id":9223372036854775807,"reviewStatus":"matched","linkedExpense":{"id":123,"description":"Current expense","amount":"12.345","bookingDate":"2026-10-02","currency":"EUR","category":"Shopping"}}');
+    await result;
+  });
+
+  it.each(['0', '-1', '007', '9223372036854775808', '9e3'])('rejects invalid Bank identity %s before transport', async id => {
+    await expect(TestBed.inject(BankApi).createAndMatch(id, { bookingDate: '2026-10-02T12:00:00+01:00', currency: 'EUR', amount: '0', description: '', category: 'Shopping' })).rejects.toThrow();
+    http.expectNone(request => request.url.includes('/create-and-match'));
+  });
+  it.each([400, 404, 409, 422, 502])('preserves HTTP %s at the create-and-match seam', async status => {
+    const promise = TestBed.inject(BankApi).createAndMatch('7', { bookingDate: '2026-10-02T12:00:00+01:00', currency: 'EUR', amount: '0', description: '', category: 'Shopping' });
+    const rejected = expect(promise).rejects.toMatchObject({ status });
+    http.expectOne('https://api.test/BankTransaction/7/create-and-match').flush('', { status, statusText: 'Failure' });
+    await rejected;
+  });
+
   it('lists all review states with optional selected query and preserves exact linked-expense data', async () => {
     const api = TestBed.inject(BankApi);
     const promise = api.list('matched');

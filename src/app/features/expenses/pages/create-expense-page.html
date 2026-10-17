@@ -48,11 +48,14 @@
       @if (saveError(); as error) {
         <div class="flex w-full flex-col items-start gap-1 rounded-xl border border-error bg-error/10 p-3" data-testid="save-error">
           <p class="text-sm font-semibold text-error">{{ error }}</p>
-          <p class="text-xs leading-normal text-base-content/60">Your values are kept — try again.</p>
+          <p class="text-xs leading-normal text-base-content/60">{{ uncertain() ? 'Current Bank state does not establish whether this Save succeeded.' : 'Your values are kept.' }}</p>
         </div>
       }
 
-      <fieldset class="grid w-full min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-4" [disabled]="saving()">
+      @if (uncertain()) {
+        <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="checkBankState()">Check again</button>
+      }
+      <fieldset class="grid w-full min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-4" [disabled]="saving() || blocked()">
         <div class="order-1 flex flex-col items-start gap-2 lg:col-span-2">
           <div class="flex w-full items-center justify-between gap-2">
           <label class="text-base leading-snug text-base-content" [attr.for]="prefix + '-amount'">Amount</label>
@@ -163,12 +166,13 @@
         </div>
       </fieldset>
 
-      <button type="submit" class="btn btn-primary w-full lg:w-[240px]" [disabled]="saving()" data-testid="save-expense">
+      <button type="submit" class="btn btn-primary w-full lg:w-[240px]" [disabled]="locked()" data-testid="save-expense">
         @if (saving()) {
           <span class="loading loading-spinner loading-sm"></span>
         }
         Save Expense
       </button>
+      @if (bankMode()) { <button type="button" class="btn btn-ghost" [disabled]="!canLeave()" (click)="cancel()">{{ uncertain() || blocked() ? 'Return to Bank' : 'Cancel' }}</button> }
     </form>
   </ng-template>
 </div>

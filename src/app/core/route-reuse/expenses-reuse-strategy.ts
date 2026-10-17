@@ -37,8 +37,10 @@ export class ExpensesRouteReuseStrategy implements RouteReuseStrategy {
     return ExpensesRouteReuseStrategy.isReusable(route) ? this.handler : null;
   }
 
-  /** Tab targets can never differ in matrix/query params today; keep future-proof anyway. */
+  /** Create captures Bank intent once; a different query context must leave and recreate it. */
   shouldReuseRoute(future: ActivatedRouteSnapshot, curr: ActivatedRouteSnapshot): boolean {
+    if (future.routeConfig?.path === 'expenses/create' &&
+      future.queryParamMap.get('bankTransactionId') !== curr.queryParamMap.get('bankTransactionId')) return false;
     return future.routeConfig === curr.routeConfig;
   }
 }

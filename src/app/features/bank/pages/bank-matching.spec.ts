@@ -107,8 +107,7 @@ describe('Manual matching through rendered component and HTTP (#134)', () => {
     http.expectOne('https://api.test/BankTransaction/7/suggestions').flush([]);
     await tick(); fixture.detectChanges();
     expect(el.querySelector('[data-testid=bank-details]')?.textContent).toContain('No suggested matches');
-    expect(button('[aria-label="Create expense (not available yet)"]').disabled).toBe(true);
-    expect(button('[aria-label="Create expense (not available yet)"]').title).toContain('create and link');
+    expect(button('[data-testid=create-bank-expense]').disabled).toBe(false);
   });
 
   it('pages history independently and deduplicates live offset repeats, retaining exact values', async () => {

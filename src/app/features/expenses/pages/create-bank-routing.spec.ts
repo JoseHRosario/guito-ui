@@ -1,0 +1,38 @@
+import '@angular/compiler';
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter, Router, RouteReuseStrategy } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { afterEach, expect, it } from 'vitest';
+import { APP_ENVIRONMENT } from '../../../core/app-environment';
+import { routes } from '../../../app.routes';
+import { appConfig } from '../../../app.config';
+import { SESSION_STORAGE_KEY, serializeSession } from '../../../core/auth/auth-session';
+
+afterEach(() => { sessionStorage.clear(); localStorage.removeItem(SESSION_STORAGE_KEY); });
+it('recreates Create on Bank query changes and guards pending context departures using production routes and reuse wiring', async () => {
+  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'stub', accessToken: 'stub', expiresAt: Date.now() + 3600000 }));
+  const reuse = appConfig.providers.find(provider => typeof provider === 'object' && 'provide' in provider && provider.provide === RouteReuseStrategy)!;
+  TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter(routes), reuse, { provide: APP_ENVIRONMENT, useValue: { expenseTimestampsEnabled: true, apiBaseUrl: 'https://api.test' } }] });
+  const harness = await RouterTestingHarness.create();
+  const http = TestBed.inject(HttpTestingController);
+  const router = TestBed.inject(Router);
+  await harness.navigateByUrl('/expenses/create');
+  http.expectOne('https://api.test/Category').flush({ categories: [{ name: 'Shopping' }] });
+  const original = harness.fixture.nativeElement.querySelector('g-create-expense-page');
+  await router.navigate(['/expenses/create'], { queryParams: { bankTransactionId: '7' }, state: { bankPrefill: { transactionId: '7', amount: '-1.23', date: '2026-10-02', description: 'Bank', category: 'Shopping' } } });
+  http.expectOne('https://api.test/Category').flush({ categories: [{ name: 'Shopping' }] });
+  await harness.fixture.whenStable(); harness.detectChanges();
+  expect(harness.fixture.nativeElement.querySelector('g-create-expense-page')).not.toBe(original);
+  harness.fixture.nativeElement.querySelector('[data-testid=save-expense]').click();
+  const post = http.expectOne('https://api.test/BankTransaction/7/create-and-match');
+  expect(await router.navigateByUrl('/expenses/create?bankTransactionId=8')).toBe(false);
+  expect(await router.navigateByUrl('/expenses/create')).toBe(false);
+  http.expectNone('https://api.test/Expense');
+  post.flush('', { status: 400, statusText: 'Rejected' });
+  await harness.fixture.whenStable();
+  expect(await router.navigateByUrl('/expenses/create')).toBe(true);
+  http.expectOne('https://api.test/Category').flush({ categories: [] });
+  http.verify();
+});
