@@ -18,58 +18,55 @@ Cancel and normal Back before Save write nothing.
 
 ## HTTP contract
 
-- POST `/BankTransaction/{id}/create-and-match` sends flat existing ExpenseCreate
-  fields (`bookingDate`, `currency`, exact-string `amount`, `description`,
-  `category`) plus `operationId` UUID.
-- GET `/BankTransaction/{id}/create-and-match/{operationId}` reads an immutable
-  historical receipt. 200 is `{operationId,transactionId: numeric Int64,expenseId:
-  Int32}`; 404 means no committed receipt is visible, not proof of rollback.
-- Both responses use the existing lossless `bankJson` numeric-token pipeline.
-  Mismatched identities or malformed receipts cannot acknowledge completion.
-- Reads rely on the server's no-store policy, without a CORS-changing request
-  Cache-Control header. Requests have a 15-second deadline. No automatic POST retry.
-- 400 retains editable values for validation; 404 missing Bank / 409 changed intent
-  or stale Bank block fresh saving and return to Bank for review; 422 refreshes
-  categories; auth rejections remain definite. Lost/network/5xx responses,
-  including 502, require GET receipt checking.
+- POST `/BankTransaction/{id}/create-and-match` sends only flat existing
+  ExpenseCreate fields: `bookingDate`, `amount`, `currency`, `description`,
+  `category`. Amount remains exact decimal text.
+- 200 returns the existing BankTransaction review DTO, as manual Match does.
+  Bank Int64 identities use the existing lossless `bankJson` pipeline.
+- Lost/network/5xx responses, including 502, require current-state readback through
+  the bare array `GET /BankTransaction`. No receipt endpoint, UUID, payload
+  ledger, idempotency retry or automatic POST exists.
+- Requests/checks have a 15-second deadline. No CORS-changing headers are added.
+- 400 retains editable values for validation; 404 missing Bank / 409 stale Bank
+  block saving and require Return to Bank; 422 refreshes categories. Auth
+  rejections remain definite.
 
-## Recovery and return
+## Uncertainty and return
 
-Before the first POST, sessionStorage retains the frozen payload and UUID without
-any authentication secrets. Reload restores that same operation and checks GET.
-While in flight or uncertain, inputs and Save/Cancel are disabled; routed
-canDeactivate and native beforeunload guard departures. Check again reads only.
-Retry same operation first reads GET; only a 404 permits the deliberate same
-POST with identical payload and UUID. Other failed checks never permit a write.
-No fresh operation is allowed while the prior outcome remains unknown.
+Before POST, sessionStorage retains only the existing Bank prefill/context and a
+minimal submitted marker. A matching browser-history entry marker keeps an older
+submitted form locked even after a fresh Create resets the shared prefill context.
+Submitted edits are never persisted. Reload/back with either marker checks current
+Bank state and cannot submit from the revisited form.
+An unresolved/read-failed check retains the form and uncertainty. Check again is
+read-only. If the current transaction is matched with a linkedExpense, return to
+Bank's authoritative current link without claiming this Save succeeded. A later
+Unmatch is never replayed or repaired by this form.
 
-A valid receipt is historical completion, even if someone already unmatched the
-Expense. It never causes replay, Match or relinking. Completion is retained
-locally and returns to an authoritative Bank/history reload. Bank filter,
-expanded row, mobile view and scroll position are retained across the form;
-a matched row hidden by Needs review is collapsed without changing that filter.
-Fresh explicit Create after a completed operation is a new intent; revisiting the
-completed form itself cannot replay the historical operation.
+Inputs and departures are guarded during an actual request/check. After an
+unresolved check, fields remain available but Save stays disabled; Return to Bank
+is available. Another POST requires deliberate Return to current Bank and a fresh
+Create click. Fresh Create cannot replace context while the original request is
+still in flight. Definite validation rejection allows correction on the same form.
+
+Bank filter, expanded row, history pages, mobile view and scroll offsets survive
+return through the existing Bank return state. A matched row hidden by Needs
+review is collapsed without changing that filter. Manual, voice and favorite
+creation remain unchanged. Owner simplification overrides obsolete receipt
+instructions in skills and earlier issue directions.
 
 ## Verification boundary
 
 Agreed seams: HTTP adapter, routed rendered Angular/navigation, built Chromium.
-Tests use fake transports, not real API writes. Local production/staging builds,
-unit/browser results do not claim live Postgres persistence acceptance. No API
-edits, dependencies, token mapping, pipeline, deployment or AWS changes belong
-to this issue. Version: 0.11.0.
+Tests use fake transports, not real API writes. Local production/staging builds
+and unit/browser results do not claim live Postgres persistence acceptance.
+No API edits, dependencies, token mapping, pipeline, deployment or AWS changes
+belong to this issue. Version remains 0.11.0.
 
-Local verification for this implementation: app/spec `tsc --noEmit`, tokens,
-400 unit tests across 37 files, production and staging builds, and full Chromium
-suites against each build (63 passed, 1 skipped per configuration). Both builds
-warn about the initial bundle at approximately 504.5 kB versus the 500 kB warning threshold;
-the build error threshold is not exceeded. The skipped deployed smoke remains
-outside this local-only run.
-
-The app explicitly uses single-user shared data. Principal/account isolation is
-outside #135; recovery storage holds no authentication secrets.
-
-Independent review regressions use production routes and reuse wiring for
-query-only Bank context changes, and rendered component recovery for invalid
-stored fields and explicit frozen wire reconstruction. Browser return coverage
-reloads Create before Cancel and checks loaded history pages and both offsets.
+Local verification: app/spec TypeScript checks, tokens, 394 unit tests across
+37 files, and production/staging builds passed. Full Chromium suites against each
+configuration passed with 63 passed and 1 deployed-smoke skip. An initial staging
+popup sign-in failure did not reproduce on a full rerun. Both builds warn at
+503.18 kB against the 500 kB initial-bundle warning budget; no error budget is
+exceeded. Independent review regressions cover malformed matched responses and
+Back to an old submitted entry after fresh Create.

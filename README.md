@@ -23,7 +23,7 @@ read-only contextual history. Create-and-match (#135) opens the existing approve
 Create Expense page (mobile `3094:35`, desktop `3094:9704`), retaining its editable
 form and layout. By explicit owner instruction there is no new Figma gate; deleted
 #135 drafts remain deleted. Bank Save uses only the atomic Bank endpoint, with
-persisted intent and receipt-based recovery. See [#134](docs/issue134-manual-matching.md)
+a minimal submitted marker and current Bank state readback after uncertainty. See [#134](docs/issue134-manual-matching.md)
 and [#135](docs/issue135-create-and-match.md). Local hermetic tests do not establish
 live API/Postgres acceptance.
 

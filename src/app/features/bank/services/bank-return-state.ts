@@ -23,7 +23,7 @@ export class BankReturnState {
         this.filter.set(saved.filter); this.view.set(saved.view); this.expandedId.set(saved.expandedId);
         this.transactionScroll.set(saved.transactionScroll); this.historyScroll.set(saved.historyScroll); this.returning.set(true);
       }
-    } catch { /* Position is optional; operation recovery independently fails closed. */ }
+    } catch { /* Position is optional. */ }
   }
   retain(): void {
     sessionStorage.setItem('guito.bank-return', JSON.stringify({ filter: this.filter(), view: this.view(),

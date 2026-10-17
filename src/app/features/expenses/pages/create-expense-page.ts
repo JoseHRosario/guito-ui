@@ -68,7 +68,7 @@ export class CreateExpensePage {
   protected readonly uncertain = signal(false);
   protected readonly blocked = signal(false);
   protected readonly locked = computed(() => this.saving() || this.uncertain() || this.blocked());
-  canLeave(): boolean { return !this.bankMode() || (!this.saving() && !this.uncertain()); }
+  canLeave(): boolean { return !this.bankMode() || !this.saving(); }
   @HostListener('window:beforeunload', ['$event'])
   beforeUnload(event: BeforeUnloadEvent): void {
     if (!this.canLeave()) { event.preventDefault(); event.returnValue = ''; }
@@ -105,19 +105,14 @@ export class CreateExpensePage {
         if (bank) {
           const supplied = state?.['bankPrefill'] as { transactionId?: string };
           if (supplied.transactionId !== id) throw new Error('bank-context-mismatch');
-          // Never replace a frozen intent when re-entering from browser history.
+          // Browser history must not clear the submitted marker.
           if (sessionStorage.getItem(`guito.bank-create.${id}`) === null) storeBankCreate({ transactionId: id, prefill: bank });
         }
         this.bankContext = readBankCreate(id);
         bank = this.bankContext.prefill;
-        if (this.bankContext.completed) {
-          this.blocked.set(true);
-          this.saveError.set('This operation already completed. Return to Bank to review its current state.');
-        } else if (this.bankContext.input) {
-          const input = this.bankContext.input;
-          bank = { amount: input.amount, description: input.description, date: input.bookingDate, category: input.category };
+        if (this.bankContext.submitted || state?.['bankCreateSubmitted'] === id) {
           this.uncertain.set(true);
-          void this.checkBankReceipt(false);
+          void this.checkBankState();
         }
       } catch {
         bank = undefined;
@@ -136,7 +131,7 @@ export class CreateExpensePage {
             // A bank row without a category suggestion starts empty for manual choice.
             this.category.set('');
           } else {
-            this.category.set(this.bankContext?.input ? this.bankContext.input.category : match ?? (names.length > 0 ? names[0] : ''));
+            this.category.set(match ?? (names.length > 0 ? names[0] : ''));
             if (match) this.voiceSuggested.update((set) => new Set([...set, 'category' as VoiceField]));
           }
         } else if (names.length > 0) {
@@ -245,75 +240,55 @@ export class CreateExpensePage {
       },
     );
   }
-  private async saveBank(input: Omit<CreateAndMatchInput, 'operationId'>): Promise<void> {
-    if (!this.bankContext) { this.saving.set(false); return; }
-    try {
-      this.bankContext = { ...this.bankContext, input: { ...input, operationId: crypto.randomUUID() } };
-      storeBankCreate(this.bankContext);
-    } catch {
-      this.blocked.set(true); this.saving.set(false);
-      this.saveError.set('Could not retain recovery data. Saving is blocked.'); return;
-    }
-    await this.postBank();
-  }
-  private async completeBank(): Promise<void> {
-    if (!this.bankContext) return;
-    // Historical receipt acknowledges creation even if the link was later removed.
-    this.blocked.set(true);
-    try { storeBankCreate({ ...this.bankContext, completed: true }); }
-    catch {
-      this.saveError.set('Expense created. Could not retain completion locally. Return to Bank.');
-    }
-    this.uncertain.set(false); this.saving.set(false);
-    await this.router.navigate(['/bank']);
-  }
-  private async postBank(): Promise<void> {
+  private async saveBank(input: CreateAndMatchInput): Promise<void> {
     const context = this.bankContext;
-    if (!context?.input) return;
-    this.saving.set(true);
+    if (!context) { this.saving.set(false); return; }
     try {
-      const persisted = readBankCreate(context.transactionId);
-      if (persisted.completed || !persisted.input || (Object.keys(context.input) as (keyof CreateAndMatchInput)[]).some(key => persisted.input?.[key] !== context.input?.[key])) throw new Error('recovery-changed');
-      storeBankCreate(context);
+      if (readBankCreate(context.transactionId).submitted || this.bankApi.isCreating(context.transactionId)) throw new Error('already-submitted');
+      storeBankCreate({ ...context, submitted: true });
+      history.replaceState({ ...history.state, bankCreateSubmitted: context.transactionId }, '');
     } catch {
       this.blocked.set(true); this.saving.set(false);
-      this.saveError.set('Could not verify recovery data. Saving is blocked.'); return;
+      this.saveError.set('Could not verify Bank context. Saving is blocked. Return to Bank.'); return;
     }
     try {
-      await this.bankApi.createAndMatch(context.transactionId, context.input);
-      await this.completeBank();
+      await this.bankApi.createAndMatch(context.transactionId, input);
+      this.saving.set(false);
+      this.blocked.set(true);
+      await this.router.navigate(['/bank']);
     } catch (error) {
       if (error instanceof HttpErrorResponse && [400, 401, 403, 404, 409, 422].includes(error.status)) {
-        // A prior unknown attempt stays frozen even if this retry is rejected.
-        if (!this.uncertain()) {
-          try { this.bankContext = { transactionId: context.transactionId, prefill: context.prefill }; storeBankCreate(this.bankContext); }
-          catch { this.blocked.set(true); }
-          if ([404, 409].includes(error.status)) this.blocked.set(true);
-        }
-        const messages: Record<number, string> = { 400: 'Check the expense values and try again.', 401: 'Sign in to continue.', 403: 'You cannot save this expense.', 404: 'Bank transaction is missing. Return to Bank.', 409: 'Bank transaction or operation changed. Return to Bank to review.', 422: 'Category is unavailable. Choose a current category.' };
-        this.saveError.set(this.uncertain() ? `${messages[error.status]} The original outcome is still unknown; check again.` : messages[error.status]);
+        try {
+          storeBankCreate(context);
+          history.replaceState({ ...history.state, bankCreateSubmitted: undefined }, '');
+        } catch { this.blocked.set(true); }
+        if ([404, 409].includes(error.status)) this.blocked.set(true);
+        const messages: Record<number, string> = { 400: 'Check the expense values and try again.', 401: 'Sign in to continue.', 403: 'You cannot save this expense.', 404: 'Bank transaction is missing. Return to Bank.', 409: 'Bank transaction changed. Return to Bank to review.', 422: 'Category is unavailable. Choose a current category.' };
+        this.saveError.set(messages[error.status]);
         if (error.status === 422) void this.categoryApi.list().then(names => this.categories.set(names), () => {});
       } else {
         this.uncertain.set(true);
-        await this.readBankReceipt(false);
+        await this.readBankState();
       }
     } finally { this.saving.set(false); }
   }
-  protected async checkBankReceipt(retry: boolean): Promise<void> {
+  protected async checkBankState(): Promise<void> {
     if (this.saving()) return;
-    await this.readBankReceipt(retry);
+    await this.readBankState();
   }
-  private async readBankReceipt(retry: boolean): Promise<void> {
-    const context = this.bankContext;
-    if (!context?.input) return;
+  private async readBankState(): Promise<void> {
+    if (!this.bankContext) return;
     this.saving.set(true);
+    this.saveError.set('Outcome unknown. Check again or Return to Bank. Review the current Bank and start a fresh Create before saving again.');
     try {
-      await this.bankApi.createReceipt(context.transactionId, context.input.operationId);
-      await this.completeBank();
-    } catch (error) {
-      this.saveError.set('Outcome unknown. Your original values are retained. Check again or safely retry the same operation.');
-      if (retry && error instanceof HttpErrorResponse && error.status === 404) await this.postBank();
-    } finally { this.saving.set(false); }
+      const current = (await this.bankApi.list()).find(row => row.id === this.bankContext?.transactionId);
+      if (current?.reviewStatus === 'matched' && current.linkedExpense) {
+        // Current link state does not establish whether this Save succeeded.
+        this.saving.set(false);
+        this.blocked.set(true);
+        await this.router.navigate(['/bank']);
+      }
+    } catch { /* Failed reads retain the form and uncertainty; they never authorize a write. */ }
+    finally { this.saving.set(false); }
   }
-
 }

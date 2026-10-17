@@ -8,7 +8,7 @@ import { categoryIcon } from '../../expenses/services/category-icon';
 import { GIcon } from '../../../shared/gicon';
 import { SyncButton } from '../components/sync-button';
 import { BankReturnState } from '../services/bank-return-state';
-import { readBankCreate, storeBankCreate } from '../services/bank-create-context';
+import { storeBankCreate } from '../services/bank-create-context';
 import { BankApi, validBankId } from '../services/bank-api';
 import type { BankTransaction } from '../models/bank-transaction';
 import type { BankReviewStatus } from '../models/bank-review-status';
@@ -242,13 +242,8 @@ export class BankPage {
     if (this.busy() || this.loadError() || tx.reviewStatus !== 'needsReview' || !validBankId(tx.id)) return;
     const prefill = { description: tx.description, amount: tx.amount, date: tx.date, category: tx.suggestedCategory?.name ?? '' };
     try {
-      const previous = sessionStorage.getItem(`guito.bank-create.${tx.id}`);
-      if (previous === null) storeBankCreate({ transactionId: tx.id, prefill });
-      else {
-        const context = readBankCreate(tx.id);
-        // A completed historical operation must never be replayed after Unmatch.
-        if (context.completed || !context.input) storeBankCreate({ transactionId: tx.id, prefill });
-      }
+      if (this.bankApi.isCreating(tx.id)) return;
+      storeBankCreate({ transactionId: tx.id, prefill });
       this.returnState.historyPages.set(Math.max(1, this.historyPages));
       this.returnState.shown.set(this.shown());
       this.returnState.filter.set(this.filter());
