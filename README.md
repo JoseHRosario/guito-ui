@@ -6,7 +6,7 @@ The web frontend of **Guito**, a personal expense tracker: control expenses and 
 
 > Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and numeric expense IDs. Production now enables the existing timestamp capability after the approved guito-api#132 Postgres cutover (fix guito-api#145); dev/staging settings are unchanged. All create paths send `bookingDate`, and exact decimal strings preserve POST/prefill precision. Production release and an owner-confirmed genuine save remain merge/deploy verification gates; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
 
-## Bank review inbox (#133)
+## Bank review (#133–#135)
 
 Bank opens on **All** with every transaction collapsed. Clicking a row (or
 Enter/Space on its native button) expands exactly one inline detail; clicking it
@@ -18,13 +18,14 @@ refreshes authoritative state without retrying the mutation. Initial load errors
 have Retry; failed refreshes preserve the previous list. Sync and Open Settings
 for missing bank connections are retained.
 
-The old Accept/create-prefill action is removed: this issue offers no Match,
-Unmatch, candidate selection or Create expense; atomic create+link is #135.
-The approved initial frames are [mobile 3328:523](https://www.figma.com/design/UoIK5MnIqDrgfHqMmBZoYk/Guito?node-id=3328-523)
-and [desktop 3328:603](https://www.figma.com/design/UoIK5MnIqDrgfHqMmBZoYk/Guito?node-id=3328-603).
-See [the inbox design/contract](docs/adr/0015-bank-review-inbox.md) for expanded
-frames and the HTTP boundary. Local tests are hermetic; live API integration and
-served visual acceptance remain separate owner/parent verification gates.
+Manual matching (#134) adds explicit Match/Unmatch with server suggestions and
+read-only contextual history. Create-and-match (#135) opens the existing approved
+Create Expense page (mobile `3094:35`, desktop `3094:9704`), retaining its editable
+form and layout. By explicit owner instruction there is no new Figma gate; deleted
+#135 drafts remain deleted. Bank Save uses only the atomic Bank endpoint, with
+persisted intent and receipt-based recovery. See [#134](docs/issue134-manual-matching.md)
+and [#135](docs/issue135-create-and-match.md). Local hermetic tests do not establish
+live API/Postgres acceptance.
 
 ## Expense edit/delete (#70)
 

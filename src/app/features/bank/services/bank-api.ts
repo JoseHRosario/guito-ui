@@ -1,8 +1,10 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { amountDecimal } from '../../expenses/services/validate-expense';
+import type { CreateAndMatchInput } from '../models/create-and-match-input';
+import type { CreateAndMatchReceipt } from '../models/create-and-match-receipt';
 import type { BankConnection } from '../models/bank-connection';
 import type { BankTransaction } from '../models/bank-transaction';
 import type { LinkedExpense } from '../models/linked-expense';
@@ -11,10 +13,17 @@ import type { BankReviewStatus } from '../models/bank-review-status';
 import type { BankConnectionDto } from '../models/bank-connection-dto';
 import type { BankTransactionDto } from '../models/bank-transaction-dto';
 
+export function validBankId(id: unknown): id is string {
+  return typeof id === 'string' && /^[1-9]\d*$/.test(id) && BigInt(id) <= 9223372036854775807n;
+}
+export function validOperationId(id: unknown): id is string {
+  return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
 /** Read unsafe numeric IDs from their original JSON tokens, before Number can round them. */
 function bankJson<T>(body: string): T {
   return JSON.parse(body, (key: string, value: unknown, context?: { source?: string }) => {
-    if (key !== 'id' || typeof value !== 'number' || Number.isSafeInteger(value)) return value;
+    if ((key !== 'id' && key !== 'transactionId') || typeof value !== 'number' || Number.isSafeInteger(value)) return value;
     if (context?.source && /^[1-9]\d*$/.test(context.source)) return context.source;
     // Older engines without reviver source must never target a rounded financial identity.
     throw new Error('This browser cannot preserve the Bank Transaction identity. Update your browser.');
@@ -51,6 +60,24 @@ export class BankApi {
     return (response ?? [])
       .filter(dto => dto !== null && typeof dto === 'object' && dto.id !== null && dto.id !== undefined && String(dto.id) !== '')
       .map(transaction);
+  }
+
+  async createAndMatch(id: string, input: CreateAndMatchInput): Promise<CreateAndMatchReceipt> {
+    return this.receipt(id, input.operationId, input);
+  }
+  async createReceipt(id: string, operationId: string): Promise<CreateAndMatchReceipt> {
+    return this.receipt(id, operationId);
+  }
+  private async receipt(id: string, operationId: string, input?: CreateAndMatchInput): Promise<CreateAndMatchReceipt> {
+    if (!validBankId(id) || !validOperationId(operationId)) throw new Error('create-context-invalid');
+    const url = `${this.env.apiBaseUrl}/BankTransaction/${id}/create-and-match`;
+    const request = input ? this.http.post(url, input, { responseType: 'text', observe: 'response' })
+      : this.http.get(`${url}/${operationId}`, { responseType: 'text', observe: 'response' });
+    const response = await firstValueFrom(request.pipe(timeout(15000)));
+    const receipt = bankJson<CreateAndMatchReceipt>(response.body ?? 'null');
+    if (response.status !== 200 || !receipt || receipt.operationId !== operationId || String(receipt.transactionId) !== id ||
+      !Number.isInteger(receipt.expenseId) || receipt.expenseId < 1 || receipt.expenseId > 2147483647) throw new Error('create-receipt-invalid');
+    return { ...receipt, transactionId: id };
   }
 
   async suggestions(id: string): Promise<LinkedExpense[]> {

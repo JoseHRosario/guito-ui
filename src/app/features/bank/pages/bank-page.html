@@ -4,8 +4,8 @@
     <g-sync-button [syncing]="syncing()" [disabled]="busy() || loadError()" (syncRequested)="sync()" />
   </div>
   <div class="flex gap-2 lg:hidden" role="group" aria-label="Bank review view">
-    <button class="view-tab" [class.bg-primary]="view() === 'transactions'" [class.bg-base-100]="view() !== 'transactions'" [class.text-primary-content]="view() === 'transactions'" [attr.aria-pressed]="view() === 'transactions'" (click)="view.set('transactions')">Transactions</button>
-    <button class="view-tab" [class.bg-primary]="view() === 'expenses'" [class.bg-base-100]="view() !== 'expenses'" [class.text-primary-content]="view() === 'expenses'" [attr.aria-pressed]="view() === 'expenses'" (click)="view.set('expenses')">Expenses</button>
+    <button class="view-tab" [class.bg-primary]="view() === 'transactions'" [class.bg-base-100]="view() !== 'transactions'" [class.text-primary-content]="view() === 'transactions'" [attr.aria-pressed]="view() === 'transactions'" (click)="selectView('transactions')">Transactions</button>
+    <button class="view-tab" [class.bg-primary]="view() === 'expenses'" [class.bg-base-100]="view() !== 'expenses'" [class.text-primary-content]="view() === 'expenses'" [attr.aria-pressed]="view() === 'expenses'" (click)="selectView('expenses')">Expenses</button>
   </div>
   <div class="review-columns">
     <section class="review-column" [class.is-inactive]="view() !== 'transactions'" aria-label="Transactions view">
@@ -18,7 +18,7 @@
         }
       </div>
       <h3 class="hidden pb-2 text-sm lg:block">Bank Transactions</h3>
-      <div class="review-scroll" role="region" aria-label="Bank Transaction list" tabindex="0">
+      <div class="review-scroll" [scrollTop]="restoringScroll() ? 0 : returnState.transactionScroll()" (scroll)="rememberScroll($event, 'transactions')" role="region" aria-label="Bank Transaction list" tabindex="0">
         @if (linkedConfirmed(); as count) { <p class="mb-3 text-sm text-success" data-testid="bank-linked-confirm">Bank connected — {{ count === 1 ? '1 account' : count + ' accounts' }} linked.</p> }
         @if (syncResult() !== null) { <p class="mb-3 text-sm text-base-content/60" data-testid="sync-result">{{ syncResult() }}</p> }
         @if (notLinked() && transactions().length > 0) { <button type="button" class="btn btn-primary btn-sm review-action" data-testid="open-settings" (click)="openSettings()">Open Settings</button> }
@@ -72,7 +72,6 @@
                         <span class="loading loading-spinner loading-sm" aria-label="Loading suggested matches"></span>
                       } @else if (candidates().length === 0) {
                         <p class="text-sm text-base-content/60">No suggested matches</p>
-                        <button type="button" class="btn btn-primary btn-sm review-action" disabled aria-label="Create expense (not available yet)" title="Atomic create and link is a future feature (#135).">Create expense</button>
                       } @else {
                         <div class="w-full overflow-hidden rounded-lg border border-base-content/10 bg-base-100">
                           @for (expense of candidates(); track expense.id) {
@@ -85,6 +84,7 @@
                         </div>
                         @if (remaining() > 0) { <button type="button" class="btn btn-primary btn-sm review-action" data-testid="show-more-suggestions" (click)="showMore()">Show more ({{ remaining() }})</button> }
                       }
+                      <button type="button" class="btn btn-primary btn-sm review-action" data-testid="create-bank-expense" [disabled]="busy() || loadError()" (click)="createExpense(tx)">Create expense</button>
                     }
                     @if (tx.reviewStatus !== 'matched') {
                       <button type="button" class="btn btn-primary btn-sm review-action" data-testid="bank-action" [disabled]="busy() || loadError()" (click)="transition(tx)">
@@ -105,7 +105,7 @@
     </section>
     <section class="review-column history-column" [class.is-inactive]="view() !== 'expenses'" aria-label="Expenses view">
       <h3 class="hidden pb-2 text-sm lg:block">Existing Expenses</h3>
-      <div class="review-scroll" role="region" aria-label="Expense history list" tabindex="0" data-testid="expense-history">
+      <div class="review-scroll" [scrollTop]="restoringScroll() ? 0 : returnState.historyScroll()" (scroll)="rememberScroll($event, 'expenses')" role="region" aria-label="Expense history list" tabindex="0" data-testid="expense-history">
         @if (historyError()) { <p class="mb-2 text-sm text-error" role="alert">Could not load Expense history. Previous history unchanged.</p><button type="button" class="btn btn-primary btn-sm review-action mb-2" [disabled]="historyLoading() || busy()" (click)="loadHistory()">Retry history</button> }
         @if (historyLoading()) { <span class="loading loading-spinner loading-sm" aria-label="Loading Expense history"></span> }
         <div class="list-card">

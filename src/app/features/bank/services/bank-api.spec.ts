@@ -55,6 +55,46 @@ describe('BankApi', () => {
     localStorage.removeItem(SESSION_STORAGE_KEY);
   });
 
+  it('creates atomically and reads a historical receipt preserving numeric Int64 identity', async () => {
+    const api = TestBed.inject(BankApi);
+    const id = '9223372036854775807';
+    const operationId = 'b529ca59-257c-4e39-9920-2bd3af233498';
+    const input = { bookingDate: '2026-10-02T12:00:00+01:00', currency: 'EUR' as const, amount: '12.345', description: 'Edited', category: 'Shopping' };
+    const pending = api.createAndMatch(id, { ...input, operationId });
+    const post = http.expectOne(`https://api.test/BankTransaction/${id}/create-and-match`);
+    expect(post.request.method).toBe('POST');
+    expect(post.request.body).toEqual({ ...input, operationId });
+    post.flush(`{"operationId":"${operationId}","transactionId":9223372036854775807,"expenseId":123}`);
+    expect(await pending).toEqual({ operationId, transactionId: id, expenseId: 123 });
+    const checking = api.createReceipt(id, operationId);
+    const get = http.expectOne(`https://api.test/BankTransaction/${id}/create-and-match/${operationId}`);
+    expect(get.request.headers.has('Cache-Control')).toBe(false);
+    get.flush(`{"operationId":"${operationId}","transactionId":9223372036854775807,"expenseId":123}`);
+    expect(await checking).toEqual({ operationId, transactionId: id, expenseId: 123 });
+  });
+
+  it.each(['0', '-1', '007', '9223372036854775808', '9e3'])('rejects invalid Bank identity %s before transport', async id => {
+    await expect(TestBed.inject(BankApi).createReceipt(id, 'b529ca59-257c-4e39-9920-2bd3af233498')).rejects.toThrow();
+    http.expectNone(request => request.url.includes('/create-and-match'));
+  });
+  it.each([
+    '{"operationId":"b529ca59-257c-4e39-9920-2bd3af233498","transactionId":8,"expenseId":123}',
+    '{"operationId":"b529ca59-257c-4e39-9920-2bd3af233498","transactionId":7,"expenseId":2147483648}',
+    '{"operationId":"wrong","transactionId":7,"expenseId":123}',
+    'null', '{"operationId":"b529ca59-257c-4e39-9920-2bd3af233498","transactionId":7,"expenseId":"123"}',
+  ])('does not acknowledge an inconsistent receipt %s', async body => {
+    const promise = TestBed.inject(BankApi).createReceipt('7', 'b529ca59-257c-4e39-9920-2bd3af233498');
+    const rejected = expect(promise).rejects.toThrow('create-receipt-invalid');
+    http.expectOne(request => request.url.includes('/create-and-match/')).flush(body);
+    await rejected;
+  });
+  it.each([400, 404, 409, 422, 502])('preserves HTTP %s at the create-and-match seam', async status => {
+    const promise = TestBed.inject(BankApi).createAndMatch('7', { operationId: 'b529ca59-257c-4e39-9920-2bd3af233498', bookingDate: '2026-10-02T12:00:00+01:00', currency: 'EUR', amount: '0', description: '', category: 'Shopping' });
+    const rejected = expect(promise).rejects.toMatchObject({ status });
+    http.expectOne('https://api.test/BankTransaction/7/create-and-match').flush('', { status, statusText: 'Failure' });
+    await rejected;
+  });
+
   it('lists all review states with optional selected query and preserves exact linked-expense data', async () => {
     const api = TestBed.inject(BankApi);
     const promise = api.list('matched');

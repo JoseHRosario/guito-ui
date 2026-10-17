@@ -1,7 +1,7 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { APP_ENVIRONMENT } from '../../../core/app-environment';
 import { serializeSession, SESSION_STORAGE_KEY } from '../../../core/auth/auth-session';
 import { CreateExpensePage } from './create-expense-page';
@@ -31,6 +31,7 @@ describe('CreateExpensePage (issue #32, frames 3094:35 / 3094:9937 / 3094:10011)
       providers: [
         provideHttpClient(withInterceptors([])),
         provideHttpClientTesting(),
+        provideRouter([]),
         { provide: APP_ENVIRONMENT, useValue: TEST_ENV },
       ],
     });

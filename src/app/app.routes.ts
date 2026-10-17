@@ -40,9 +40,8 @@ export const routes: Routes = [
         title: 'Guito · Budgets',
       },
       {
-        // Bank review page (issue #61): pending bank transactions with sync +
-        // accept-to-expense. NOT marked data.reuse — each visit reloads the
-        // pending list so freshly synced rows appear on tab switch.
+        // Bank review: every visit reads authoritative transactions/history,
+        // including return from atomic create-and-match.
         path: 'bank',
         component: BankPage,
         title: 'Guito · Bank',
@@ -60,7 +59,9 @@ export const routes: Routes = [
       },
       {
         path: 'expenses/create',
+        runGuardsAndResolvers: 'paramsOrQueryParamsChange',
         component: CreateExpensePage,
+        canDeactivate: [(page: CreateExpensePage) => page.canLeave()],
         title: 'Guito · Create Expense',
       },
     ],

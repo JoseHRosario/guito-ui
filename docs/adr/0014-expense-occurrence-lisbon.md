@@ -150,3 +150,13 @@ production environment's required `bookingDate` create contract, and both built
 production and staging timestamp browser modes (including favorites),
 manual exact decimals, exact AI/bank prefill round-trips, and an arbitrary +05:30
 known instant displayed in Lisbon and preserved unchanged.
+
+## Bank atomic creation (#135)
+
+Bank-origin Save now uses `POST /BankTransaction/{id}/create-and-match`, never
+ordinary ExpenseApi.create. It sends the same canonical ExpenseCreate fields
+plus a persisted UUID; current production/staging both enable timestamps.
+The existing canonical Create page is reused by explicit owner instruction,
+without a new Figma gate or replacement drafts. Voice/manual/favorites retain
+the ExpenseApi capability gate described above. See [#135](../issue135-create-and-match.md)
+for lossless Bank identity, frozen intent and historical receipt recovery.

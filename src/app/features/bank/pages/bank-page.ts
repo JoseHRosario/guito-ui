@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, Injector, afterNextRender, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ExpenseApi } from '../../expenses/services/expense-api';
@@ -7,7 +7,9 @@ import type { LinkedExpense } from '../models/linked-expense';
 import { categoryIcon } from '../../expenses/services/category-icon';
 import { GIcon } from '../../../shared/gicon';
 import { SyncButton } from '../components/sync-button';
-import { BankApi } from '../services/bank-api';
+import { BankReturnState } from '../services/bank-return-state';
+import { readBankCreate, storeBankCreate } from '../services/bank-create-context';
+import { BankApi, validBankId } from '../services/bank-api';
 import type { BankTransaction } from '../models/bank-transaction';
 import type { BankReviewStatus } from '../models/bank-review-status';
 
@@ -53,11 +55,16 @@ const LABELS = { needsReview: 'Needs review', matched: 'Matched', ignored: 'Igno
 /** Approved #134 review: explicit existing-Expense matches and independent read-only history. */
 @Component({
   selector: 'g-bank-page',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './bank-page.html',
   styleUrl: './bank.css',
   imports: [GIcon, SyncButton],
 })
 export class BankPage {
+  protected readonly returnState = inject(BankReturnState);
+  private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+  protected readonly restoringScroll = signal(false);
   private readonly bankApi = inject(BankApi);
   private readonly expenseApi = inject(ExpenseApi);
   protected readonly view = signal<'transactions' | 'expenses'>('transactions');
@@ -201,7 +208,57 @@ export class BankPage {
       linkedView: tx.linkedExpense ? expenseView(tx.linkedExpense) : null,
     })));
 
-  constructor() { void this.load(); void this.loadHistory(); }
+  constructor() {
+    const shown = this.returnState.returning() ? this.returnState.shown() : 3;
+    if (this.returnState.returning()) {
+      this.restoringScroll.set(true);
+      this.historyPages = this.returnState.historyPages();
+      this.filter.set(this.returnState.filter());
+      this.expandedId.set(this.returnState.expandedId());
+      this.view.set(this.returnState.view());
+      this.returnState.consume();
+    }
+    void Promise.all([this.load().then(() => this.loadSuggestions()).then(() => this.shown.set(shown)), this.loadHistory()]).then(() => {
+      // Scroll properties must be applied after rows and expansion have rendered.
+      if (this.destroyRef.destroyed) return;
+      afterNextRender(() => this.restoringScroll.set(false), { injector: this.injector });
+    });
+  }
+  protected selectView(view: 'transactions' | 'expenses'): void {
+    this.restoringScroll.set(true);
+    this.view.set(view);
+    if (!this.loading() && !this.historyLoading()) {
+      afterNextRender(() => this.restoringScroll.set(false), { injector: this.injector });
+    }
+  }
+  protected rememberScroll(event: Event, column: 'transactions' | 'expenses'): void {
+    const target = event.target as HTMLElement;
+    // Hidden mobile panes have no scroll range; their zero is not a user position.
+    if (this.restoringScroll() || target.clientHeight === 0) return;
+    if (column === 'transactions') this.returnState.transactionScroll.set(target.scrollTop);
+    else this.returnState.historyScroll.set(target.scrollTop);
+  }
+  protected createExpense(tx: BankTransaction): void {
+    if (this.busy() || this.loadError() || tx.reviewStatus !== 'needsReview' || !validBankId(tx.id)) return;
+    const prefill = { description: tx.description, amount: tx.amount, date: tx.date, category: tx.suggestedCategory?.name ?? '' };
+    try {
+      const previous = sessionStorage.getItem(`guito.bank-create.${tx.id}`);
+      if (previous === null) storeBankCreate({ transactionId: tx.id, prefill });
+      else {
+        const context = readBankCreate(tx.id);
+        // A completed historical operation must never be replayed after Unmatch.
+        if (context.completed || !context.input) storeBankCreate({ transactionId: tx.id, prefill });
+      }
+      this.returnState.historyPages.set(Math.max(1, this.historyPages));
+      this.returnState.shown.set(this.shown());
+      this.returnState.filter.set(this.filter());
+      this.returnState.expandedId.set(this.expandedId());
+      this.returnState.view.set(this.view());
+      this.returnState.retain();
+      this.returnState.returning.set(true);
+      void this.router.navigate(['/expenses/create'], { queryParams: { bankTransactionId: tx.id }, state: { bankPrefill: { ...prefill, transactionId: tx.id } } });
+    } catch { this.rowError.set({ id: tx.id, message: 'Recovery storage is unavailable or invalid. Create expense is blocked.' }); }
+  }
   protected toggle(id: string): void {
     this.expandedId.update(current => current === id ? null : id);
     void this.loadSuggestions();
@@ -218,7 +275,7 @@ export class BankPage {
       const rows = await this.bankApi.list();
       this.transactions.set(rows);
       this.loadError.set(false);
-      if (!rows.some(tx => tx.id === this.expandedId())) this.expandedId.set(null);
+      if (!rows.some(tx => tx.id === this.expandedId() && (this.filter() === 'all' || tx.reviewStatus === this.filter()))) this.expandedId.set(null);
       if (rows.length === 0) await this.probeLink();
       else this.notLinked.set(false);
     } catch (error) {
