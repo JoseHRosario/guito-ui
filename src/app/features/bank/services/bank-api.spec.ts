@@ -73,6 +73,21 @@ describe('BankApi', () => {
     expect(await checking).toEqual({ operationId, transactionId: id, expenseId: 123 });
   });
 
+  it.each([
+    { id: '7', write: false }, { id: '7', write: true },
+    { id: '9223372036854775807', write: false }, { id: '9223372036854775807', write: true },
+  ])('rejects quoted Transaction identity in a receipt: %s', async ({ id, write }) => {
+    const api = TestBed.inject(BankApi);
+    const operationId = 'b529ca59-257c-4e39-9920-2bd3af233498';
+    const promise = write
+      ? api.createAndMatch(id, { operationId, bookingDate: '2026-10-02T12:00:00+01:00', currency: 'EUR', amount: '12.34', description: 'Expense', category: 'Shopping' })
+      : api.createReceipt(id, operationId);
+    const rejected = expect(promise).rejects.toThrow('create-receipt-invalid');
+    http.expectOne(request => request.url.includes('/create-and-match'))
+      .flush(`{"operationId":"${operationId}","transactionId":"${id}","expenseId":123}`);
+    await rejected;
+  });
+
   it.each(['0', '-1', '007', '9223372036854775808', '9e3'])('rejects invalid Bank identity %s before transport', async id => {
     await expect(TestBed.inject(BankApi).createReceipt(id, 'b529ca59-257c-4e39-9920-2bd3af233498')).rejects.toThrow();
     http.expectNone(request => request.url.includes('/create-and-match'));

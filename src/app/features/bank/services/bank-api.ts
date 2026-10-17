@@ -23,6 +23,8 @@ export function validOperationId(id: unknown): id is string {
 /** Read unsafe numeric IDs from their original JSON tokens, before Number can round them. */
 function bankJson<T>(body: string): T {
   return JSON.parse(body, (key: string, value: unknown, context?: { source?: string }) => {
+    // Receipt identity must originate as a numeric token, not a quoted lookalike.
+    if (key === 'transactionId' && typeof value !== 'number') throw new Error('create-receipt-invalid');
     if ((key !== 'id' && key !== 'transactionId') || typeof value !== 'number' || Number.isSafeInteger(value)) return value;
     if (context?.source && /^[1-9]\d*$/.test(context.source)) return context.source;
     // Older engines without reviver source must never target a rounded financial identity.

@@ -60,9 +60,9 @@ edits, dependencies, token mapping, pipeline, deployment or AWS changes belong
 to this issue. Version: 0.11.0.
 
 Local verification for this implementation: app/spec `tsc --noEmit`, tokens,
-396 unit tests across 37 files, production and staging builds, and full Chromium
+400 unit tests across 37 files, production and staging builds, and full Chromium
 suites against each build (63 passed, 1 skipped per configuration). Both builds
-warn about the initial bundle at 504.40 kB versus the 500 kB warning threshold;
+warn about the initial bundle at approximately 504.5 kB versus the 500 kB warning threshold;
 the build error threshold is not exceeded. The skipped deployed smoke remains
 outside this local-only run.
 
