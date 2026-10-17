@@ -1,5 +1,10 @@
 # Bank review inbox (#133)
 
+Historical #133 implementation record. [Manual matching (#134)](../issue134-manual-matching.md)
+supersedes the composition, date groups, panels and Match/Unmatch scope below.
+Identity/auth boundaries remain. Do not restore the old sidebar or BOOK/currency
+commentary from these historical frames.
+
 ## Approved design and interaction
 
 File `UoIK5MnIqDrgfHqMmBZoYk`, Guito App page. José approved the design/start

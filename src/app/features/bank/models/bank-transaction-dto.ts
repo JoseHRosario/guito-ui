@@ -13,4 +13,5 @@ export interface BankTransactionDto {
   reviewStatus?: BankReviewStatus;
   suggestedCategory?: { id: number | string; name: string } | null;
   linkedExpense?: LinkedExpense | null;
+  suggestedExpenseCount?: number;
 }

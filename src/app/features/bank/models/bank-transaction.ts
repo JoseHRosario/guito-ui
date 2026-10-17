@@ -14,4 +14,5 @@ export interface BankTransaction {
   reviewStatus: BankReviewStatus;
   suggestedCategory: SuggestedCategory | null;
   linkedExpense: LinkedExpense | null;
+  suggestedExpenseCount: number;
 }

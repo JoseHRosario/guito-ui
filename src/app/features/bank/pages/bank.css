@@ -1,2 +1,24 @@
-/* Bank page has no styles beyond the shared Tailwind utilities — kept for the
-   per-page CSS file convention (expenses-page pattern). */
+/* Geometry: approved #134 desktop 3522:1235, mobile 3512:1019.
+   Palette/radii deliberately reuse the generated canonical List Expenses theme. */
+:host { display: block; }
+.review-page { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; height: calc(100dvh - 10rem); }
+.review-columns { display: grid; min-height: 0; flex: 1; gap: 1.5rem; }
+.review-column { display: flex; min-height: 0; min-width: 0; flex-direction: column; }
+.review-column.is-inactive { display: none; }
+.review-scroll { min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.list-card { overflow: hidden; border-radius: var(--guito-radius-box); border: var(--guito-border) solid color-mix(in srgb, var(--guito-color-base-content) 10%, transparent); background: var(--guito-color-base-100); padding-bottom: 1rem; }
+.date-heading { padding: 1rem 1rem .5rem; font-size: 1rem; font-weight: 600; line-height: 1.375; }
+.review-row { display: flex; align-items: center; gap: .75rem; border-bottom: var(--guito-border) solid color-mix(in srgb, var(--guito-color-base-content) 10%, transparent); padding: .75rem 1rem; }
+.row-icon { display: flex; width: 2.5rem; height: 2.5rem; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 50%; background: var(--guito-color-success-content); color: var(--guito-color-success); }
+.row-title { overflow-wrap: anywhere; font-size: 1rem; font-weight: 600; line-height: 1.375; }
+.row-meta { margin-top: .25rem; font-size: .75rem; font-weight: 400; line-height: 1.5; color: color-mix(in srgb, var(--guito-color-base-content) 60%, transparent); }
+.row-amount { flex-shrink: 0; text-align: right; font-size: 1rem; font-weight: 600; line-height: 1.25; letter-spacing: -.025em; color: var(--guito-color-error); }
+.review-action { height: 2.25rem; border-radius: var(--guito-radius-selector); padding-inline: 1.25rem; font-size: .875rem; font-weight: 400; box-shadow: none; }
+.view-tab { min-width: 8rem; border-radius: 9999px; padding: .75rem 1.25rem; font-size: .75rem; }
+@media (min-width: 64rem) {
+  .review-page { height: calc(100dvh - 9.5rem); padding: 2.5rem 3rem 2rem; }
+  .review-columns { grid-template-columns: 1.2fr 1fr; }
+  .review-column.is-inactive { display: flex; }
+  .review-scroll { scrollbar-width: thin; }
+  .history-column { padding-top: 3.5rem; }
+}
