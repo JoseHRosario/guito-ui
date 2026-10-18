@@ -1,6 +1,6 @@
-# Persistent human login — local verification and live gates
+# Persistent user login — local verification and live gates
 
-Companion to [ADR 0016](adr/0016-persistent-human-login.md) and
+Companion to [ADR 0016](adr/0016-persistent-user-login.md) and
 [API issue #156](https://github.com/JoseHRosario/guito-api/issues/156).
 UI version: **0.12.0**. This document describes source behavior and acceptance
 requirements; it is not a deployed-status claim.
@@ -23,7 +23,7 @@ when Google omitted renewal permission. No Google refresh token belongs in any
 browser response/storage, URL, log or screenshot.
 
 API prerequisites belong to the API release/runbook, not to UI provisioning:
-server-side session schema/migration, per-environment credential encryption key
+server-side user-session schema/migration, per-environment credential encryption key
 in the existing secret backend, allowed identity and OAuth configuration,
 explicit trusted UI origins, public-at-edge cookie endpoints, their own
 origin/header/content-type protections and credentialed CORS. Required cookie:
@@ -32,6 +32,15 @@ persistent Max-Age=604800 on success, with server-enforced idle expiry.
 Staging and production use distinct API hosts/cookies and secrets. Missing
 key/configuration must fail closed, never fall back to browser refresh tokens
 or plaintext storage.
+
+Review naming uses **user session**, not a new multi-user identity model. The
+paired API retains applied migration 011 and adds forward migration 012 to rename
+the table/indexes/constraints to `user_sessions` without changing session values.
+Its canonical setting is `UserSessionEncryptionKey`; the existing deployed
+`HumanSessionEncryptionKey` remains a validated legacy backend alias, not a new
+key. Either alone is supported; both must be valid and identical. Credential
+field migration/removal needs separate owner approval. No UI runtime or wire
+contract change is needed. See the [API runbook](https://github.com/JoseHRosario/guito-api/blob/feature/156-persistent-login/docs/persistent-human-login.md).
 
 Do not deploy just the UI against an old API and call persistent login working.
 Do not use the legacy `/Auth/logout` as a compatibility fallback: it revokes the

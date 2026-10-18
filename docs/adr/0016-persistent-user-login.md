@@ -1,8 +1,8 @@
-# 0016 — Persistent human login (guito-api#156)
+# 0016 — Persistent user login (guito-api#156)
 
 ## Decision
 
-The API owns an independent browser/device session with a rolling seven-day
+The API owns an independent browser/device **user session** with a rolling seven-day
 inactivity expiry, without an additional fixed maximum. Google ID-token
 validation on business routes is unchanged. The session cookie is **not**
 business authentication; the UI continues sending the same ID token in both
