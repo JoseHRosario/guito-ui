@@ -41,11 +41,16 @@ entries may stay. Its already-renamed table needs no drop if the schema/indexes
 match; the new filename runs harmless CREATE statements and is then recorded.
 Existing-schema mismatch is not repaired automatically: pause for José's manual
 cleanup decision, never delete ledger entries or drop tables as part of deployment.
-Its canonical setting is `UserSessionEncryptionKey`; the existing deployed
-`HumanSessionEncryptionKey` remains a validated legacy backend alias, not a new
-key. Either alone is supported; both must be valid and identical. Credential
-field migration/removal needs separate owner approval. No UI runtime or wire
-contract change is needed. See the [API runbook](https://github.com/JoseHRosario/guito-api/blob/feature/156-persistent-login/docs/persistent-human-login.md).
+The API now requires only `UserSessionEncryptionKey`, deserialized from the existing
+SSM JSON payload; missing/invalid canonical keys and old-only payloads fail closed.
+Before pushing/deploying the paired API source, José must separately approve
+renaming staging's historical `HumanSessionEncryptionKey` JSON field to
+`UserSessionEncryptionKey`, preserving its exact value and all unrelated fields
+and settings, removing the old field and privately verifying readback. This is not
+key rotation. Shared-staging replacement approval and deployed/rollback consumer
+compatibility remain required. No live credential operation is performed by this
+source/doc change, and no UI runtime or wire contract change is needed.
+See the [API runbook](https://github.com/JoseHRosario/guito-api/blob/feature/156-persistent-login/docs/persistent-human-login.md).
 
 Do not deploy just the UI against an old API and call persistent login working.
 Do not use the legacy `/Auth/logout` as a compatibility fallback: it revokes the
