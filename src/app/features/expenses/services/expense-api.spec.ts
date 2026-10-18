@@ -1,3 +1,4 @@
+import { provideRouter } from '@angular/router';
 import '@angular/compiler';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
@@ -25,11 +26,11 @@ describe('ExpenseApi.latest', () => {
     localStorage.removeItem(SESSION_STORAGE_KEY);
     localStorage.setItem(
       SESSION_STORAGE_KEY,
-      serializeSession({ idToken: 'id-token', accessToken: 'access', expiresAt: Date.now() + 3_600_000 }),
+      serializeSession({ idToken: 'id-token', accessToken: 'access', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3_600_000 }),
     );
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withInterceptors([authInterceptor])),
+        provideRouter([]), provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         { provide: APP_ENVIRONMENT, useValue: { ...TEST_ENV } },
       ],

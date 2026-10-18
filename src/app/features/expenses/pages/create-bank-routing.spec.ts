@@ -12,7 +12,7 @@ import { SESSION_STORAGE_KEY, serializeSession } from '../../../core/auth/auth-s
 
 afterEach(() => { sessionStorage.clear(); localStorage.removeItem(SESSION_STORAGE_KEY); });
 it('recreates Create on Bank query changes and guards pending context departures using production routes and reuse wiring', async () => {
-  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'stub', accessToken: 'stub', expiresAt: Date.now() + 3600000 }));
+  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'stub', accessToken: 'stub', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3600000 }));
   const reuse = appConfig.providers.find(provider => typeof provider === 'object' && 'provide' in provider && provider.provide === RouteReuseStrategy)!;
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter(routes), reuse, { provide: APP_ENVIRONMENT, useValue: { expenseTimestampsEnabled: true, apiBaseUrl: 'https://api.test' } }] });
   const harness = await RouterTestingHarness.create();

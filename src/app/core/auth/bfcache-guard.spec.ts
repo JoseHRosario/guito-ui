@@ -9,7 +9,7 @@ import { provideBfcacheGuard } from './bfcache-guard-initializer';
 
 const TEST_ENV = { production: false, googleClientId: 'cid', apiBaseUrl: 'https://api.test' };
 
-const auth = { isAuthenticated: vi.fn(() => false) };
+const auth = { isAuthenticated: vi.fn(() => false), ensureSession: vi.fn(async () => false) };
 
 /** Fresh seams per test: pageshow registration recorder + redirect spy. */
 function fakeRegistrar(): {
@@ -27,6 +27,7 @@ function fakeRegistrar(): {
 
 beforeEach(() => {
   auth.isAuthenticated.mockReturnValue(false);
+  auth.ensureSession.mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -36,28 +37,31 @@ afterEach(() => {
 });
 
 describe('guardBfcacheRestores (issue #39)', () => {
-  it('redirects to /signin when a bfcache restore lands unauthenticated', () => {
+  it('redirects to /signin when a bfcache restore lands unauthenticated', async () => {
     const registrar = fakeRegistrar();
     const redirect = vi.fn();
     guardBfcacheRestores(auth as unknown as AuthService, redirect, registrar.addListener);
 
     registrar.registered[0].fire({ persisted: true });
+    await Promise.resolve();
 
-    expect(redirect).toHaveBeenCalledWith('/signin');
+    expect(redirect).toHaveBeenCalledWith('/signin?returnUrl=%2F');
   });
 
-  it('does not redirect an authenticated bfcache restore', () => {
+  it('does not redirect an authenticated bfcache restore', async () => {
     auth.isAuthenticated.mockReturnValue(true);
+    auth.ensureSession.mockResolvedValue(true);
     const registrar = fakeRegistrar();
     const redirect = vi.fn();
     guardBfcacheRestores(auth as unknown as AuthService, redirect, registrar.addListener);
 
     registrar.registered[0].fire({ persisted: true });
+    await Promise.resolve();
 
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it('ignores ordinary (non-bfcache) pageshow events', () => {
+  it('ignores ordinary (non-bfcache) pageshow events', async () => {
     const registrar = fakeRegistrar();
     const redirect = vi.fn();
     guardBfcacheRestores(auth as unknown as AuthService, redirect, registrar.addListener);
@@ -67,7 +71,7 @@ describe('guardBfcacheRestores (issue #39)', () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it('registers exactly one pageshow listener', () => {
+  it('registers exactly one pageshow listener', async () => {
     const registrar = fakeRegistrar();
     guardBfcacheRestores(auth as unknown as AuthService, vi.fn(), registrar.addListener);
     expect(registrar.registered.map((r) => r.type)).toEqual(['pageshow']);
@@ -92,7 +96,10 @@ describe('provideBfcacheGuard (app initializer wiring)', () => {
 
   it('fires the redirect through the real router when restored unauthenticated', async () => {
     let pageshowHandler: ((event: { persisted: boolean }) => void) | undefined;
-    vi.spyOn(window, 'addEventListener').mockImplementation(((type: string, fn: (event: { persisted: boolean }) => void) => {
+    vi.spyOn(window, 'addEventListener').mockImplementation(((
+      type: string,
+      fn: (event: { persisted: boolean }) => void,
+    ) => {
       if (type === 'pageshow') pageshowHandler = fn;
     }) as never);
     TestBed.configureTestingModule({
@@ -111,6 +118,23 @@ describe('provideBfcacheGuard (app initializer wiring)', () => {
     pageshowHandler!({ persisted: true } as PageTransitionEvent);
     await Promise.resolve();
 
-    expect(navigate).toHaveBeenCalledWith('/signin', { replaceUrl: true });
+    expect(navigate).toHaveBeenCalledWith('/signin?returnUrl=%2F', { replaceUrl: true });
   });
+});
+
+it('a temporary bfcache renewal failure routes to the retry card retaining the requested URL', async () => {
+  auth.ensureSession.mockRejectedValueOnce(new Error('offline'));
+  const registrar = fakeRegistrar();
+  const redirect = vi.fn();
+  guardBfcacheRestores(
+    auth as unknown as AuthService,
+    redirect,
+    registrar.addListener,
+    () => '/expenses/create?source=back',
+  );
+  registrar.registered[0].fire({ persisted: true });
+  await Promise.resolve();
+  expect(redirect).toHaveBeenCalledWith(
+    '/auth/renew?returnUrl=%2Fexpenses%2Fcreate%3Fsource%3Dback',
+  );
 });

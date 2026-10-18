@@ -20,7 +20,9 @@ import {
       <div class="flex min-h-dvh items-center justify-center p-6" data-testid="auth-error">
         <div class="card w-full max-w-sm bg-base-100 shadow">
           <div class="card-body">
-            <h2 class="card-title text-error">Sign-in failed</h2>
+            <h2 class="card-title text-error">
+              {{ renew() ? 'Connection failed' : 'Sign-in failed' }}
+            </h2>
             <p>{{ err }}</p>
             <div class="card-actions justify-end">
               <button class="btn btn-primary" type="button" (click)="retry()">Try again</button>
@@ -35,12 +37,13 @@ import {
     }
   `,
 })
-
 export class AuthCallback {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   /** Query params bound via withComponentInputBinding (defaults per AGENTS rule). */
+  readonly renew = input(false);
+  readonly returnUrl = input<string>('/');
   readonly code = input<string>('');
   readonly state = input<string>('');
   readonly error = input<string>('');
@@ -52,6 +55,13 @@ export class AuthCallback {
   constructor() {
     // Runs once when the router-bound query params land (code/state or error).
     effect(() => {
+      if (this.renew()) {
+        if (!this.started) {
+          this.started = true;
+          void this.resume();
+        }
+        return;
+      }
       if (this.code() === '' && this.error() === '') return;
       if (this.started) return;
       this.started = true;
@@ -66,10 +76,12 @@ export class AuthCallback {
       return;
     }
     try {
-      const returnUrl = this.safeReturnUrl(await this.auth.completeSignIn({
-        code: this.code(),
-        state: this.state(),
-      }));
+      const returnUrl = this.safeReturnUrl(
+        await this.auth.completeSignIn({
+          code: this.code(),
+          state: this.state(),
+        }),
+      );
       await this.router.navigateByUrl(returnUrl, { replaceUrl: true });
     } catch (cause) {
       if (cause instanceof StaleSignInError) {
@@ -89,7 +101,7 @@ export class AuthCallback {
   /**
    * Popup-mode branch: this page is running inside the sign-in popup, so it
    * doesn't exchange anything — it posts the code back to the opener (the
-   * main window validates origin + source) and closes itself. Returns true
+   * main window validates origin + source) and the opener closes it after acceptance. Returns true
    * when the handoff was performed.
    */
   private handoffToOpener(): boolean {
@@ -104,12 +116,33 @@ export class AuthCallback {
       },
       location.origin,
     );
-    window.close();
+    // The opener closes after consuming the handoff. Closing here races its
+    // abandoned-popup poll against queued postMessage delivery under load.
     return true;
   }
 
   retry(): void {
+    if (this.renew()) {
+      void this.resume();
+      return;
+    }
     void this.auth.signIn('/');
+  }
+
+  private async resume(): Promise<void> {
+    this.message.set('');
+    const target = this.safeReturnUrl(this.returnUrl() ?? '/');
+    try {
+      if (await this.auth.ensureSession())
+        await this.router.navigateByUrl(target, { replaceUrl: true });
+      else
+        await this.router.navigate(['/signin'], {
+          queryParams: { returnUrl: target },
+          replaceUrl: true,
+        });
+    } catch {
+      this.message.set('Could not renew your session. Check your connection and try again.');
+    }
   }
 
   /** Only navigate to relative paths — an absolute/foreign returnUrl is an open-redirect vector. */
@@ -117,4 +150,3 @@ export class AuthCallback {
     return url.startsWith('/') && !url.startsWith('//') ? url : '/';
   }
 }
-

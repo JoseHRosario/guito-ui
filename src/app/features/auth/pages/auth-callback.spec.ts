@@ -84,7 +84,7 @@ describe('AuthCallback', () => {
     expect(el.querySelector('[data-testid="auth-error"]')).toBeNull();
   });
 
-  it('hands the code to the opener window and closes itself when running inside the popup', async () => {
+  it('hands the code to the opener and lets the opener close after accepting the message', async () => {
     const opener = { postMessage: vi.fn() };
     Object.defineProperty(window, 'opener', { configurable: true, value: opener });
     const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {});
@@ -95,7 +95,7 @@ describe('AuthCallback', () => {
         location.origin,
       );
       expect(auth.completeSignIn).not.toHaveBeenCalled();
-      expect(closeSpy).toHaveBeenCalled();
+      expect(closeSpy).not.toHaveBeenCalled();
     } finally {
       Object.defineProperty(window, 'opener', { configurable: true, value: null });
       closeSpy.mockRestore();

@@ -15,7 +15,7 @@ let http: HttpTestingController;
 let harness: RouterTestingHarness;
 const detail = { id: 7, amount: '-65.5500', description: 'Veggies and fruit', category: 'Groceries', bookingDate: '2026-07-02T05:45:27.123456+05:30', currency: 'EUR', revision: '1' };
 beforeEach(async () => {
-  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'test', accessToken: 'test', expiresAt: Date.now() + 3600000 }));
+  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'test', accessToken: 'test', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3600000 }));
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter(routes), { provide: APP_ENVIRONMENT, useValue: { apiBaseUrl: 'https://api.test', googleClientId: 'test' } }] });
   http = TestBed.inject(HttpTestingController);
   harness = await RouterTestingHarness.create();

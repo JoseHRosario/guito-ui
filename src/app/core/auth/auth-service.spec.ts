@@ -10,25 +10,19 @@ const TEST_ENV = {
 };
 
 const AUTHORIZE_HOST = 'https://accounts.google.com/o/oauth2/v2/auth';
-const EXCHANGE_URL = 'https://api.example.com/Auth/token';
+const EXCHANGE_URL = 'https://api.example.com/Auth/session/token';
 
 function serviceWithStorage(storage: Record<string, string>) {
-  vi.stubGlobal(
-    'localStorage',
-    {
-      getItem: (k: string) => storage[k] ?? null,
-      setItem: (k: string, v: string) => (storage[k] = v),
-      removeItem: (k: string) => delete storage[k],
-    },
-  );
-  vi.stubGlobal(
-    'sessionStorage',
-    {
-      getItem: (k: string) => storage['session:' + k] ?? null,
-      setItem: (k: string, v: string) => (storage['session:' + k] = v),
-      removeItem: (k: string) => delete storage['session:' + k],
-    },
-  );
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => storage[k] ?? null,
+    setItem: (k: string, v: string) => (storage[k] = v),
+    removeItem: (k: string) => delete storage[k],
+  });
+  vi.stubGlobal('sessionStorage', {
+    getItem: (k: string) => storage['session:' + k] ?? null,
+    setItem: (k: string, v: string) => (storage['session:' + k] = v),
+    removeItem: (k: string) => delete storage['session:' + k],
+  });
   return TestBed.configureTestingModule({
     providers: [{ provide: APP_ENVIRONMENT, useValue: TEST_ENV }],
   }).inject(AuthService);
@@ -49,6 +43,7 @@ function okTokenResponse() {
       idToken: 'new.id.token',
       accessToken: 'new.at',
       expiresIn: 3600,
+      sessionExpiresAt: '2099-01-01T00:00:00Z',
     }),
     { status: 200 },
   );
@@ -78,7 +73,10 @@ beforeEach(() => {
     href: 'https://app.example.com/some/route',
     assign,
   });
-  vi.stubGlobal('fetch', vi.fn(async () => okTokenResponse()));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => okTokenResponse()),
+  );
   // Default: no popup available → the full-page redirect fallback runs, which
   // is what the existing signIn expectations (location.assign) describe.
   openFn = vi.fn(() => null);
@@ -96,6 +94,9 @@ describe('AuthService initialization', () => {
       'guito.auth.session': JSON.stringify({
         idToken: 'id',
         accessToken: 'at',
+        persistent: true,
+        sessionExpiresAt: '2099-01-01T00:00:00Z',
+        refreshedAt: Date.now(),
         expiresAt: Date.now() + 60_000,
       }),
     });
@@ -108,6 +109,9 @@ describe('AuthService initialization', () => {
       'guito.auth.session': JSON.stringify({
         idToken: 'id',
         accessToken: 'at',
+        persistent: true,
+        sessionExpiresAt: '2099-01-01T00:00:00Z',
+        refreshedAt: Date.now(),
         expiresAt: Date.now() - 1_000,
       }),
     });
@@ -152,9 +156,17 @@ describe('AuthService.signIn — popup flow (issue #36 desktop Back)', () => {
     const pkce = JSON.parse(storage['session:guito.auth.pkce']);
 
     // Wrong origin and wrong source: must be ignored, sign-in keeps waiting.
-    postFromPopup(popup, { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state }, 'https://evil.example.com');
+    postFromPopup(
+      popup,
+      { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state },
+      'https://evil.example.com',
+    );
     const wrongWindow = fakePopup();
-    postFromPopup(wrongWindow, { source: 'guito-auth-popup-handoff', code: 'x', state: pkce.state });
+    postFromPopup(wrongWindow, {
+      source: 'guito-auth-popup-handoff',
+      code: 'x',
+      state: pkce.state,
+    });
 
     postFromPopup(popup, { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state });
     await startPromise;
@@ -177,7 +189,10 @@ describe('AuthService.signIn — popup flow (issue #36 desktop Back)', () => {
   it('redirects straight to the full-page flow in standalone (installed PWA) mode', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    );
     const popup = fakePopup();
     openFn.mockReturnValue(popup);
 
@@ -226,7 +241,10 @@ describe('AuthService.signIn — popup flow (issue #36 desktop Back)', () => {
     const auth = serviceWithStorage(storage);
     const popup = fakePopup();
     openFn.mockReturnValue(popup);
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('nope', { status: 500 })),
+    );
 
     const startPromise = auth.signIn();
     await vi.waitFor(() => expect(openFn).toHaveBeenCalledTimes(1));
@@ -257,6 +275,9 @@ describe('AuthService.signIn', () => {
     expect(url.searchParams.get('client_id')).toBe(TEST_ENV.googleClientId);
     expect(url.searchParams.get('redirect_uri')).toBe('https://app.example.com/auth/callback');
     expect(url.searchParams.get('scope')).toBe('openid email profile');
+    expect(url.searchParams.get('access_type')).toBe('offline');
+    expect(url.searchParams.get('prompt')).toBe('consent');
+    expect(url.searchParams.has('include_granted_scopes')).toBe(false);
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(url.searchParams.get('code_challenge')).toBeTruthy();
     expect(url.searchParams.get('state')).toBe(pkce.state);
@@ -286,7 +307,14 @@ describe('AuthService.completeSignIn', () => {
     expect(storage['session:guito.auth.pkce']).toBeUndefined();
 
     const fetchMock = vi.mocked(fetch);
-    expect(fetchMock).toHaveBeenCalledWith(EXCHANGE_URL, expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      EXCHANGE_URL,
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Guito-Session': '1' },
+      }),
+    );
     const body = JSON.parse(fetchMock.mock.calls[0][1]!.body as string);
     expect(body).toEqual({
       code: 'abc',
@@ -302,9 +330,9 @@ describe('AuthService.completeSignIn', () => {
     const auth = serviceWithStorage(storage);
     await auth.signIn('/expenses');
 
-    await expect(
-      auth.completeSignIn({ code: 'abc', state: 'forged-state' }),
-    ).rejects.toThrowError(/state/i);
+    await expect(auth.completeSignIn({ code: 'abc', state: 'forged-state' })).rejects.toThrowError(
+      /state/i,
+    );
     expect(fetch).not.toHaveBeenCalled();
     expect(storage['guito.auth.session']).toBeUndefined();
   });
@@ -341,15 +369,21 @@ describe('AuthService.completeSignIn', () => {
     const pkce = JSON.parse(storage['session:guito.auth.pkce']);
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response(
-        JSON.stringify({ error: 'invalid_grant', error_description: 'code was already redeemed' }),
-        { status: 400 },
-      )),
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: 'invalid_grant',
+              error_description: 'code was already redeemed',
+            }),
+            { status: 400 },
+          ),
+      ),
     );
 
-    await expect(
-      auth.completeSignIn({ code: 'abc', state: pkce.state }),
-    ).rejects.toThrowError(/invalid_grant/);
+    await expect(auth.completeSignIn({ code: 'abc', state: pkce.state })).rejects.toThrowError(
+      /invalid_grant/,
+    );
     expect(storage['guito.auth.session']).toBeUndefined();
   });
 
@@ -363,14 +397,14 @@ describe('AuthService.completeSignIn', () => {
       vi.fn(async () => new Response('Internal Server Error', { status: 502 })),
     );
 
-    await expect(
-      auth.completeSignIn({ code: 'abc', state: pkce.state }),
-    ).rejects.toThrowError(/502/);
+    await expect(auth.completeSignIn({ code: 'abc', state: pkce.state })).rejects.toThrowError(
+      /502/,
+    );
   });
 });
 
 describe('AuthService.signOut', () => {
-  it('clears the persisted session and the auth state, then revokes the Google access token (guito-api#64)', async () => {
+  it('clears local state immediately and logs out only the device cookie session', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
     await auth.signIn();
@@ -385,26 +419,27 @@ describe('AuthService.signOut', () => {
     expect(auth.session()).toBeNull();
     expect(storage['guito.auth.session']).toBeUndefined();
     const fetchMock = vi.mocked(fetch);
-    const logoutCall = fetchMock.mock.calls.find(([u]) => u === 'https://api.example.com/Auth/logout');
+    const logoutCall = fetchMock.mock.calls.find(
+      ([u]) => u === 'https://api.example.com/Auth/session/logout',
+    );
     expect(logoutCall).toBeTruthy();
     const [, init] = logoutCall!;
     expect(init?.method).toBe('POST');
-    // Both headers carry the ID TOKEN (edge authorizer contract); the access
-    // token rides in the body — it's the one being revoked.
-    expect(init?.headers).toEqual(expect.objectContaining({
-      Authorization: 'Bearer new.id.token',
-      'x-google-idtoken': 'new.id.token',
-    }));
-    expect(JSON.parse(init?.body as string)).toEqual({ accessToken: 'new.at' });
+    expect(init?.credentials).toBe('include');
+    expect(init?.headers).toEqual({ 'Content-Type': 'application/json', 'X-Guito-Session': '1' });
+    expect(init?.body).toBe('{}');
   });
 
-  it('still signs out locally when the revocation endpoint is unreachable or fails', async () => {
+  it('still signs out locally when the device logout endpoint is unreachable or fails', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
     await auth.signIn();
     const pkce = JSON.parse(storage['session:guito.auth.pkce']);
     await auth.completeSignIn({ code: 'abc', state: pkce.state });
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('nope', { status: 500 })),
+    );
 
     expect(auth.signOut()).toBe('/signin');
     expect(auth.isAuthenticated()).toBe(false);
@@ -413,9 +448,26 @@ describe('AuthService.signOut', () => {
     expect(storage['guito.auth.session']).toBeUndefined();
   });
 
-  it('returns the /signin redirect target without revoking when signed out with no session', () => {
+  it('logs out the cookie even when local short-lived tokens are missing', () => {
     const auth = serviceWithStorage({});
     expect(auth.signOut()).toBe('/signin');
-    expect(fetch).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.example.com/Auth/session/logout',
+      expect.objectContaining({ credentials: 'include' }),
+    );
   });
+});
+
+it('rejects a pending callback cancelled by another tab logout before issuing an exchange', async () => {
+  const storage: Record<string, string> = {};
+  const auth = serviceWithStorage(storage);
+  await auth.signIn('/expenses/create');
+  const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+  storage['guito.auth.epoch'] = 'another-tab-logout';
+  storage['guito.auth.signed-out'] = '1';
+  await expect(auth.completeSignIn({ code: 'late-code', state: pkce.state })).rejects.toThrow(
+    StaleSignInError,
+  );
+  expect(fetch).not.toHaveBeenCalled();
+  expect(storage['guito.auth.session']).toBeUndefined();
 });

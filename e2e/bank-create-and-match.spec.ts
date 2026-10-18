@@ -9,7 +9,7 @@ async function setup(page: Page, mode: 'success' | 'unknown' = 'success', sugges
   const reads: string[] = [];
   let matched = false;
 
-  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'test-id', accessToken: 'test-access', expiresAt: Date.now() + 3600000 })), SESSION_KEY);
+  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'test-id', accessToken: 'test-access', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3600000 })), SESSION_KEY);
   await page.route('**/Expense**', route => route.fulfill({ status: 501, body: 'Unexpected Expense request' }));
   await page.route('**/BankTransaction**', route => route.fulfill({ status: 501, body: 'Unexpected Bank request' }));
   await page.route('**/Category', route => route.fulfill({ json: { categories: [{ name: 'Shopping' }, { name: 'Travel' }] } }));

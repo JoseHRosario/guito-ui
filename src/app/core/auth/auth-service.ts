@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { APP_ENVIRONMENT } from '../app-environment';
 import {
   AuthSession,
@@ -8,7 +8,6 @@ import {
   SESSION_STORAGE_KEY,
 } from './auth-session';
 import { codeChallenge, createCodeVerifier, generateState } from './pkce';
-import { revokeAccessToken } from './revoke-access-token';
 
 /** Thrown for any sign-in failure the callback component should surface. */
 export class AuthError extends Error {}
@@ -26,6 +25,10 @@ const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const PKCE_STORAGE_KEY = 'guito.auth.pkce';
 const AUTH_CALLBACK_PATH = '/auth/callback';
 const SIGN_OUT_REDIRECT = '/signin';
+const SIGNED_OUT_KEY = 'guito.auth.signed-out';
+const EPOCH_KEY = 'guito.auth.epoch';
+const SESSION_LOCK = 'guito-auth-session';
+const FOREGROUND_COALESCE_MS = 60_000;
 
 // Popup sign-in (issue #36): desktop browsers open Google in a popup so the
 // main window's history never gains a Google entry and Back after sign-in
@@ -43,6 +46,7 @@ interface PendingSignIn {
   verifier: string;
   state: string;
   returnUrl: string;
+  epoch: string;
 }
 
 /** The popup went away without completing (user closed it) — abort, no fallback. */
@@ -62,8 +66,7 @@ async function exchangeFailureMessage(response: Response): Promise<string> {
       error_description?: unknown;
     };
     const error = typeof body.error === 'string' ? body.error : '';
-    const description =
-      typeof body.error_description === 'string' ? body.error_description : '';
+    const description = typeof body.error_description === 'string' ? body.error_description : '';
     if (!error && !description) return base;
     return [error, description].filter(Boolean).join(' — ');
   } catch {
@@ -74,7 +77,7 @@ async function exchangeFailureMessage(response: Response): Promise<string> {
 /**
  * Google OAuth 2.0 + PKCE authorization-code flow (no implicit flow, no secret
  * — the web client is a public client). Auth state is a signal persisted to
- * localStorage so it survives reloads; expired tokens force re-auth.
+ * localStorage as a short-lived cache; the server cookie owns renewal/expiry.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -86,7 +89,7 @@ export class AuthService {
   readonly session = signal<AuthSession | null>(readPersistedSession());
   readonly isAuthenticated = computed(() => {
     const s = this.session();
-    return s !== null && !isExpired(s);
+    return s?.persistent === true && !isExpired(s) && !localStorage.getItem(SIGNED_OUT_KEY);
   });
 
   /**
@@ -103,13 +106,16 @@ export class AuthService {
    * initiated (the caller must not navigate); the pending PKCE pair is kept
    * so the /auth/callback redirect can complete the flow.
    *
-   * Rejects only when the user abandons the popup (closed without completing).
+   * Rejects when abandoned or superseded by a newer browser login/logout.
    */
   async signIn(returnUrl: string = '/'): Promise<string | undefined> {
+    const epoch = crypto.randomUUID();
+    localStorage.setItem(EPOCH_KEY, epoch);
     const pending: PendingSignIn = {
       verifier: createCodeVerifier(),
       state: generateState(),
       returnUrl,
+      epoch,
     };
     sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(pending));
     this.pending.set(pending);
@@ -135,7 +141,8 @@ export class AuthService {
       }
       // A failed exchange or malformed handoff: the full-page redirect's
       // error-card UX already handles every failure mode.
-      this.clearPending();
+      if (this.pending()?.epoch !== localStorage.getItem(EPOCH_KEY))
+        throw new AuthError('Sign-in was cancelled.');
       this.closeSignInPopup(popup);
       location.assign(authorizeUrl);
       return undefined;
@@ -222,6 +229,8 @@ export class AuthService {
       state: pending.state,
       code_challenge: await codeChallenge(pending.verifier),
       code_challenge_method: 'S256',
+      access_type: 'offline',
+      prompt: 'consent',
     });
     return `${AUTHORIZE_URL}?${params}`;
   }
@@ -232,6 +241,7 @@ export class AuthService {
    * returnUrl to route to; rejects with `AuthError` on any failure.
    */
   async completeSignIn(params: Record<string, string>): Promise<string> {
+    const epoch = localStorage.getItem(EPOCH_KEY);
     const pending = this.pending();
     if (!pending) {
       // No code/error variant distinction matters: any callback without the
@@ -241,6 +251,10 @@ export class AuthService {
       throw new StaleSignInError('No sign-in in progress — stale callback');
     }
 
+    if (pending.epoch !== epoch) {
+      this.clearPending();
+      throw new StaleSignInError('Sign-in was cancelled in another tab.');
+    }
     const error = params['error'];
     if (error) {
       this.clearPending();
@@ -257,14 +271,20 @@ export class AuthService {
     // ship in the browser bundle — the API adds client_id + client_secret.
     let tokenResponse: Response;
     try {
-      tokenResponse = await fetch(`${this.env.apiBaseUrl}/Auth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: params['code'] ?? '',
-          codeVerifier: pending.verifier,
-          redirectUri: this.redirectUri(),
-        }),
+      tokenResponse = await this.withSessionLock(() => {
+        if (epoch !== localStorage.getItem(EPOCH_KEY))
+          throw new AuthError('Sign-in was cancelled.');
+        return fetch(`${this.env.apiBaseUrl}/Auth/session/token`, {
+          method: 'POST',
+          credentials: 'include',
+          signal: AbortSignal.timeout(15_000),
+          headers: { 'Content-Type': 'application/json', 'X-Guito-Session': '1' },
+          body: JSON.stringify({
+            code: params['code'] ?? '',
+            codeVerifier: pending.verifier,
+            redirectUri: this.redirectUri(),
+          }),
+        });
       });
     } catch (cause) {
       throw new AuthError('Could not reach the token exchange endpoint', { cause });
@@ -273,42 +293,158 @@ export class AuthService {
       throw new AuthError(await exchangeFailureMessage(tokenResponse));
     }
 
-    const tokens: unknown = await tokenResponse.json();
-    const { idToken, accessToken, expiresIn } = tokens as Record<string, unknown>;
-    if (typeof idToken !== 'string' || typeof accessToken !== 'string' || typeof expiresIn !== 'number') {
-      this.clearPending();
-      throw new AuthError('Token exchange response was malformed');
-    }
-
+    const session = await this.readTokenResponse(tokenResponse);
+    if (epoch !== localStorage.getItem(EPOCH_KEY)) throw new AuthError('Sign-in was cancelled.');
     this.clearPending();
-    this.setSession({
-      idToken: idToken,
-      accessToken: accessToken,
-      expiresAt: Date.now() + expiresIn * 1000,
-    });
+    localStorage.removeItem(SIGNED_OUT_KEY);
+    this.setSession(session);
     return pending.returnUrl;
   }
 
-  /**
-   * Clear auth state (localStorage + signal) and revoke the session's Google
-   * access token server-side (guito-api#64: POST /Auth/logout collapses the
-   * copied-token validity window to ~0). Fire-and-forget: a failed/unreachable
-   * endpoint NEVER blocks or delays the local sign-out. Returns the redirect
-   * target.
-   */
+  /** Clear this browser immediately; never revoke the shared Google grant. */
   signOut(): string {
-    const session = this.session();
-    if (session !== null) {
-      // Headers carry the ID TOKEN (edge authorizer validates it); the ACCESS
-      // token rides in the body — it's the one being revoked (guito-api#64).
-      void revokeAccessToken(this.env.apiBaseUrl, session.idToken, session.accessToken, fetch).then(
-        () => undefined,
-        () => undefined,
-      );
-    }
+    localStorage.setItem(SIGNED_OUT_KEY, '1');
+    localStorage.setItem(EPOCH_KEY, crypto.randomUUID());
+    this.clearPending();
     localStorage.removeItem(SESSION_STORAGE_KEY);
     this.session.set(null);
+    void this.withSessionLock(() => this.sessionRequest('logout')).catch(() => undefined);
     return SIGN_OUT_REDIRECT;
+  }
+
+  hasPendingSignIn(): boolean {
+    return this.pending() !== null;
+  }
+
+  /** Only a bounded cache of a successful foreground renewal can skip networking. */
+  isSessionReady(): boolean {
+    const session = readPersistedSession();
+    this.session.set(session);
+    return (
+      !localStorage.getItem(SIGNED_OUT_KEY) && session?.persistent === true && this.isFresh(session)
+    );
+  }
+
+  private renewal: Promise<boolean> | undefined;
+
+  constructor() {
+    const onStorage = (event: StorageEvent): void => {
+      if (![SESSION_STORAGE_KEY, SIGNED_OUT_KEY, EPOCH_KEY, null].includes(event.key)) return;
+      this.session.set(readPersistedSession());
+    };
+    window.addEventListener('storage', onStorage);
+    inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', onStorage));
+  }
+
+  /** Bootstrap, foreground and request gate. No timer and no business replay. */
+  ensureSession(): Promise<boolean> {
+    if (localStorage.getItem(SIGNED_OUT_KEY)) {
+      this.session.set(null);
+      return Promise.resolve(false);
+    }
+    const cached = readPersistedSession();
+    this.session.set(cached);
+    // Legacy token-only clients need one explicit consent/login, not a pretend cookie.
+    if (cached?.persistent !== true) return Promise.resolve(false);
+    if (document.visibilityState === 'hidden')
+      return Promise.reject(new AuthError('Return to Guito to renew your session.'));
+    if (this.isFresh(cached)) return Promise.resolve(true);
+    if (this.renewal) return this.renewal;
+    const epoch = localStorage.getItem(EPOCH_KEY);
+    const operation = this.withSessionLock(async () => {
+      if (!this.isCurrent(epoch)) return false;
+      const shared = readPersistedSession();
+      // A second tab may have renewed while this tab waited for the Web Lock.
+      if (shared?.persistent && this.isFresh(shared) && shared.refreshedAt !== cached.refreshedAt) {
+        this.session.set(shared);
+        return true;
+      }
+      let response: Response;
+      try {
+        response = await this.sessionRequest('refresh');
+      } catch (cause) {
+        if (!this.isCurrent(epoch)) return false;
+        throw new AuthError('Could not renew your session. Check your connection and try again.', {
+          cause,
+        });
+      }
+      if (!this.isCurrent(epoch)) return false;
+      if (response.status === 401) {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        this.session.set(null);
+        return false;
+      }
+      if (!response.ok) throw new AuthError('Could not renew your session. Please try again.');
+      const renewed = await this.readTokenResponse(response);
+      if (!this.isCurrent(epoch)) return false;
+      this.setSession(renewed);
+      return true;
+    });
+    this.renewal = operation;
+    void operation
+      .finally(() => {
+        if (this.renewal === operation) this.renewal = undefined;
+      })
+      .catch(() => undefined);
+    return operation;
+  }
+
+  private isFresh(session: AuthSession): boolean {
+    const age = Date.now() - (session.refreshedAt ?? 0);
+    return (
+      !isExpired(session) &&
+      age >= 0 &&
+      age < FOREGROUND_COALESCE_MS &&
+      Date.parse(session.sessionExpiresAt ?? '') > Date.now()
+    );
+  }
+
+  private isCurrent(epoch: string | null): boolean {
+    return epoch === localStorage.getItem(EPOCH_KEY) && !localStorage.getItem(SIGNED_OUT_KEY);
+  }
+
+  private sessionRequest(action: 'refresh' | 'logout'): Promise<Response> {
+    return fetch(`${this.env.apiBaseUrl}/Auth/session/${action}`, {
+      method: 'POST',
+      credentials: 'include',
+      signal: AbortSignal.timeout(15_000),
+      headers: { 'Content-Type': 'application/json', 'X-Guito-Session': '1' },
+      body: '{}',
+    });
+  }
+
+  private withSessionLock<T>(operation: () => Promise<T>): Promise<T> {
+    // Web Locks serialize cookie mutations across same-origin tabs. Generation
+    // checks still protect local state on browsers without Web Locks.
+    return navigator.locks ? navigator.locks.request(SESSION_LOCK, operation) : operation();
+  }
+
+  private async readTokenResponse(response: Response): Promise<AuthSession> {
+    const { idToken, accessToken, expiresIn, sessionExpiresAt } = (await response.json()) as Record<
+      string,
+      unknown
+    >;
+    if (
+      typeof idToken !== 'string' ||
+      !idToken ||
+      typeof accessToken !== 'string' ||
+      !accessToken ||
+      typeof expiresIn !== 'number' ||
+      !Number.isFinite(expiresIn) ||
+      expiresIn <= 30 ||
+      typeof sessionExpiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(sessionExpiresAt))
+    ) {
+      throw new AuthError('Session response was malformed. Please try again.');
+    }
+    return {
+      idToken,
+      accessToken,
+      expiresAt: Date.now() + expiresIn * 1000,
+      persistent: true,
+      sessionExpiresAt,
+      refreshedAt: Date.now(),
+    };
   }
 
   private setSession(session: AuthSession): void {

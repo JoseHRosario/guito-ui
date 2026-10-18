@@ -8,7 +8,7 @@ const STUB_PENDING = [
   { id: 9, accountUid: 'test-account', bookingDate: '2026-10-01', amount: '200', currency: 'EUR', status: 'BOOK', reviewStatus: 'matched', remittanceInformation: 'TRF MB WAY PARA MARIA S', suggestedCategory: null, linkedExpense: { id: 12, bookingDate: '2026-10-01T23:30:00+00:00', amount: '200', currency: 'EUR', description: 'Expense paid', category: 'Bills' } },
 ];
 async function seedSession(page: Page): Promise<void> {
-  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', expiresAt: Date.now() + 3_600_000 })), SESSION_KEY);
+  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3_600_000 })), SESSION_KEY);
 }
 // A JavaScript fixture cannot represent Int64.MaxValue as a Number. Emit the
 // literal numeric token used by .NET, rather than hiding precision loss with strings.

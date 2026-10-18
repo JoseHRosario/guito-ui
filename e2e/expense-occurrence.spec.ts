@@ -12,7 +12,7 @@ for (const [name, viewport, date, offset] of [
   test(`${name}: ${process.env['GUITO_TIMESTAMPS_ENABLED'] !== 'false' ? 'timestamp capability, Lisbon/DST and exact save' : 'legacy capability date-only exact save'}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.clock.setFixedTime(new Date('2026-07-01T23:15:42Z'));
-    await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub-id', accessToken: 'stub-access', expiresAt: Date.now() + 3600000 })), SESSION_KEY);
+    await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub-id', accessToken: 'stub-access', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3600000 })), SESSION_KEY);
     await stubExpensesApi(page);
     await page.route('**/Category', route => route.fulfill({ json: { categories: [{ name: 'Clothing' }] } }));
     await page.goto('/expenses/create');

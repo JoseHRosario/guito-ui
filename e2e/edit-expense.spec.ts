@@ -7,7 +7,7 @@ const field = (page: Page, name: string) => page.locator(`input[id$="-${name}"]:
 const action = (page: Page, name: string) => page.getByRole('button', { name, exact: true }).filter({ visible: true });
 
 async function setup(page: Page) {
-  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub', accessToken: 'stub', expiresAt: Date.now() + 3600000 })), SESSION_KEY);
+  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub', accessToken: 'stub', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3600000 })), SESSION_KEY);
   // Every remote request is intercepted; no live API or financial mutations.
   await page.route('https://**', route => route.abort());
   await page.route('**/Category', route => route.fulfill({ json: { categories: [{ name: 'Groceries' }, { name: 'Restaurants' }] } }));
