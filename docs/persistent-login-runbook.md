@@ -34,8 +34,13 @@ key/configuration must fail closed, never fall back to browser refresh tokens
 or plaintext storage.
 
 Review naming uses **user session**, not a new multi-user identity model. The
-paired API retains applied migration 011 and adds forward migration 012 to rename
-the table/indexes/constraints to `user_sessions` without changing session values.
+paired API follows José's one-migration decision for the unmerged feature:
+`011_user_sessions.sql` directly creates `user_sessions` and its expiry index with
+`IF NOT EXISTS`; there is no rename migration. Staging's historical 011/012 ledger
+entries may stay. Its already-renamed table needs no drop if the schema/indexes
+match; the new filename runs harmless CREATE statements and is then recorded.
+Existing-schema mismatch is not repaired automatically: pause for José's manual
+cleanup decision, never delete ledger entries or drop tables as part of deployment.
 Its canonical setting is `UserSessionEncryptionKey`; the existing deployed
 `HumanSessionEncryptionKey` remains a validated legacy backend alias, not a new
 key. Either alone is supported; both must be valid and identical. Credential
