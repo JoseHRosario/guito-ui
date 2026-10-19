@@ -36,13 +36,28 @@ cancelled login from overriding later logout/login.
   30-second safety margin, old/future renewal timestamps or an elapsed server
   expiry hint force server consultation; old caches cannot extend seven-day
   expiry. The server remains authoritative, not a client seven-day timer.
-- No periodic keepalive or hidden-tab renewal exists. Cookie endpoint fetches
-  time out after 15 seconds. A previously valid recent token may still serve an
+- No periodic keepalive or hidden-tab renewal exists. Session HTTP fetches
+  (initial exchange, refresh and best-effort logout) time out after **35 seconds**:
+  API session budget **25s**, gateway/host **30s**, browser **35s**. Unrelated
+  business requests keep their existing deadlines. A previously valid recent token may still serve an
   already-initiated business request; that does not extend server inactivity.
 - Network failures, 502/503 and malformed successful renewal responses retain
   credentials. Bootstrap/foreground failures reuse the existing auth error card
   at `/auth/renew?returnUrl=…`, with **Try again**, rather than sending the user
   to Google. Pre-request renewal failures reach existing feature error regions.
+- HTTP 503 `service_starting` is the paired API's explicit readiness failure
+  **before** the Google exchange. The existing callback error card displays
+  **Service starting** and permits only a deliberate **Try again** of that
+  pending callback. Generic 5xx, network/CORS failure, timeout or malformed
+  success do not prove the code was unused: retain pending route/state but mark
+  the exchange attempted, including across reload, and restart Google on user
+  retry instead of resending the code. No automatic code exchange retry exists.
+  Popup exchange failures also land on this card without another exchange or
+  Google redirect; `sessionError` is a display hint, never code-safety proof.
+- Browser deadlines say **timed out / service may be unavailable**, not endpoint
+  unreachable. Actual fetch rejection retains connectivity wording. Renewal
+  renders the service's error rather than overwriting it with a connection
+  diagnosis; transient errors never remove the persistent session.
 - A definitive renewal 401 removes the short-lived cache and requires login,
   retaining the requested route. A business request may wait for renewal
   **before** sending; neither 401 nor 5xx business responses are replayed. There

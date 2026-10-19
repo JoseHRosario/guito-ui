@@ -236,24 +236,67 @@ describe('AuthService.signIn — popup flow (issue #36 desktop Back)', () => {
     }
   });
 
-  it('falls back to the full-page redirect when the exchange rejects the handoff code', async () => {
+  it('does not navigate to a popup failure card after another login/logout changes the epoch', async () => {
     const storage: Record<string, string> = {};
     const auth = serviceWithStorage(storage);
     const popup = fakePopup();
     openFn.mockReturnValue(popup);
+    let finish!: (response: Response) => void;
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('nope', { status: 500 })),
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          }),
+      ),
     );
-
-    const startPromise = auth.signIn();
+    const operation = auth.signIn('/budgets');
+    const outcome = operation.catch((cause: Error) => cause.message);
     await vi.waitFor(() => expect(openFn).toHaveBeenCalledTimes(1));
     const pkce = JSON.parse(storage['session:guito.auth.pkce']);
     postFromPopup(popup, { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state });
-
-    await startPromise;
-    expect(assign).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    storage['guito.auth.epoch'] = 'new-epoch';
+    finish(new Response(JSON.stringify({ error: 'service_starting' }), { status: 503 }));
+    expect(await outcome).toMatch(/cancelled/i);
+    expect(assign).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { status: 503, error: 'service_starting', marker: 'service_starting' },
+    { status: 500, error: 'temporarily_unavailable', marker: 'exchange_failed' },
+    { status: 0, error: '', marker: 'connectivity' },
+    { status: 200, error: '', marker: 'exchange_failed' },
+  ])(
+    'returns the existing callback error card after popup exchange failure, without another Google redirect: $marker',
+    async ({ status, error, marker }) => {
+      const storage: Record<string, string> = {};
+      const auth = serviceWithStorage(storage);
+      const popup = fakePopup();
+      openFn.mockReturnValue(popup);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          if (status === 0) throw new TypeError('Failed to fetch');
+          if (status === 200) return new Response('invalid JSON');
+          return new Response(JSON.stringify({ error }), { status });
+        }),
+      );
+
+      const startPromise = auth.signIn();
+      await vi.waitFor(() => expect(openFn).toHaveBeenCalledTimes(1));
+      const pkce = JSON.parse(storage['session:guito.auth.pkce']);
+      postFromPopup(popup, { source: 'guito-auth-popup-handoff', code: 'abc', state: pkce.state });
+
+      const target = new URL((await startPromise)!, 'https://app.example.com');
+      expect(target.pathname).toBe('/auth/callback');
+      expect(target.searchParams.get('sessionError')).toBe(marker);
+      expect(target.searchParams.get('code')).toBe('abc');
+      expect(assign).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
 });
 
 describe('AuthService.signIn', () => {

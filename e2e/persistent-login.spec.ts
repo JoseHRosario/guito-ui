@@ -62,7 +62,7 @@ test('temporary bootstrap failure shows the existing retry card, preserves crede
     }),
   );
   await page.goto('/budgets?source=offline');
-  await expect(page.getByTestId('auth-error')).toContainText('Connection failed');
+  await expect(page.getByTestId('auth-error')).toContainText('Session renewal failed');
   await expect(page).toHaveURL(/auth\/renew\?returnUrl=/);
   expect(
     await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).idToken, SESSION_KEY),
@@ -95,7 +95,7 @@ test('foreground renewal failure is retryable and never masquerades as Google si
     // Real app initializer registration; controlled lifecycle event, not a live Android claim.
     document.dispatchEvent(new Event('visibilitychange'));
   }, SESSION_KEY);
-  await expect(page.getByTestId('auth-error')).toContainText('Connection failed');
+  await expect(page.getByTestId('auth-error')).toContainText('Session renewal failed');
   await expect(page.getByTestId('signin-button')).toHaveCount(0);
   available = true;
   await page.getByRole('button', { name: 'Try again', exact: true }).click();

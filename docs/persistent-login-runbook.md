@@ -17,8 +17,10 @@ The paired API must implement the exact browser contract:
 
 Every request uses JSON, includes credentials and `X-Guito-Session: 1`.
 `expiresIn` is seconds; `sessionExpiresAt` is a UTC ISO timestamp. Renewal 401
-means permanent `session_expired`; 502/503 means retryable
-`temporarily_unavailable`. Failed establishment must not pretend persistence
+means permanent `session_expired`; generic 502/503 means retryable
+`temporarily_unavailable`. HTTP 503 `service_starting` is reserved for known
+readiness exhaustion **before Google code exchange**, not arbitrary 503,
+configuration or encryption-key failures. Failed establishment must not pretend persistence
 when Google omitted renewal permission. No Google refresh token belongs in any
 browser response/storage, URL, log or screenshot.
 
@@ -57,6 +59,38 @@ Do not use the legacy `/Auth/logout` as a compatibility fallback: it revokes the
 shared Google grant and violates independent-device logout. Do not patch live
 credentials or silently substitute a response when an endpoint is unavailable.
 
+## Cold-start budgets and recovery
+
+- Session HTTP only: **35s browser > 30s gateway/Lambda > 25s API overall**.
+  API readiness has up to **18s within** the overall operation, not an extra
+  allowance. Unrelated financial request deadlines remain unchanged at 15s.
+  Logout still clears local state synchronously; its cookie cleanup is bounded
+  best-effort with the session HTTP deadline.
+- `service_starting` displays **Service starting / The service is starting.
+  Please try again.** on the existing error card. The UI does not automatically
+  resend any Google code. A deliberate retry may reuse the pending callback
+  only after this explicit readiness-gated API failure; returnUrl/PKCE survive.
+- Generic HTTP errors, malformed success, connectivity or browser timeout do
+  **not** establish whether Google consumed the code. The stored pending record
+  marks an attempted exchange so callback revisits/reloads cannot resend it;
+  the next user retry starts Google again, retaining only the requested route.
+  Popup exchange failures reuse the same callback card without another exchange
+  on entry. Its `sessionError` query marker selects copy, not code-reuse safety.
+- Browser deadline copy says **timed out / service may be unavailable**;
+  actual network/CORS rejection keeps connectivity wording. Renewal's original
+  error reaches the existing card/feature error region, without forced signout.
+  The server's definitive renewal 401 still clears the expired session and
+  routes to Google with the correct returnUrl. No drafts or financial replay.
+- The staging incident showed Google success followed by endpoint 503 after
+  16.295s, then a subsequent 740ms success. The old 15s browser deadline was
+  shorter than the 25s API budget. Aurora min=0 alone does not prove the original
+  failure was a database exception; no such underlying exception was logged.
+- Local clocks/control responses prove delayed (>15s) success, deadline copy,
+  explicit retry and no replay. Playwright substitutes only the
+  `AbortSignal.timeout` timer source so its clock controls the deadline; native
+  AbortController and fetch remain in use. Exact 34,999/35,000ms boundary checks
+  use unit fake timers. No test sleeps for a real 35s timeout.
+
 ## Hermetic local checks
 
 Use the owned issue worktree. Dependencies may be borrowed from an ignored
@@ -92,17 +126,28 @@ negative old-header business preflight probe.
 
 - Application and spec TypeScript checks passed (`--noEmit`).
 - Token generation passed without token-source changes.
-- Full Angular unit suite: **38 files, 412 tests passed**.
-- Production built Chromium suite: **74 passed, 1 skipped** (the live-only
+- Full Angular unit suite: **39 files, 436 tests passed**.
+- Production built Chromium suite: **83 passed, 1 skipped** (the live-only
   deployed-smoke gate, intentionally not enabled).
-- Staging built Chromium suite: **74 passed, 1 skipped**, same live-only gate.
+- Staging built Chromium suite: **83 passed, 1 skipped**, same live-only gate.
 - Popup handoff stress regression: **20/20 passed** with four workers after
   fixing the callback-close/queued-message race. No retries hid a failing run.
-- Both builds passed, with an initial bundle warning: **508.13 kB**, **8.13 kB**
-  above the 500 kB warning budget. No budget was raised and no dependency added.
+- Additional cold-auth browser repetition: **27/27 passed** (nine scenarios,
+  three repetitions, four workers), without retries.
+- Both builds passed, with initial bundle warnings: production **512.09 kB**
+  (**12.09 kB** above the 500 kB warning budget), staging **512.10 kB**
+  (**12.10 kB** above). No budget was raised and no dependency added.
 
 These figures are local hermetic evidence for this source change. None of the
 live acceptance gates below has been performed by these checks.
+
+Cold-start TDD evidence: delayed exchange/refresh tests first failed because
+the 15s signal aborted; after the 35s budget they passed. Exact-deadline tests
+then failed on the old connectivity wording and passed with timeout copy.
+Explicit startup renewal, uncertain-code replay prevention, rendered retry/route
+restoration and popup failure handoff each had observed failing tests before
+their implementation. Final full suites include all these regressions, native
+Web Locks/logout races and the unchanged no-financial-replay scenarios.
 
 ## Owner-approved live staging acceptance — NOT performed locally
 
@@ -135,6 +180,15 @@ live acceptance gates below has been performed by these checks.
    backgrounding/abandonment does not keep it alive. Test the exact seven-day
    boundary on the server with controlled time; do not fake a week of Android
    acceptance by editing browser token expiry.
+
+8. **Cold Aurora / installed Android acceptance NOT performed:** with separately
+   approved paired staging deployments/configuration, let Aurora actually pause,
+   then test fresh Google callback and persistent renewal on the installed
+   Android app. Confirm successful resume inside the coordinated budgets, or
+   explicit startup retry with no consumed-code replay. Correlate sanitized API
+   stages/timings; generic 503 must not masquerade as `service_starting`. These
+   local stubbed tests do not establish real Aurora readiness, real Google
+   one-use behavior, cookies on Android or deployment readiness.
 
 Production rollout and genuine Android owner acceptance are separate gates.
 Provider revocation/refresh-token limits can still require a fresh login. A

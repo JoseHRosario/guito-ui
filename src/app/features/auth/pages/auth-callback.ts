@@ -4,6 +4,7 @@ import {
   AUTH_POPUP_HANDOFF,
   AuthError,
   AuthService,
+  ServiceStartingError,
   StaleSignInError,
 } from '../../../core/auth/auth-service';
 
@@ -21,7 +22,13 @@ import {
         <div class="card w-full max-w-sm bg-base-100 shadow">
           <div class="card-body">
             <h2 class="card-title text-error">
-              {{ renew() ? 'Connection failed' : 'Sign-in failed' }}
+              {{
+                serviceStarting()
+                  ? 'Service starting'
+                  : renew()
+                    ? 'Session renewal failed'
+                    : 'Sign-in failed'
+              }}
             </h2>
             <p>{{ err }}</p>
             <div class="card-actions justify-end">
@@ -47,8 +54,11 @@ export class AuthCallback {
   readonly code = input<string>('');
   readonly state = input<string>('');
   readonly error = input<string>('');
+  /** Popup failed in the opener: render only; never exchange again on entry. */
+  readonly sessionError = input<string>('');
 
   readonly message = signal('');
+  readonly serviceStarting = signal(false);
 
   private started = false;
 
@@ -65,11 +75,27 @@ export class AuthCallback {
       if (this.code() === '' && this.error() === '') return;
       if (this.started) return;
       this.started = true;
+      if (this.sessionError()) {
+        const starting = this.sessionError() === 'service_starting';
+        this.serviceStarting.set(starting);
+        this.message.set(
+          starting
+            ? 'The service is starting. Please try again.'
+            : this.sessionError() === 'timeout'
+              ? 'Sign-in timed out. The service may be unavailable. Please try again.'
+              : this.sessionError() === 'connectivity'
+                ? 'Could not reach the token exchange endpoint. Please restart with Google.'
+                : 'Sign-in failed. Please restart with Google.',
+        );
+        return;
+      }
       void this.complete();
     });
   }
 
   async complete(): Promise<void> {
+    this.message.set('');
+    this.serviceStarting.set(false);
     if (this.handoffToOpener()) return;
     if (this.error()) {
       this.message.set(`Google sign-in failed: ${this.error()}`);
@@ -92,6 +118,7 @@ export class AuthCallback {
         await this.router.navigateByUrl('/signin', { replaceUrl: true });
         return;
       }
+      this.serviceStarting.set(cause instanceof ServiceStartingError);
       this.message.set(
         cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
       );
@@ -121,16 +148,29 @@ export class AuthCallback {
     return true;
   }
 
-  retry(): void {
+  async retry(): Promise<void> {
     if (this.renew()) {
-      void this.resume();
+      await this.resume();
       return;
     }
-    void this.auth.signIn('/');
+    if (this.serviceStarting()) {
+      await this.complete();
+      return;
+    }
+    try {
+      const target = await this.auth.signIn(this.safeReturnUrl(this.auth.pendingReturnUrl()));
+      if (target !== undefined)
+        await this.router.navigateByUrl(this.safeReturnUrl(target), { replaceUrl: true });
+    } catch (cause) {
+      this.message.set(
+        cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
+      );
+    }
   }
 
   private async resume(): Promise<void> {
     this.message.set('');
+    this.serviceStarting.set(false);
     const target = this.safeReturnUrl(this.returnUrl() ?? '/');
     try {
       if (await this.auth.ensureSession())
@@ -140,8 +180,13 @@ export class AuthCallback {
           queryParams: { returnUrl: target },
           replaceUrl: true,
         });
-    } catch {
-      this.message.set('Could not renew your session. Check your connection and try again.');
+    } catch (cause) {
+      this.serviceStarting.set(cause instanceof ServiceStartingError);
+      this.message.set(
+        cause instanceof AuthError
+          ? cause.message
+          : 'Could not renew your session. Please try again.',
+      );
     }
   }
 

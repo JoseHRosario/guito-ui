@@ -12,6 +12,9 @@ import { codeChallenge, createCodeVerifier, generateState } from './pkce';
 /** Thrown for any sign-in failure the callback component should surface. */
 export class AuthError extends Error {}
 
+/** API readiness failed before Google exchange; only this contract permits code reuse. */
+export class ServiceStartingError extends AuthError {}
+
 /**
  * The callback page ran with an authorization code but no pending PKCE state:
  * the callback URL outlived the sign-in that created it (Android PWA restores
@@ -29,6 +32,8 @@ const SIGNED_OUT_KEY = 'guito.auth.signed-out';
 const EPOCH_KEY = 'guito.auth.epoch';
 const SESSION_LOCK = 'guito-auth-session';
 const FOREGROUND_COALESCE_MS = 60_000;
+// API operation 25s < gateway/host 30s < browser session HTTP 35s.
+const SESSION_HTTP_TIMEOUT_MS = 35_000;
 
 // Popup sign-in (issue #36): desktop browsers open Google in a popup so the
 // main window's history never gains a Google entry and Back after sign-in
@@ -47,6 +52,7 @@ interface PendingSignIn {
   state: string;
   returnUrl: string;
   epoch: string;
+  exchangeAttempted?: boolean;
 }
 
 /** The popup went away without completing (user closed it) — abort, no fallback. */
@@ -58,8 +64,7 @@ class PopupAbandoned extends Error {}
  * diagnosable from the UI; falls back to the status-only message when the
  * body isn't that JSON. Contains no credentials — safe to display.
  */
-async function exchangeFailureMessage(response: Response): Promise<string> {
-  const base = `Sign-in token exchange failed (HTTP ${response.status})`;
+async function sessionFailure(response: Response, base: string): Promise<AuthError> {
   try {
     const body = (await response.json()) as {
       error?: unknown;
@@ -67,10 +72,12 @@ async function exchangeFailureMessage(response: Response): Promise<string> {
     };
     const error = typeof body.error === 'string' ? body.error : '';
     const description = typeof body.error_description === 'string' ? body.error_description : '';
-    if (!error && !description) return base;
-    return [error, description].filter(Boolean).join(' — ');
+    if (response.status === 503 && error === 'service_starting')
+      return new ServiceStartingError('The service is starting. Please try again.');
+    if (!error && !description) return new AuthError(base);
+    return new AuthError([error, description].filter(Boolean).join(' — '));
   } catch {
-    return base;
+    return new AuthError(base);
   }
 }
 
@@ -131,6 +138,20 @@ export class AuthService {
       const handoff = await this.waitForPopupHandoff(popup);
       try {
         return await this.completeSignIn(handoff);
+      } catch (cause) {
+        if (pending.epoch !== localStorage.getItem(EPOCH_KEY)) throw cause;
+        // Reuse the callback card without exchanging again on entry. A popup
+        // failure must not silently start Google or replay its one-use code.
+        const underlying = cause instanceof AuthError ? cause.cause : undefined;
+        const sessionError =
+          cause instanceof ServiceStartingError
+            ? 'service_starting'
+            : underlying instanceof DOMException && underlying.name === 'TimeoutError'
+              ? 'timeout'
+              : underlying instanceof TypeError
+                ? 'connectivity'
+                : 'exchange_failed';
+        return `${AUTH_CALLBACK_PATH}?${new URLSearchParams({ ...handoff, sessionError })}`;
       } finally {
         this.closeSignInPopup(popup);
       }
@@ -274,10 +295,17 @@ export class AuthService {
       tokenResponse = await this.withSessionLock(() => {
         if (epoch !== localStorage.getItem(EPOCH_KEY))
           throw new AuthError('Sign-in was cancelled.');
+        if (!this.pending() || this.pending()?.exchangeAttempted)
+          throw new AuthError(
+            'Sign-in may already have been attempted. Please restart with Google.',
+          );
+        const attempted = { ...pending, exchangeAttempted: true };
+        this.pending.set(attempted);
+        sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(attempted));
         return fetch(`${this.env.apiBaseUrl}/Auth/session/token`, {
           method: 'POST',
           credentials: 'include',
-          signal: AbortSignal.timeout(15_000),
+          signal: AbortSignal.timeout(SESSION_HTTP_TIMEOUT_MS),
           headers: { 'Content-Type': 'application/json', 'X-Guito-Session': '1' },
           body: JSON.stringify({
             code: params['code'] ?? '',
@@ -287,10 +315,24 @@ export class AuthService {
         });
       });
     } catch (cause) {
-      throw new AuthError('Could not reach the token exchange endpoint', { cause });
+      if (cause instanceof AuthError) throw cause;
+      throw new AuthError(
+        cause instanceof DOMException && cause.name === 'TimeoutError'
+          ? 'Sign-in timed out. The service may be unavailable. Please try again.'
+          : 'Could not reach the token exchange endpoint',
+        { cause },
+      );
     }
     if (!tokenResponse.ok) {
-      throw new AuthError(await exchangeFailureMessage(tokenResponse));
+      const failure = await sessionFailure(
+        tokenResponse,
+        `Sign-in token exchange failed (HTTP ${tokenResponse.status})`,
+      );
+      if (failure instanceof ServiceStartingError && epoch === localStorage.getItem(EPOCH_KEY)) {
+        this.pending.set(pending);
+        sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(pending));
+      }
+      throw failure;
     }
 
     const session = await this.readTokenResponse(tokenResponse);
@@ -314,6 +356,10 @@ export class AuthService {
 
   hasPendingSignIn(): boolean {
     return this.pending() !== null;
+  }
+
+  pendingReturnUrl(): string {
+    return this.pending()?.returnUrl ?? '/';
   }
 
   /** Only a bounded cache of a successful foreground renewal can skip networking. */
@@ -364,9 +410,12 @@ export class AuthService {
         response = await this.sessionRequest('refresh');
       } catch (cause) {
         if (!this.isCurrent(epoch)) return false;
-        throw new AuthError('Could not renew your session. Check your connection and try again.', {
-          cause,
-        });
+        throw new AuthError(
+          cause instanceof DOMException && cause.name === 'TimeoutError'
+            ? 'Session renewal timed out. The service may be unavailable. Please try again.'
+            : 'Could not renew your session. Check your connection and try again.',
+          { cause },
+        );
       }
       if (!this.isCurrent(epoch)) return false;
       if (response.status === 401) {
@@ -374,7 +423,8 @@ export class AuthService {
         this.session.set(null);
         return false;
       }
-      if (!response.ok) throw new AuthError('Could not renew your session. Please try again.');
+      if (!response.ok)
+        throw await sessionFailure(response, 'Could not renew your session. Please try again.');
       const renewed = await this.readTokenResponse(response);
       if (!this.isCurrent(epoch)) return false;
       this.setSession(renewed);
@@ -407,7 +457,7 @@ export class AuthService {
     return fetch(`${this.env.apiBaseUrl}/Auth/session/${action}`, {
       method: 'POST',
       credentials: 'include',
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(SESSION_HTTP_TIMEOUT_MS),
       headers: { 'Content-Type': 'application/json', 'X-Guito-Session': '1' },
       body: '{}',
     });
