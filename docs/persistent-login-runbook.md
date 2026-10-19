@@ -25,7 +25,7 @@ when Google omitted renewal permission. No Google refresh token belongs in any
 browser response/storage, URL, log or screenshot.
 
 API prerequisites belong to the API release/runbook, not to UI provisioning:
-server-side user-session schema/migration, per-environment credential encryption key
+per-environment DynamoDB session table and scoped IAM, credential encryption key
 in the existing secret backend, allowed identity and OAuth configuration,
 explicit trusted UI origins, public-at-edge cookie endpoints, their own
 origin/header/content-type protections and credentialed CORS. Required cookie:
@@ -35,23 +35,34 @@ Staging and production use distinct API hosts/cookies and secrets. Missing
 key/configuration must fail closed, never fall back to browser refresh tokens
 or plaintext storage.
 
-Review naming uses **user session**, not a new multi-user identity model. The
-paired API follows José's one-migration decision for the unmerged feature:
-`011_user_sessions.sql` directly creates `user_sessions` and its expiry index with
-`IF NOT EXISTS`; there is no rename migration. Staging's historical 011/012 ledger
-entries may stay. Its already-renamed table needs no drop if the schema/indexes
-match; the new filename runs harmless CREATE statements and is then recorded.
-Existing-schema mismatch is not repaired automatically: pause for José's manual
-cleanup decision, never delete ledger entries or drop tables as part of deployment.
-The API now requires only `UserSessionEncryptionKey`, deserialized from the existing
-SSM JSON payload; missing/invalid canonical keys and old-only payloads fail closed.
-Before pushing/deploying the paired API source, José must separately approve
-renaming staging's historical `HumanSessionEncryptionKey` JSON field to
-`UserSessionEncryptionKey`, preserving its exact value and all unrelated fields
-and settings, removing the old field and privately verifying readback. This is not
-key rotation. Shared-staging replacement approval and deployed/rollback consumer
-compatibility remain required. No live credential operation is performed by this
-source/doc change, and no UI runtime or wire contract change is needed.
+Review naming uses **user session**, not a new multi-user identity model.
+José approved replacing the unmerged feature's Postgres session store with
+DynamoDB: Standard tables in Ireland (`eu-west-1`), fixed provisioned **1 RCU /
+1 WCU per table**, named `guito-api-user-sessions-staging` and
+`guito-api-user-sessions`. Runtime access is scoped to GetItem, PutItem,
+UpdateItem and DeleteItem on those tables; deployment provisioning and exact
+readback belong to the paired API lane. The free-first capacity choice depends
+on the account's shared allowance, not a promise of a zero AWS bill. No
+session backup/autoscaling or paid extras are introduced.
+
+The API retains encrypted refresh credentials in the existing AES-GCM envelope.
+DynamoDB TTL is eventual cleanup only; server predicates enforce seven-day idle
+expiry immediately. Login, renewal and logout must not access the financial
+Data API or wake Aurora. Expense/Category/Bank requests still may wake Aurora.
+There is no Postgres fallback, dual write or live credential import. José chose
+**one fresh staging sign-in** at cutover. The unmerged SQL session migration is
+removed on the API side; previously applied Postgres rows/tables and migration
+ledger entries stay untouched. Their later cleanup requires separate approval.
+
+`UserSessionEncryptionKey` remains canonical in the existing per-environment
+SSM JSON payload. Staging's historical field rename was separately approved and
+privately verified with the exact same key; it is no longer a pending gate and
+was not rotation. This store switch needs no SSM/key mutation. Missing/invalid
+canonical keys and old-only payloads fail closed. Production key setup and
+production deployment remain separate owner gates. Shared-staging replacement
+must remain within approved scope; rollback must not blindly restore Postgres
+session acceptance because the stores do not share renewal/logout state.
+No UI runtime or wire contract change is needed.
 See the [API runbook](https://github.com/JoseHRosario/guito-api/blob/feature/156-persistent-login/docs/persistent-human-login.md).
 
 Do not deploy just the UI against an old API and call persistent login working.
@@ -62,11 +73,13 @@ credentials or silently substitute a response when an endpoint is unavailable.
 ## Cold-start budgets and recovery
 
 - Session HTTP only: **35s browser > 30s gateway/Lambda > 25s API overall**.
-  API readiness has up to **18s within** the overall operation, not an extra
-  allowance. Unrelated financial request deadlines remain unchanged at 15s.
+  API refresh cleanup has a separate **2s maximum**. The pre-code availability
+  check is a non-mutating strongly consistent DynamoDB GetItem; there is no
+  18s Aurora readiness loop on session paths and no SDK retry of uncertain
+  session mutations. Unrelated financial deadlines remain unchanged at 15s.
   Logout still clears local state synchronously; its cookie cleanup is bounded
   best-effort with the session HTTP deadline.
-- `service_starting` displays **Service starting / The service is starting.
+- Compatibility handling remains: `service_starting` displays **Service starting / The service is starting.
   Please try again.** on the existing error card. The UI does not automatically
   resend any Google code. A deliberate retry may reuse the pending callback
   only after this explicit readiness-gated API failure; returnUrl/PKCE survive.
@@ -88,7 +101,8 @@ credentials or silently substitute a response when an endpoint is unavailable.
   error reaches the existing card/feature error region, without forced signout.
   The server's definitive renewal 401 still clears the expired session and
   routes to Google with the correct returnUrl. No drafts or financial replay.
-- The staging incident showed Google success followed by endpoint 503 after
+- **Historical Postgres-backed incident (before the 2026-10-19 store decision):**
+  staging showed Google success followed by endpoint 503 after
   16.295s, then a subsequent 740ms success. The old 15s browser deadline was
   shorter than the 25s API budget. Aurora min=0 alone does not prove the original
   failure was a database exception; no such underlying exception was logged.
@@ -131,6 +145,21 @@ negative old-header business preflight probe.
 
 ## Verified local source evidence
 
+### 2026-10-19 documentation-only DynamoDB alignment
+
+- Application and spec TypeScript checks passed (`--noEmit`); tokens regenerated
+  without a tracked source change.
+- Production and staging builds passed: **512.46 kB** initial bundle each,
+  **12.46 kB** above the unchanged 500 kB warning budget.
+- Full Angular unit suite: **39 files, 436 tests passed**. The existing jsdom
+  diagnostic `Not implemented: navigation to another Document` remains.
+- Full production and staging built Chromium suites each: **85 passed, 1 skipped**
+  (live-only deployed smoke), four workers, no retries or failures.
+- Angular/runtime, tests, configuration, dependencies and version are unchanged.
+  These hermetic UI checks do not verify live DynamoDB or owner Android gates.
+
+### Earlier UI implementation evidence — retained history
+
 - Application and spec TypeScript checks passed (`--noEmit`).
 - Token generation passed without token-source changes.
 - Full Angular unit suite: **39 files, 436 tests passed**.
@@ -145,7 +174,8 @@ negative old-header business preflight probe.
   (**12.09 kB** above the 500 kB warning budget), staging **512.10 kB**
   (**12.10 kB** above). No budget was raised and no dependency added.
 
-These figures are local hermetic evidence for this source change. None of the
+These figures are retained evidence from the earlier UI implementation, not a
+DynamoDB deployment check. None of the
 live acceptance gates below has been performed by these checks.
 
 Cold-start TDD evidence: delayed exchange/refresh tests first failed because
@@ -158,12 +188,14 @@ Web Locks/logout races and the unchanged no-financial-replay scenarios.
 
 ## Owner-approved live staging acceptance — NOT performed locally
 
-1. Review exact paired UI/API commits, staging deployment provenance, migration,
-   API key configuration and explicit UI origins. Provisioning and replacing
-   shared staging each require owner approval. Branch pushes auto-deploy
+1. Review exact paired UI/API commits, staging deployment provenance, DynamoDB
+   table settings/TTL/scoped IAM, canonical API key configuration and explicit UI
+   origins. Confirm shared-staging replacement remains within José's approved
+   scope; production is not approved. Branch pushes auto-deploy
    staging: a local source commit is **not** permission to push.
 2. Use the real approved staging UI and Google account. Confirm one fresh
-   identity-only offline consent and a successful session exchange. Inspect
+   identity-only offline consent and a successful session exchange after cutover;
+   do not migrate live Postgres credentials. Inspect
    cookie **attributes**, not token contents. JavaScript must not read the
    HttpOnly handle; no Google refresh credential is exposed.
 3. Confirm native browser OPTIONS allows the exact UI origin,
@@ -188,14 +220,15 @@ Web Locks/logout races and the unchanged no-financial-replay scenarios.
    boundary on the server with controlled time; do not fake a week of Android
    acceptance by editing browser token expiry.
 
-8. **Cold Aurora / installed Android acceptance NOT performed:** with separately
-   approved paired staging deployments/configuration, let Aurora actually pause,
-   then test fresh Google callback and persistent renewal on the installed
-   Android app. Confirm successful resume inside the coordinated budgets, or
-   explicit startup retry with no consumed-code replay. Correlate sanitized API
-   stages/timings; generic 503 must not masquerade as `service_starting`. These
-   local stubbed tests do not establish real Aurora readiness, real Google
-   one-use behavior, cookies on Android or deployment readiness.
+8. **Aurora-independent session / installed Android acceptance NOT performed:**
+   with approved paired staging deployments/configuration, confirm fresh Google
+   callback, renewal and logout succeed without waking or waiting for Aurora.
+   Correlate sanitized API stages/timings and exact DynamoDB configuration;
+   subsequent Expense/Category/Bank reads may still resume Aurora. Do not change
+   financial data to induce coldness or use a financial write as an auth test.
+   Generic 503 must not masquerade as `service_starting`. Local stubbed tests
+   do not establish live DynamoDB conditions, real Google one-use behavior,
+   cookies on Android or deployment readiness.
 
 Production rollout and genuine Android owner acceptance are separate gates.
 Provider revocation/refresh-token limits can still require a fresh login. A

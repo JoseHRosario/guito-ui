@@ -17,6 +17,27 @@ short-lived ID/access tokens, a `persistent: true` marker, the server's
 token-only cache requires one fresh Google login; it cannot be upgraded merely
 by changing the cache's expiry.
 
+### Session-store amendment — 2026-10-19
+
+The paired [API ADR 0019](https://github.com/JoseHRosario/guito-api/blob/feature/156-persistent-login/docs/adr/0019-persistent-human-sessions.md)
+replaces the earlier Postgres session store with DynamoDB, without changing
+this UI's wire contract, runtime behavior or 0.12.0 feature version. Login,
+renewal and device logout must not access the financial Data API or wake Aurora;
+subsequent Expense/Category/Bank requests still can. The server retains AES-GCM
+credential encryption and seven-day idle expiry; eventual TTL deletion is only
+cleanup, not authorization.
+
+José approved Standard tables in `eu-west-1`, fixed at 1 RCU / 1 WCU each:
+`guito-api-user-sessions-staging` and `guito-api-user-sessions`, with scoped IAM.
+He chose one fresh staging sign-in, not migration of live refresh credentials.
+No Postgres fallback or dual write is permitted; historical Postgres session
+rows and migration ledger stay untouched. The canonical SSM field remains
+`UserSessionEncryptionKey`; its separately approved staging rename preserved
+the exact key and is already verified, not a pending gate or rotation.
+Production key setup/deployment and later Postgres cleanup remain separate
+owner operations. The [runbook](../persistent-login-runbook.md) records cutover,
+rollback cautions and outstanding live gates.
+
 Google authorization retains **only** `openid email profile`, PKCE S256 and
 state. `access_type=offline` and `prompt=consent` request renewal permission;
 `include_granted_scopes` is deliberately absent. Popup handoff still checks
@@ -38,14 +59,17 @@ cancelled login from overriding later logout/login.
   expiry. The server remains authoritative, not a client seven-day timer.
 - No periodic keepalive or hidden-tab renewal exists. Session HTTP fetches
   (initial exchange, refresh and best-effort logout) time out after **35 seconds**:
-  API session budget **25s**, gateway/host **30s**, browser **35s**. Unrelated
+  API session budget **25s** plus at most **2s** awaited refresh cleanup,
+  gateway/host **30s**, browser **35s**. The pre-code check is a non-mutating,
+  strongly consistent DynamoDB GetItem, not an 18s Aurora readiness loop.
+  Uncertain session mutations must not be retried by the SDK. Unrelated
   business requests keep their existing deadlines. A previously valid recent token may still serve an
   already-initiated business request; that does not extend server inactivity.
 - Network failures, 502/503 and malformed successful renewal responses retain
   credentials. Bootstrap/foreground failures reuse the existing auth error card
   at `/auth/renew?returnUrl=…`, with **Try again**, rather than sending the user
   to Google. Pre-request renewal failures reach existing feature error regions.
-- HTTP 503 `service_starting` is the paired API's explicit readiness failure
+- Retained compatibility: HTTP 503 `service_starting` denotes an explicit readiness failure
   **before** the Google exchange. The existing callback error card displays
   **Service starting** and permits only a deliberate **Try again** of that
   pending callback. A shared non-secret epoch/state attempt marker is checked
