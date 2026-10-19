@@ -48,7 +48,11 @@ cancelled login from overriding later logout/login.
 - HTTP 503 `service_starting` is the paired API's explicit readiness failure
   **before** the Google exchange. The existing callback error card displays
   **Service starting** and permits only a deliberate **Try again** of that
-  pending callback. Generic 5xx, network/CORS failure, timeout or malformed
+  pending callback. A shared non-secret epoch/state attempt marker is checked
+  and recorded within the session Web Lock, so a copied tab's stale PKCE record
+  cannot replay an uncertain exchange. The readiness-rejected outcome also
+  persists across reloads/copied tabs: callback entry displays the card without
+  fetching; only **Try again** authorizes its next exchange. Generic 5xx, network/CORS failure, timeout or malformed
   success do not prove the code was unused: retain pending route/state but mark
   the exchange attempted, including across reload, and restart Google on user
   retry instead of resending the code. No automatic code exchange retry exists.

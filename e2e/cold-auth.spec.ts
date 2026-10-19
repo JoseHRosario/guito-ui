@@ -39,6 +39,73 @@ async function prepare(page: Page, context: BrowserContext, action: 'token' | 'r
     }
   }, action);
 }
+test('startup callback reload and copied tab require explicit manual retry', async ({
+  page,
+  context,
+}) => {
+  await prepare(page, context, 'token');
+  await page.goto('/signin');
+  const pending = await page.evaluate(() => sessionStorage.getItem('guito.auth.pkce')!);
+  const copied = await context.newPage();
+  await copied.addInitScript(
+    (pending) => sessionStorage.setItem('guito.auth.pkce', pending),
+    pending,
+  );
+  let requests = 0;
+  await context.route('**/Auth/session/token', (route) => {
+    requests++;
+    return route.fulfill({ status: 503, json: { error: 'service_starting' } });
+  });
+  await page.goto(entry('token'));
+  await expect(page.getByTestId('auth-error')).toContainText('Service starting');
+  expect(requests).toBe(1);
+  await page.reload();
+  await expect(page.getByTestId('auth-error')).toBeVisible();
+  expect(requests).toBe(1);
+  await expect(page.getByTestId('auth-error')).toContainText('Service starting');
+  await copied.goto(entry('token'));
+  await expect(copied.getByTestId('auth-error')).toContainText('Service starting');
+  expect(requests).toBe(1);
+  await copied.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect.poll(() => requests).toBe(2);
+  await expect(copied.getByTestId('auth-error')).toContainText('Service starting');
+  await page.reload();
+  await expect(page.getByTestId('auth-error')).toContainText('Service starting');
+  expect(requests).toBe(2);
+});
+
+// Copy PKCE before the first exchange, as a duplicated browser tab does.
+test('copied tab cannot replay an uncertain exchange across native Web Locks', async ({
+  page,
+  context,
+}) => {
+  await prepare(page, context, 'token');
+  await page.goto('/signin');
+  const pending = await page.evaluate(() => sessionStorage.getItem('guito.auth.pkce')!);
+  const copied = await context.newPage();
+  await copied.addInitScript((pending) => {
+    sessionStorage.setItem('guito.auth.pkce', pending);
+  }, pending);
+  let requests = 0;
+  await context.route('**/Auth/session/token', (route) => {
+    requests++;
+    return route.fulfill({ status: 503, json: { error: 'temporarily_unavailable' } });
+  });
+  await page.goto(entry('token'));
+  await expect(page.getByTestId('auth-error')).toContainText('temporarily_unavailable');
+  expect(requests).toBe(1);
+  expect(await page.evaluate(() => typeof navigator.locks.request)).toBe('function');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('guito.auth.exchange')!)),
+  ).toEqual(['epoch', 'state', 'attempted']);
+  await copied.goto(entry('token'));
+  await expect(copied.getByTestId('auth-error')).toBeVisible();
+  expect(requests).toBe(1);
+  await copied.reload();
+  await expect(copied.getByTestId('auth-error')).toBeVisible();
+  expect(requests).toBe(1);
+});
+
 const entry = (action: 'token' | 'refresh') =>
   action === 'token'
     ? '/auth/callback?code=one-use&state=state'

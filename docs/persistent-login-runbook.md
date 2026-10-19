@@ -70,9 +70,16 @@ credentials or silently substitute a response when an endpoint is unavailable.
   Please try again.** on the existing error card. The UI does not automatically
   resend any Google code. A deliberate retry may reuse the pending callback
   only after this explicit readiness-gated API failure; returnUrl/PKCE survive.
+  A shared `guito.auth.exchange` marker records only the login epoch, OAuth
+  state and outcome (`attempted` or `manual-retry-required`), never code/verifier
+  or tokens. It is read/written inside the session Web Lock, including readiness
+  classification before releasing the lock. Callback reloads and copied tabs
+  render the startup card without exchanging; only an explicit **Try again**
+  authorizes a recorded readiness rejection's next exchange. Unknown failures
+  remain blocked across tabs/reloads; a fresh Google login creates a new epoch.
 - Generic HTTP errors, malformed success, connectivity or browser timeout do
-  **not** establish whether Google consumed the code. The stored pending record
-  marks an attempted exchange so callback revisits/reloads cannot resend it;
+  **not** establish whether Google consumed the code. The shared attempt guard
+  blocks even a copied tab carrying an older pending PKCE record;
   the next user retry starts Google again, retaining only the requested route.
   Popup exchange failures reuse the same callback card without another exchange
   on entry. Its `sessionError` query marker selects copy, not code-reuse safety.

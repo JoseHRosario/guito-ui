@@ -8,12 +8,10 @@ import {
   SESSION_STORAGE_KEY,
 } from './auth-session';
 import { codeChallenge, createCodeVerifier, generateState } from './pkce';
+import { ServiceStartingError } from './service-starting-error';
 
 /** Thrown for any sign-in failure the callback component should surface. */
 export class AuthError extends Error {}
-
-/** API readiness failed before Google exchange; only this contract permits code reuse. */
-export class ServiceStartingError extends AuthError {}
 
 /**
  * The callback page ran with an authorization code but no pending PKCE state:
@@ -30,6 +28,8 @@ const AUTH_CALLBACK_PATH = '/auth/callback';
 const SIGN_OUT_REDIRECT = '/signin';
 const SIGNED_OUT_KEY = 'guito.auth.signed-out';
 const EPOCH_KEY = 'guito.auth.epoch';
+// Non-secret coordination only: epoch, state and outcome; never code/verifier.
+const EXCHANGE_KEY = 'guito.auth.exchange';
 const SESSION_LOCK = 'guito-auth-session';
 const FOREGROUND_COALESCE_MS = 60_000;
 // API operation 25s < gateway/host 30s < browser session HTTP 35s.
@@ -64,7 +64,10 @@ class PopupAbandoned extends Error {}
  * diagnosable from the UI; falls back to the status-only message when the
  * body isn't that JSON. Contains no credentials — safe to display.
  */
-async function sessionFailure(response: Response, base: string): Promise<AuthError> {
+async function sessionFailure(
+  response: Response,
+  base: string,
+): Promise<AuthError | ServiceStartingError> {
   try {
     const body = (await response.json()) as {
       error?: unknown;
@@ -118,6 +121,7 @@ export class AuthService {
   async signIn(returnUrl: string = '/'): Promise<string | undefined> {
     const epoch = crypto.randomUUID();
     localStorage.setItem(EPOCH_KEY, epoch);
+    localStorage.removeItem(EXCHANGE_KEY);
     const pending: PendingSignIn = {
       verifier: createCodeVerifier(),
       state: generateState(),
@@ -261,7 +265,7 @@ export class AuthService {
    * authorization code for tokens, persist the session. Resolves with the
    * returnUrl to route to; rejects with `AuthError` on any failure.
    */
-  async completeSignIn(params: Record<string, string>): Promise<string> {
+  async completeSignIn(params: Record<string, string>, manualRetry = false): Promise<string> {
     const epoch = localStorage.getItem(EPOCH_KEY);
     const pending = this.pending();
     if (!pending) {
@@ -292,17 +296,28 @@ export class AuthService {
     // ship in the browser bundle — the API adds client_id + client_secret.
     let tokenResponse: Response;
     try {
-      tokenResponse = await this.withSessionLock(() => {
+      tokenResponse = await this.withSessionLock(async () => {
         if (epoch !== localStorage.getItem(EPOCH_KEY))
           throw new AuthError('Sign-in was cancelled.');
-        if (!this.pending() || this.pending()?.exchangeAttempted)
+        const attemptedMarker = JSON.stringify([epoch, pending.state, 'attempted']);
+        const retryMarker = JSON.stringify([epoch, pending.state, 'manual-retry-required']);
+        const marker = localStorage.getItem(EXCHANGE_KEY);
+        if (marker === retryMarker && !manualRetry)
+          throw new ServiceStartingError('The service is starting. Please try again.');
+        if (
+          !this.pending() ||
+          (manualRetry
+            ? marker !== retryMarker
+            : marker === attemptedMarker || this.pending()?.exchangeAttempted)
+        )
           throw new AuthError(
             'Sign-in may already have been attempted. Please restart with Google.',
           );
+        localStorage.setItem(EXCHANGE_KEY, attemptedMarker);
         const attempted = { ...pending, exchangeAttempted: true };
         this.pending.set(attempted);
         sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(attempted));
-        return fetch(`${this.env.apiBaseUrl}/Auth/session/token`, {
+        const response = await fetch(`${this.env.apiBaseUrl}/Auth/session/token`, {
           method: 'POST',
           credentials: 'include',
           signal: AbortSignal.timeout(SESSION_HTTP_TIMEOUT_MS),
@@ -313,9 +328,20 @@ export class AuthService {
             redirectUri: this.redirectUri(),
           }),
         });
+        if (!response.ok) {
+          const failure = await sessionFailure(
+            response,
+            `Sign-in token exchange failed (HTTP ${response.status})`,
+          );
+          // Record the outcome before releasing the cross-tab lock.
+          if (failure instanceof ServiceStartingError && epoch === localStorage.getItem(EPOCH_KEY))
+            localStorage.setItem(EXCHANGE_KEY, retryMarker);
+          throw failure;
+        }
+        return response;
       });
     } catch (cause) {
-      if (cause instanceof AuthError) throw cause;
+      if (cause instanceof AuthError || cause instanceof ServiceStartingError) throw cause;
       throw new AuthError(
         cause instanceof DOMException && cause.name === 'TimeoutError'
           ? 'Sign-in timed out. The service may be unavailable. Please try again.'
@@ -323,18 +349,6 @@ export class AuthService {
         { cause },
       );
     }
-    if (!tokenResponse.ok) {
-      const failure = await sessionFailure(
-        tokenResponse,
-        `Sign-in token exchange failed (HTTP ${tokenResponse.status})`,
-      );
-      if (failure instanceof ServiceStartingError && epoch === localStorage.getItem(EPOCH_KEY)) {
-        this.pending.set(pending);
-        sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(pending));
-      }
-      throw failure;
-    }
-
     const session = await this.readTokenResponse(tokenResponse);
     if (epoch !== localStorage.getItem(EPOCH_KEY)) throw new AuthError('Sign-in was cancelled.');
     this.clearPending();

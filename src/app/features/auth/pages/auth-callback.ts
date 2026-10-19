@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { ServiceStartingError } from '../../../core/auth/service-starting-error';
 import {
   AUTH_POPUP_HANDOFF,
   AuthError,
   AuthService,
-  ServiceStartingError,
   StaleSignInError,
 } from '../../../core/auth/auth-service';
 
@@ -93,7 +93,7 @@ export class AuthCallback {
     });
   }
 
-  async complete(): Promise<void> {
+  async complete(manualRetry = false): Promise<void> {
     this.message.set('');
     this.serviceStarting.set(false);
     if (this.handoffToOpener()) return;
@@ -103,10 +103,13 @@ export class AuthCallback {
     }
     try {
       const returnUrl = this.safeReturnUrl(
-        await this.auth.completeSignIn({
-          code: this.code(),
-          state: this.state(),
-        }),
+        await this.auth.completeSignIn(
+          {
+            code: this.code(),
+            state: this.state(),
+          },
+          manualRetry,
+        ),
       );
       await this.router.navigateByUrl(returnUrl, { replaceUrl: true });
     } catch (cause) {
@@ -120,7 +123,9 @@ export class AuthCallback {
       }
       this.serviceStarting.set(cause instanceof ServiceStartingError);
       this.message.set(
-        cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
+        cause instanceof AuthError || cause instanceof ServiceStartingError
+          ? cause.message
+          : 'Sign-in failed — please try again.',
       );
     }
   }
@@ -154,7 +159,7 @@ export class AuthCallback {
       return;
     }
     if (this.serviceStarting()) {
-      await this.complete();
+      await this.complete(true);
       return;
     }
     try {
@@ -163,7 +168,9 @@ export class AuthCallback {
         await this.router.navigateByUrl(this.safeReturnUrl(target), { replaceUrl: true });
     } catch (cause) {
       this.message.set(
-        cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
+        cause instanceof AuthError || cause instanceof ServiceStartingError
+          ? cause.message
+          : 'Sign-in failed — please try again.',
       );
     }
   }
@@ -183,7 +190,7 @@ export class AuthCallback {
     } catch (cause) {
       this.serviceStarting.set(cause instanceof ServiceStartingError);
       this.message.set(
-        cause instanceof AuthError
+        cause instanceof AuthError || cause instanceof ServiceStartingError
           ? cause.message
           : 'Could not renew your session. Please try again.',
       );

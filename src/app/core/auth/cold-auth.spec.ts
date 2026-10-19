@@ -54,15 +54,24 @@ it.each(['token', 'refresh'] as const)(
       .mockResolvedValueOnce(new Response(JSON.stringify(tokens)));
     vi.stubGlobal('fetch', transport);
     const auth = setup();
-    const run = () =>
+    const run = (manualRetry = false) =>
       action === 'token'
-        ? auth.completeSignIn({ code: 'one-use', state: 'state' })
+        ? auth.completeSignIn({ code: 'one-use', state: 'state' }, manualRetry)
         : auth.ensureSession();
     await expect(run()).rejects.toThrow('The service is starting. Please try again.');
     expect(transport).toHaveBeenCalledTimes(1);
     expect(auth.session()?.idToken).toBe('old');
     expect(auth.hasPendingSignIn()).toBe(true);
-    expect(await run()).toBe(action === 'token' ? '/budgets' : true);
+    if (action === 'token') {
+      await expect(run()).rejects.toThrow('The service is starting. Please try again.');
+      expect(transport).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(localStorage.getItem('guito.auth.exchange')!)).toEqual([
+        'epoch',
+        'state',
+        'manual-retry-required',
+      ]);
+    }
+    expect(await run(true)).toBe(action === 'token' ? '/budgets' : true);
     expect(transport).toHaveBeenCalledTimes(2);
   },
 );
@@ -167,7 +176,12 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   sessionStorage.removeItem(pendingKey);
-  for (const key of [SESSION_STORAGE_KEY, 'guito.auth.epoch', 'guito.auth.signed-out'])
+  for (const key of [
+    SESSION_STORAGE_KEY,
+    'guito.auth.epoch',
+    'guito.auth.signed-out',
+    'guito.auth.exchange',
+  ])
     localStorage.removeItem(key);
 });
 

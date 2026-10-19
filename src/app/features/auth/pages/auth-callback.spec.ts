@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import {
-  AuthError,
-  AuthService,
-  ServiceStartingError,
-  StaleSignInError,
-} from '../../../core/auth/auth-service';
+import { ServiceStartingError } from '../../../core/auth/service-starting-error';
+import { AuthError, AuthService, StaleSignInError } from '../../../core/auth/auth-service';
 import { AuthCallback } from './auth-callback';
 
 const auth = {
@@ -53,6 +49,7 @@ describe('AuthCallback', () => {
     el.querySelector('button')!.click();
     await fixture.whenStable();
     expect(auth.completeSignIn).toHaveBeenCalledTimes(2);
+    expect(auth.completeSignIn).toHaveBeenLastCalledWith({ code: 'abc', state: 'st' }, true);
     expect(navigate).toHaveBeenCalledWith('/expenses', { replaceUrl: true });
   });
 
@@ -113,7 +110,7 @@ describe('AuthCallback', () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     await create({ code: 'abc', state: 'st' });
-    expect(auth.completeSignIn).toHaveBeenCalledWith({ code: 'abc', state: 'st' });
+    expect(auth.completeSignIn).toHaveBeenCalledWith({ code: 'abc', state: 'st' }, false);
     expect(navigate).toHaveBeenCalledWith('/expenses', { replaceUrl: true });
   });
 
