@@ -10,16 +10,28 @@ import { serializeSession, SESSION_STORAGE_KEY, type AuthSession } from './auth-
 import { Component } from '@angular/core';
 
 function validSession(): AuthSession {
-  return { idToken: 'id', accessToken: 'access', expiresAt: Date.now() + 3_600_000 };
+  return {
+    idToken: 'id',
+    accessToken: 'access',
+    persistent: true,
+    sessionExpiresAt: '2099-01-01T00:00:00Z',
+    refreshedAt: Date.now(),
+    expiresAt: Date.now() + 3_600_000,
+  };
 }
 
-const auth = { isAuthenticated: vi.fn(() => false) };
+const auth = {
+  isAuthenticated: vi.fn(() => false),
+  ensureSession: vi.fn(async () => false),
+  hasPendingSignIn: () => false,
+};
 
 @Component({ template: '', standalone: true })
 class DummyRoute {}
 
 beforeEach(() => {
   auth.isAuthenticated.mockReturnValue(false);
+  auth.ensureSession.mockResolvedValue(false);
   localStorage.removeItem(SESSION_STORAGE_KEY);
   TestBed.configureTestingModule({
     providers: [
@@ -35,14 +47,17 @@ beforeEach(() => {
 describe('authGuard', () => {
   it('lets authenticated users through', async () => {
     auth.isAuthenticated.mockReturnValue(true);
-    const guard = TestBed.runInInjectionContext(() => authGuard({} as never, { url: '/' } as never));
+    auth.ensureSession.mockResolvedValue(true);
+    const guard = await TestBed.runInInjectionContext(() =>
+      authGuard({} as never, { url: '/' } as never),
+    );
     expect(guard).toBe(true);
   });
 
-  it('redirects unauthenticated visitors to /signin with the original URL as returnUrl', () => {
-    const guard = TestBed.runInInjectionContext(() =>
+  it('redirects unauthenticated visitors to /signin with the original URL as returnUrl', async () => {
+    const guard = (await TestBed.runInInjectionContext(() =>
       authGuard({} as never, { url: '/expenses?month=1' } as never),
-    ) as UrlTree;
+    )) as UrlTree;
     expect(guard.toString()).toContain('/signin');
     expect(guard.queryParams['returnUrl']).toBe('/expenses?month=1');
   });
@@ -61,17 +76,19 @@ describe('authGuard', () => {
 });
 
 describe('signedInGuard (issue #36)', () => {
-  it('redirects an already-authenticated user to the app root', () => {
+  it('redirects an already-authenticated user to the app root', async () => {
     auth.isAuthenticated.mockReturnValue(true);
-    const guard = TestBed.runInInjectionContext(() =>
+    auth.ensureSession.mockResolvedValue(true);
+    const guard = (await TestBed.runInInjectionContext(() =>
       signedInGuard({} as never, { url: '/signin' } as never),
-    ) as UrlTree;
+    )) as UrlTree;
     expect(guard.toString()).toBe('/');
   });
 
-  it('lets unauthenticated visitors through', () => {
+  it('lets unauthenticated visitors through', async () => {
     auth.isAuthenticated.mockReturnValue(false);
-    const guard = TestBed.runInInjectionContext(() =>
+    auth.ensureSession.mockResolvedValue(false);
+    const guard = await TestBed.runInInjectionContext(() =>
       signedInGuard({} as never, { url: '/signin' } as never),
     );
     expect(guard).toBe(true);

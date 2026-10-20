@@ -12,7 +12,7 @@ import { ExpensesRouteReuseStrategy } from '../../../core/route-reuse/expenses-r
 
 afterEach(() => { vi.restoreAllMocks(); localStorage.removeItem(SESSION_STORAGE_KEY); });
 it('restores remembered list scroll after returning from an edit and refreshing latest', async () => {
-  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'stub', accessToken: 'stub', expiresAt: Date.now() + 3600000 }));
+  localStorage.setItem(SESSION_STORAGE_KEY, serializeSession({ idToken: 'stub', accessToken: 'stub', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3600000 }));
   TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter(routes), { provide: RouteReuseStrategy, useExisting: ExpensesRouteReuseStrategy }, { provide: APP_ENVIRONMENT, useValue: { apiBaseUrl: 'https://api.test' } }] });
   const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
   vi.spyOn(window, 'scrollY', 'get').mockReturnValue(320);

@@ -11,6 +11,7 @@ import { BankPage } from './features/bank/pages/bank-page';
 import { authGuard, signedInGuard } from './core/auth/auth-guard';
 
 export const routes: Routes = [
+  { path: 'auth/renew', component: AuthCallback, data: { renew: true }, title: 'Guito · Reconnecting' },
   {
     // Shell chrome (header/nav/footer) wraps the app screens; auth routes render bare.
     path: '',
@@ -54,14 +55,14 @@ export const routes: Routes = [
       {
         path: 'expenses/:id/edit',
         component: EditExpensePage,
-        canDeactivate: [(page: EditExpensePage) => page.canLeave()],
+        canDeactivate: [(page: EditExpensePage, _route, _state, next) => isAuthRecovery(next?.url) || page.canLeave()],
         title: 'Guito · Edit Expense',
       },
       {
         path: 'expenses/create',
         runGuardsAndResolvers: 'paramsOrQueryParamsChange',
         component: CreateExpensePage,
-        canDeactivate: [(page: CreateExpensePage) => page.canLeave()],
+        canDeactivate: [(page: CreateExpensePage, _route, _state, next) => isAuthRecovery(next?.url) || page.canLeave()],
         title: 'Guito · Create Expense',
       },
     ],
@@ -84,3 +85,7 @@ export const routes: Routes = [
   // Unknown URLs redirect to '' which is auth-gated itself — the guard still applies.
   { path: '**', redirectTo: '' },
 ];
+
+function isAuthRecovery(url: string | undefined): boolean {
+  return url?.split('?')[0] === '/signin' || url?.split('?')[0] === '/auth/renew';
+}

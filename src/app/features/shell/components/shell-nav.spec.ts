@@ -11,7 +11,7 @@ const LIVE_SESSION = {
     JSON.stringify({ email: 'jane.doe@example.com', name: 'Jane Doe' }),
   )}.sig`,
   accessToken: 'access-token',
-  expiresAt: Date.now() + 60 * 60 * 1000,
+  persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 60 * 60 * 1000,
 };
 
 function setup(session: object | null) {

@@ -28,7 +28,7 @@ describe('CreateExpensePage — bank create-and-match (#135) and shared prefill 
     localStorage.removeItem(SESSION_STORAGE_KEY);
     localStorage.setItem(
       SESSION_STORAGE_KEY,
-      serializeSession({ idToken: 'id-token', accessToken: 'access', expiresAt: Date.now() + 3_600_000 }),
+      serializeSession({ idToken: 'id-token', accessToken: 'access', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3_600_000 }),
     );
     TestBed.configureTestingModule({
       providers: [

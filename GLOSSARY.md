@@ -1,5 +1,7 @@
 # Context & Glossary (guito-ui)
 
+- **User session** — independent browser/device server-managed cookie capability with seven-day inactivity expiry; renews short-lived Google tokens but is not business authorization or a new multi-user model. See [ADR 0016](docs/adr/0016-persistent-user-login.md).
+
 - **Expense occurrence** — the purchase instant (`bookingDate`), distinct from creation/update audit dates. Editable Date/Time use Europe/Lisbon; new expenses default to now, not historical-import midnight. Known offset prefills retain their instant; DST gaps/folds are validated (ADR 0014).
 - **Expense ID** — immutable positive numeric Int32 backend identity, distinct from the bank transaction Int64 identity normalized to text. Digit-only legacy strings adapt at the HTTP boundary; missing/invalid IDs remain null and cannot open an editor. List position, description and `storedOrder` never identify an expense or a reconciliation reference.
 - **Expense revision** — API decimal Int64 revision string with a strong quoted ETag. Edit/delete send the received ETag unchanged as `If-Match`; a stale token yields 412.

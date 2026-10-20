@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { SESSION_KEY } from './helpers/stub-auth';
 
-const allowedHeaders = ['authorization', 'content-type', 'if-match', 'x-api-key', 'x-google-idtoken'];
+const allowedHeaders = ['authorization', 'content-type', 'if-match', 'x-api-key', 'x-google-idtoken', 'x-guito-session'];
 const detail = { id: 7, amount: '-65.5500', description: 'Hermetic CORS expense', category: 'Groceries', bookingDate: '2026-07-02T14:23:45.123456+01:00', currency: 'EUR', revision: '1' };
 
 async function listen(server: Server): Promise<string> {
@@ -26,20 +26,31 @@ test('native cross-origin policy blocks the old header but loads Edit Expense wi
   const preflights: string[][] = [];
   const reads: Record<string, string | string[] | undefined>[] = [];
   let writes = 0;
+  let trustedOrigin = '';
+  let sessionRefreshes = 0;
   const api = createServer((req, res) => {
     if (req.method === 'OPTIONS') {
       const requested = String(req.headers['access-control-request-headers'] ?? '').toLowerCase().split(',').map(header => header.trim()).filter(Boolean);
       preflights.push(requested);
-      if (requested.every(header => allowedHeaders.includes(header))) {
-        res.setHeader('Access-Control-Allow-Origin', '*');
+      if (req.headers.origin === trustedOrigin && requested.every(header => allowedHeaders.includes(header))) {
+        res.setHeader('Access-Control-Allow-Origin', trustedOrigin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Access-Control-Allow-Methods', 'DELETE,GET,OPTIONS,POST,PUT');
         res.setHeader('Access-Control-Allow-Headers', allowedHeaders.join(','));
       }
       res.writeHead(204).end();
       return;
     }
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', trustedOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/Auth/session/refresh' && req.method === 'POST') {
+      expect(req.headers.origin).toBe(trustedOrigin);
+      expect(req.headers['x-guito-session']).toBe('1');
+      expect(req.headers['content-type']).toBe('application/json');
+      sessionRefreshes++;
+      res.end(JSON.stringify({ idToken: 'stub', accessToken: 'stub', expiresIn: 3600, sessionExpiresAt: '2099-01-01T00:00:00Z' })); return;
+    }
     if (req.method !== 'GET') { writes++; res.writeHead(405).end('{}'); return; }
     if (req.url === '/Expense/7') {
       reads.push(req.headers);
@@ -78,6 +89,7 @@ test('native cross-origin policy blocks the old header but loads Edit Expense wi
     } catch { res.writeHead(500).end(); }
   });
   const appOrigin = await listen(app);
+  trustedOrigin = appOrigin;
   try {
     await page.goto(`${appOrigin}/cors-probe`);
     const oldRequest = await page.evaluate(async origin => {
@@ -90,7 +102,7 @@ test('native cross-origin policy blocks the old header but loads Edit Expense wi
     expect(preflights).toEqual([['authorization', 'cache-control', 'x-google-idtoken']]);
     expect(reads).toHaveLength(0); // Chromium blocked GET before it reached HTTP.
 
-    await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub', accessToken: 'stub', expiresAt: Date.now() + 3600000 })), SESSION_KEY);
+    await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'stub', accessToken: 'stub', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: 1, expiresAt: Date.now() + 3600000 })), SESSION_KEY);
     await page.goto(`${appOrigin}/expenses/7/edit`);
     await expect(page.locator('input[id$="-description"]:visible')).toHaveValue(detail.description);
     await expect(page.locator('input[id$="-amount"]:visible')).toHaveValue('-65,5500');
@@ -103,6 +115,8 @@ test('native cross-origin policy blocks the old header but loads Edit Expense wi
     expect(reads[0]['cache-control']).toBeUndefined();
     expect(preflights.slice(1)).toContainEqual(['authorization', 'x-google-idtoken']);
     for (const requested of preflights.slice(1)) expect(requested.every(header => allowedHeaders.includes(header))).toBe(true);
+    expect(sessionRefreshes).toBe(1);
+    expect(preflights).toContainEqual(['content-type', 'x-guito-session']);
     expect(writes).toBe(0);
   } finally {
     await close(app);

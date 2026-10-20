@@ -30,12 +30,18 @@ test.describe('sign-in flow (stubbed Google OAuth + token exchange, guito-api#51
     await stubExpensesApi(page);
 
     const popupPromise = page.context().waitForEvent('page');
+    // Observe navigation before clicking: the callback may close its popup
+    // before a post-hoc URL assertion can inspect a live page.
+    const callbackNavigation = page.context().waitForEvent('request', request =>
+      request.isNavigationRequest() && request.url().startsWith(`${appOrigin}/auth/callback?`));
     await page.getByTestId('signin-button').click();
     const popup = await popupPromise;
 
     // The popup lands on the app's /auth/callback (after the stubbed Google
-    // bounce), posts the code to the opener and closes itself.
-    await expect(popup).toHaveURL(new RegExp(`^${appOrigin}/auth/callback`), { timeout: 10_000 });
+    // bounce), posts the code to the opener; the opener closes it after acceptance.
+    const callbackRequest = await callbackNavigation;
+    expect(new URL(callbackRequest.url()).origin).toBe(appOrigin);
+    expect(new URL(callbackRequest.url()).pathname).toBe('/auth/callback');
     await expect.poll(() => popup.isClosed(), { timeout: 10_000 }).toBe(true);
 
     // The MAIN window never navigated to Google: it is straight on the list.

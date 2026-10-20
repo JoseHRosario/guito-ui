@@ -24,7 +24,7 @@ async function seedSession(page: Page): Promise<void> {
   await page.addInitScript((key) => {
     localStorage.setItem(
       key,
-      JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', expiresAt: Date.now() + 3_600_000 }),
+      JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3_600_000 }),
     );
   }, SESSION_KEY);
 }

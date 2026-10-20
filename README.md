@@ -6,6 +6,20 @@ The web frontend of **Guito**, a personal expense tracker: control expenses and 
 
 > Status: the auth-gated app, latest expenses, create/voice/favorites and Bank/Settings flows are implemented. Issue guito-api#128 adds editable native Time beside Date from the approved canonical frames, Lisbon occurrence timestamps and numeric expense IDs. Production now enables the existing timestamp capability after the approved guito-api#132 Postgres cutover (fix guito-api#145); dev/staging settings are unchanged. All create paths send `bookingDate`, and exact decimal strings preserve POST/prefill precision. Production release and an owner-confirmed genuine save remain merge/deploy verification gates; see [ADR 0014](docs/adr/0014-expense-occurrence-lisbon.md).
 
+## Persistent user login (guito-api#156)
+
+Version 0.12.0 adds cookie-backed foreground token renewal, server-authoritative
+seven-day inactivity expiry and device-only logout. Existing installations need
+one fresh identity-only Google consent/login. Temporary renewal failures offer
+Retry; definitive expiry restores the requested route after login, without
+preserving drafts or replaying financial writes. Business calls still use both
+Google ID-token headers. See [ADR 0016](docs/adr/0016-persistent-user-login.md)
+and the [runbook/live gates](docs/persistent-login-runbook.md).
+
+This is local source functionality, not a staging/production or genuine Android
+acceptance claim. Paired API rollout, credentials, live Google cookie/CORS and
+owner-approved Android close/restart acceptance remain separate gates.
+
 ## Bank review (#133–#135)
 
 Bank opens on **All** with every transaction collapsed. Clicking a row (or

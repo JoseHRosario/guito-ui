@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { ServiceStartingError } from '../../../core/auth/service-starting-error';
 import {
   AUTH_POPUP_HANDOFF,
   AuthError,
@@ -20,7 +21,15 @@ import {
       <div class="flex min-h-dvh items-center justify-center p-6" data-testid="auth-error">
         <div class="card w-full max-w-sm bg-base-100 shadow">
           <div class="card-body">
-            <h2 class="card-title text-error">Sign-in failed</h2>
+            <h2 class="card-title text-error">
+              {{
+                serviceStarting()
+                  ? 'Service starting'
+                  : renew()
+                    ? 'Session renewal failed'
+                    : 'Sign-in failed'
+              }}
+            </h2>
             <p>{{ err }}</p>
             <div class="card-actions justify-end">
               <button class="btn btn-primary" type="button" (click)="retry()">Try again</button>
@@ -35,41 +44,73 @@ import {
     }
   `,
 })
-
 export class AuthCallback {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   /** Query params bound via withComponentInputBinding (defaults per AGENTS rule). */
+  readonly renew = input(false);
+  readonly returnUrl = input<string>('/');
   readonly code = input<string>('');
   readonly state = input<string>('');
   readonly error = input<string>('');
+  /** Popup failed in the opener: render only; never exchange again on entry. */
+  readonly sessionError = input<string>('');
 
   readonly message = signal('');
+  readonly serviceStarting = signal(false);
 
   private started = false;
 
   constructor() {
     // Runs once when the router-bound query params land (code/state or error).
     effect(() => {
+      if (this.renew()) {
+        if (!this.started) {
+          this.started = true;
+          void this.resume();
+        }
+        return;
+      }
       if (this.code() === '' && this.error() === '') return;
       if (this.started) return;
       this.started = true;
+      if (this.sessionError()) {
+        const starting = this.sessionError() === 'service_starting';
+        this.serviceStarting.set(starting);
+        this.message.set(
+          starting
+            ? 'The service is starting. Please try again.'
+            : this.sessionError() === 'timeout'
+              ? 'Sign-in timed out. The service may be unavailable. Please try again.'
+              : this.sessionError() === 'connectivity'
+                ? 'Could not reach the token exchange endpoint. Please restart with Google.'
+                : 'Sign-in failed. Please restart with Google.',
+        );
+        return;
+      }
       void this.complete();
     });
   }
 
-  async complete(): Promise<void> {
+  async complete(manualRetry = false): Promise<void> {
+    this.message.set('');
+    this.serviceStarting.set(false);
     if (this.handoffToOpener()) return;
     if (this.error()) {
       this.message.set(`Google sign-in failed: ${this.error()}`);
       return;
     }
     try {
-      const returnUrl = this.safeReturnUrl(await this.auth.completeSignIn({
-        code: this.code(),
-        state: this.state(),
-      }));
+      const returnUrl = this.safeReturnUrl(
+        await this.auth.completeSignIn(
+          {
+            code: this.code(),
+            state: this.state(),
+          },
+          manualRetry,
+        ),
+      );
       await this.router.navigateByUrl(returnUrl, { replaceUrl: true });
     } catch (cause) {
       if (cause instanceof StaleSignInError) {
@@ -80,8 +121,11 @@ export class AuthCallback {
         await this.router.navigateByUrl('/signin', { replaceUrl: true });
         return;
       }
+      this.serviceStarting.set(cause instanceof ServiceStartingError);
       this.message.set(
-        cause instanceof AuthError ? cause.message : 'Sign-in failed — please try again.',
+        cause instanceof AuthError || cause instanceof ServiceStartingError
+          ? cause.message
+          : 'Sign-in failed — please try again.',
       );
     }
   }
@@ -89,7 +133,7 @@ export class AuthCallback {
   /**
    * Popup-mode branch: this page is running inside the sign-in popup, so it
    * doesn't exchange anything — it posts the code back to the opener (the
-   * main window validates origin + source) and closes itself. Returns true
+   * main window validates origin + source) and the opener closes it after acceptance. Returns true
    * when the handoff was performed.
    */
   private handoffToOpener(): boolean {
@@ -104,12 +148,53 @@ export class AuthCallback {
       },
       location.origin,
     );
-    window.close();
+    // The opener closes after consuming the handoff. Closing here races its
+    // abandoned-popup poll against queued postMessage delivery under load.
     return true;
   }
 
-  retry(): void {
-    void this.auth.signIn('/');
+  async retry(): Promise<void> {
+    if (this.renew()) {
+      await this.resume();
+      return;
+    }
+    if (this.serviceStarting()) {
+      await this.complete(true);
+      return;
+    }
+    try {
+      const target = await this.auth.signIn(this.safeReturnUrl(this.auth.pendingReturnUrl()));
+      if (target !== undefined)
+        await this.router.navigateByUrl(this.safeReturnUrl(target), { replaceUrl: true });
+    } catch (cause) {
+      this.message.set(
+        cause instanceof AuthError || cause instanceof ServiceStartingError
+          ? cause.message
+          : 'Sign-in failed — please try again.',
+      );
+    }
+  }
+
+  private async resume(): Promise<void> {
+    this.message.set('');
+    this.serviceStarting.set(false);
+    const target = this.safeReturnUrl(this.returnUrl() ?? '/');
+    try {
+      if (await this.auth.ensureSession())
+        await this.router.navigateByUrl(target, { replaceUrl: true });
+      else
+        await this.router.navigate(['/signin'], {
+          queryParams: { returnUrl: target },
+          replaceUrl: true,
+        });
+    } catch (cause) {
+      this.serviceStarting.set(cause instanceof ServiceStartingError);
+      this.message.set(
+        cause instanceof AuthError || cause instanceof ServiceStartingError
+          ? cause.message
+          : 'Could not renew your session. Please try again.',
+      );
+    }
   }
 
   /** Only navigate to relative paths — an absolute/foreign returnUrl is an open-redirect vector. */
@@ -117,4 +202,3 @@ export class AuthCallback {
     return url.startsWith('/') && !url.startsWith('//') ? url : '/';
   }
 }
-

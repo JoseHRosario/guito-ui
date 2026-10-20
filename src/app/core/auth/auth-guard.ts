@@ -2,28 +2,27 @@ import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth-service';
 
-/**
- * Inverse gate for the bare auth routes (`/signin`, `/auth/callback`): an
- * already-authenticated visitor is bounced to the app root instead of seeing
- * the sign-in screen or re-running a spent authorization-code exchange
- * (issue #36 — stale callback entries in history, incl. PWA cold start).
- */
-export const signedInGuard: CanActivateFn = () => {
+/** Do not renew while a new PKCE exchange is pending. */
+export const signedInGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  return auth.isAuthenticated() ? router.parseUrl('/') : true;
+  if (state.url.startsWith('/auth/callback') && auth.hasPendingSignIn()) return true;
+  try {
+    return (await auth.ensureSession()) ? router.parseUrl('/') : true;
+  } catch {
+    return router.createUrlTree(['/auth/renew'], { queryParams: { returnUrl: '/' } });
+  }
 };
 
-/**
- * ADR-0011: every route is auth-gated. Unauthenticated visits redirect to
- * `/signin?returnUrl=<original url>`; the sign-in flow restores the original
- * destination after the OAuth callback lands.
- */
-export const authGuard: CanActivateFn = (_route, state) => {
+/** Only a definitive session failure requires Google login. */
+export const authGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  if (auth.isAuthenticated()) {
-    return true;
+  try {
+    return (await auth.ensureSession())
+      ? true
+      : router.createUrlTree(['/signin'], { queryParams: { returnUrl: state.url } });
+  } catch {
+    return router.createUrlTree(['/auth/renew'], { queryParams: { returnUrl: state.url } });
   }
-  return router.createUrlTree(['/signin'], { queryParams: { returnUrl: state.url } });
 };

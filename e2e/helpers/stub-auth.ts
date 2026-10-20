@@ -3,7 +3,7 @@ import { expect, test, type BrowserContext, type Page, type Route } from '@playw
 /**
  * Shared stubs for the sign-in flow e2e (guito-api#51 + deployed smoke):
  * no real Google round-trip — the authorize navigation is intercepted and
- * bounced back to /auth/callback with a fake code, and POST /Auth/token
+ * bounced back to /auth/callback with a fake code, and POST /Auth/session/token
  * returns stubbed tokens while asserting the exchange contract.
  */
 
@@ -37,7 +37,12 @@ export async function stubExpensesApi(page: Page | BrowserContext): Promise<void
 export async function stubGoogleAuthorize(page: Page | BrowserContext, appOrigin: string): Promise<void> {
   await page.route('**/accounts.google.com/**', (route: Route) => {
     // Echo the state the app generated so the CSRF check passes end-to-end.
-    const state = new URL(route.request().url()).searchParams.get('state') ?? '';
+    const params = new URL(route.request().url()).searchParams;
+    expect(params.get('scope')).toBe('openid email profile');
+    expect(params.get('access_type')).toBe('offline');
+    expect(params.get('prompt')).toBe('consent');
+    expect(params.has('include_granted_scopes')).toBe(false);
+    const state = params.get('state') ?? '';
     route.fulfill({
       status: 200,
       contentType: 'text/html',
@@ -55,7 +60,8 @@ interface TokenRequestBody {
 }
 
 export async function stubTokenExchange(page: Page | BrowserContext): Promise<void> {
-  await page.route('**/Auth/token', async (route: Route) => {
+  await stubSessionRefresh(page);
+  await page.route('**/Auth/session/token', async (route: Route) => {
     const request = route.request();
     if (request.method() !== 'POST') {
       await route.fulfill({ status: 405, body: 'method not allowed' });
@@ -64,6 +70,8 @@ export async function stubTokenExchange(page: Page | BrowserContext): Promise<vo
     try {
       // Guard the exchange contract: the stubbed code + a real PKCE verifier
       // (RFC 7636: 43–128 chars) arrive, with the app's callback redirect_uri.
+      expect(request.headers()['x-guito-session']).toBe('1');
+      expect(request.headers()['content-type']).toContain('application/json');
       const body = request.postDataJSON() as TokenRequestBody;
       expect(body.code).toBe(E2E_AUTH_CODE);
       expect(body.codeVerifier.length).toBeGreaterThanOrEqual(43);
@@ -81,7 +89,7 @@ export async function stubTokenExchange(page: Page | BrowserContext): Promise<vo
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', expiresIn: 3600 }),
+      body: JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', expiresIn: 3600, sessionExpiresAt: '2099-01-01T00:00:00Z' }),
     });
   });
 }
@@ -124,4 +132,20 @@ export async function stubbedSignInFlow(page: Page): Promise<void> {
     SESSION_KEY,
   );
   expect(session).toMatchObject({ idToken: 'e2e-id', accessToken: 'e2e-access' });
+}
+
+/** Hermetic renewal transport; no cookie or Google grant is invented as live evidence. */
+export async function stubSessionRefresh(page: Page | BrowserContext, idToken = 'e2e-id', accessToken = 'e2e-access'): Promise<void> {
+  await page.route('**/Auth/session/refresh', route => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-guito-session']).toBe('1');
+    expect(route.request().postDataJSON()).toEqual({});
+    return route.fulfill({ json: { idToken, accessToken, expiresIn: 3600, sessionExpiresAt: '2099-01-01T00:00:00Z' } });
+  });
+  await page.route('**/Auth/session/logout', route => {
+    expect(route.request().method()).toBe('POST');
+    expect(route.request().headers()['x-guito-session']).toBe('1');
+    expect(route.request().postDataJSON()).toEqual({});
+    return route.fulfill({ status: 204 });
+  });
 }

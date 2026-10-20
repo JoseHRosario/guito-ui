@@ -21,7 +21,7 @@ const bankBody = (value: unknown) => JSON.stringify(value).replaceAll(`"id":"${I
 async function transport(page: Page) {
   let rows = structuredClone(initial);
   const writes: string[] = [];
-  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', expiresAt: Date.now() + 3600000 })), SESSION_KEY);
+  await page.addInitScript(key => localStorage.setItem(key, JSON.stringify({ idToken: 'e2e-id', accessToken: 'e2e-access', persistent: true, sessionExpiresAt: '2099-01-01T00:00:00Z', refreshedAt: Date.now(), expiresAt: Date.now() + 3600000 })), SESSION_KEY);
   // Catch every financial request: a forgotten fake can never fall through to live API.
   await page.route('**/Expense**', route => route.fulfill({ status: 501, body: 'Unconfigured Expense transport' }));
   await page.route('**/BankTransaction**', route => route.fulfill({ status: 501, body: 'Unconfigured Bank transport' }));

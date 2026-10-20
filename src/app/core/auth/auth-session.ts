@@ -6,6 +6,10 @@ export interface AuthSession {
   accessToken: string;
   /** Epoch ms when the token set expires (Google ~1h). */
   expiresAt: number;
+  /** Only a successful cookie-session exchange establishes persistent login. */
+  persistent?: boolean;
+  sessionExpiresAt?: string;
+  refreshedAt?: number;
 }
 
 /**
